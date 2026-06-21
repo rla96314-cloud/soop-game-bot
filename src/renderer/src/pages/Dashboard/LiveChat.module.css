@@ -146,3 +146,15 @@
   color: var(--text3);
   font-family: 'Inter', sans-serif;
 }
+
+.empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.balloonRow {
+  background: var(--gold-bg);
+}
+.balloonRow:hover { background: #FEF3C7; }

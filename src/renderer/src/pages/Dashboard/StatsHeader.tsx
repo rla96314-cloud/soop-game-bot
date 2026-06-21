@@ -1,12 +1,12 @@
-import { useState } from 'react'
+import { useApp } from '../../contexts/AppContext'
 import styles from './StatsHeader.module.css'
 
 export default function StatsHeader() {
-  const [darkMode, setDarkMode] = useState(false)
+  const { connected, simulation, stats } = useApp()
 
   return (
     <header className={styles.header}>
-      {/* Connection */}
+      {/* Connection status */}
       <div className={styles.connCard}>
         <div className={styles.connIcon}>
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
@@ -20,51 +20,20 @@ export default function StatsHeader() {
         <div>
           <div className={styles.connLabel}>SOOP 연동 상태</div>
           <div className={styles.connStatus}>
-            <span className={styles.dot} />
-            연결됨
+            <span className={styles.dot} style={{ background: connected ? '#10B981' : '#EF4444' }} />
+            {connected ? (simulation ? '시뮬레이션 중' : '연결됨') : '연결 끊김'}
           </div>
         </div>
       </div>
 
       {/* Stats */}
-      <StatCard
-        label="오늘 실행 횟수"
-        value="32"
-        delta="+9%"
-        icon={<BarIcon />}
-      />
-      <StatCard
-        label="참여 시청자 수"
-        value="289"
-        delta="+11%"
-        icon={<PeopleIcon />}
-      />
-      <StatCard
-        label="소모 별풍선"
-        value="12,450"
-        delta="+7%"
-        icon={<StarIcon />}
-        valueColor="var(--gold)"
-      />
-      <StatCard
-        label="누적 실행 횟수"
-        value="987"
-        icon={<CrownIcon />}
-      />
+      <StatCard label="오늘 실행 횟수"  value={stats.todayRuns.toLocaleString()}      delta={undefined} icon={<BarIcon />} />
+      <StatCard label="참여 시청자 수"  value={stats.todayViewers.toLocaleString()}    delta={undefined} icon={<PeopleIcon />} />
+      <StatCard label="소모 별풍선"     value={stats.todayBalloons.toLocaleString()}   delta={undefined} icon={<StarIcon />} valueColor="var(--gold)" />
+      <StatCard label="누적 실행 횟수"  value={stats.todayRuns.toLocaleString()}       delta={undefined} icon={<CrownIcon />} />
 
       <div className={styles.actions}>
-        <button className={styles.iconBtn} title="알림">
-          🔔
-          <span className={styles.notifDot} />
-        </button>
-        <button
-          className={styles.iconBtn}
-          onClick={() => setDarkMode(d => !d)}
-          title="다크모드"
-        >
-          {darkMode ? '☀️' : '🌙'}
-        </button>
-        <button className={styles.runBtn}>
+        <button className={styles.runBtn} onClick={() => {}}>
           ▶ 수동 실행
         </button>
       </div>
@@ -72,14 +41,8 @@ export default function StatsHeader() {
   )
 }
 
-function StatCard({
-  label, value, delta, icon, valueColor
-}: {
-  label: string
-  value: string
-  delta?: string
-  icon: React.ReactNode
-  valueColor?: string
+function StatCard({ label, value, delta, icon, valueColor }: {
+  label: string; value: string; delta?: string; icon: React.ReactNode; valueColor?: string
 }) {
   return (
     <div className={styles.stat}>
@@ -104,7 +67,6 @@ function BarIcon() {
     </svg>
   )
 }
-
 function PeopleIcon() {
   return (
     <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
@@ -115,7 +77,6 @@ function PeopleIcon() {
     </svg>
   )
 }
-
 function StarIcon() {
   return (
     <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
@@ -124,7 +85,6 @@ function StarIcon() {
     </svg>
   )
 }
-
 function CrownIcon() {
   return (
     <svg width="28" height="28" viewBox="0 0 24 24" fill="none">

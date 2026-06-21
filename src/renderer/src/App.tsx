@@ -1,7 +1,11 @@
 import { useState } from 'react'
+import { AppProvider } from './contexts/AppContext'
 import Sidebar from './components/Sidebar'
 import TitleBar from './components/TitleBar'
 import Dashboard from './pages/Dashboard'
+import Settings from './pages/Settings'
+import GamesPage from './pages/Games'
+import OverlayPage from './pages/Overlay'
 import styles from './App.module.css'
 
 export type Page = 'dashboard' | 'chat' | 'games' | 'overlay' | 'history' | 'settings' | 'help'
@@ -10,20 +14,25 @@ export default function App() {
   const [page, setPage] = useState<Page>('dashboard')
 
   return (
-    <div className={styles.shell}>
-      <TitleBar />
-      <div className={styles.body}>
-        <Sidebar current={page} onChange={setPage} />
-        <main className={styles.main}>
-          {page === 'dashboard' && <Dashboard />}
-          {page !== 'dashboard' && (
-            <div className={styles.placeholder}>
-              <span className={styles.placeholderIcon}>🚧</span>
-              <p>준비 중인 페이지입니다</p>
-            </div>
-          )}
-        </main>
+    <AppProvider>
+      <div className={styles.shell}>
+        <TitleBar />
+        <div className={styles.body}>
+          <Sidebar current={page} onChange={setPage} />
+          <main className={styles.main}>
+            {page === 'dashboard' && <Dashboard />}
+            {page === 'games'     && <GamesPage />}
+            {page === 'overlay'   && <OverlayPage />}
+            {page === 'settings'  && <Settings />}
+            {(page === 'chat' || page === 'history' || page === 'help') && (
+              <div className={styles.placeholder}>
+                <span className={styles.placeholderIcon}>🚧</span>
+                <p>준비 중인 페이지입니다</p>
+              </div>
+            )}
+          </main>
+        </div>
       </div>
-    </div>
+    </AppProvider>
   )
 }

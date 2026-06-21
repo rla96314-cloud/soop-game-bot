@@ -1,50 +1,47 @@
 import { useState } from 'react'
+import { useApp } from '../../contexts/AppContext'
 import styles from './LiveChat.module.css'
 
-const CHAT_PAGES = [
-  [
-    { user: '도라이몽', amount: 1000, cmd: '룰렛 가자!', time: '14:22', avatar: '🐱' },
-    { user: '별하늘', amount: 500, cmd: '보스전 공략!!', time: '14:21', avatar: '⭐' },
-    { user: '게임사랑', amount: 100, cmd: '!퀴즈', time: '14:21', avatar: '🎮' },
-    { user: '행운아', amount: 300, cmd: '!뽑기', time: '14:20', avatar: '🍀' },
-    { user: '바다소년', amount: 200, cmd: '!사다리', time: '14:20', avatar: '🌊' },
-    { user: '랜더걸', amount: 1000, cmd: '대박 기원!', time: '14:19', avatar: '🎲' },
-    { user: '치킨좋아', amount: 100, cmd: '!슬롯', time: '14:19', avatar: '🍗' },
-  ],
-  [
-    { user: '하늘바람', amount: 500, cmd: '!룰렛', time: '14:18', avatar: '💨' },
-    { user: '달빛소녀', amount: 1500, cmd: '스핀 해줘!', time: '14:17', avatar: '🌙' },
-    { user: '코딩왕자', amount: 200, cmd: '!보스전', time: '14:17', avatar: '💻' },
-    { user: '수박좋아', amount: 300, cmd: '!뽑기', time: '14:16', avatar: '🍉' },
-    { user: '행복이', amount: 100, cmd: '!퀴즈', time: '14:15', avatar: '😊' },
-    { user: '마법사', amount: 700, cmd: '룰렛 부탁!', time: '14:14', avatar: '🧙' },
-    { user: '별빛', amount: 50, cmd: '!사다리', time: '14:13', avatar: '✨' },
-  ],
-]
+const AVATARS = ['🐱','⭐','🎮','🍀','🌊','🎲','🍗','💨','🌙','💻','🍉','😊','🧙','✨','🔥']
+const avatarFor = (user: string) => AVATARS[user.charCodeAt(0) % AVATARS.length]
+
+const PAGE_SIZE = 7
 
 export default function LiveChat() {
+  const { chat } = useApp()
   const [page, setPage] = useState(0)
-  const totalPages = CHAT_PAGES.length
-  const items = CHAT_PAGES[page]
+
+  const totalPages = Math.max(1, Math.ceil(chat.length / PAGE_SIZE))
+  const items = chat.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE)
+
+  const fmtTime = (ts: number) => {
+    const d = new Date(ts)
+    return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
+  }
 
   return (
     <div className={styles.card}>
       <div className={styles.header}>
         <span className={styles.title}>실시간 채팅 &amp; 후원</span>
-        <button className={styles.more}>더보기 ›</button>
+        <button className={styles.more} onClick={() => setPage(0)}>새로고침</button>
       </div>
 
       <div className={styles.list}>
+        {items.length === 0 && (
+          <div className={styles.empty}>SOOP 채팅 연결 대기 중...</div>
+        )}
         {items.map((item, i) => (
-          <div key={i} className={styles.row}>
-            <div className={styles.avatar}>{item.avatar}</div>
+          <div key={i} className={`${styles.row} ${item.isBalloon ? styles.balloonRow : ''}`}>
+            <div className={styles.avatar}>{avatarFor(item.user)}</div>
             <span className={styles.user}>{item.user}</span>
-            <div className={styles.balloon}>
-              <span className={styles.star}>⭐</span>
-              <span className={styles.amount}>{item.amount.toLocaleString()}</span>
-            </div>
-            <span className={styles.cmd}>{item.cmd}</span>
-            <span className={styles.time}>{item.time}</span>
+            {item.isBalloon && (
+              <div className={styles.balloon}>
+                <span className={styles.star}>⭐</span>
+                <span className={styles.amount}>{item.amount?.toLocaleString()}</span>
+              </div>
+            )}
+            <span className={styles.cmd}>{item.message}</span>
+            <span className={styles.time}>{fmtTime(item.ts)}</span>
           </div>
         ))}
       </div>

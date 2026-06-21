@@ -1,28 +1,36 @@
+import { useApp } from '../../contexts/AppContext'
 import styles from './RecentHistory.module.css'
 
-const HISTORY = [
-  { game: '룰렛', icon: '🎡', user: '도라이몽', balloon: 1000, result: '다이아몬드', time: '14:22:10', resultType: 'jackpot' },
-  { game: '보스전', icon: '👾', user: '별하늘', balloon: 2000, result: '5,678 데미지', time: '14:18:33', resultType: 'damage' },
-  { game: '사다리타기', icon: '🪜', user: '게임사랑', balloon: 500, result: '3번 사다리 당첨', time: '14:15:08', resultType: 'win' },
-  { game: '뽑기', icon: '🎁', user: '행운아', balloon: 300, result: '전설 등급 당첨', time: '14:10:21', resultType: 'legend' },
-  { game: '퀴즈', icon: '❓', user: '바다소년', balloon: 100, result: '정답!', time: '14:08:45', resultType: 'correct' },
-  { game: '슬롯머신', icon: '🎰', user: '랜더걸', balloon: 1000, result: 'JACKPOT!', time: '14:05:12', resultType: 'jackpot' },
-]
-
 const RESULT_COLORS: Record<string, string> = {
-  jackpot: '#F59E0B',
-  damage: '#EF4444',
-  win: '#8B5CF6',
-  legend: '#F59E0B',
-  correct: '#10B981',
+  jackpot:  '#F59E0B',
+  damage:   '#EF4444',
+  win:      '#8B5CF6',
+  legend:   '#F59E0B',
+  correct:  '#10B981',
+  default:  '#6B7280',
+}
+
+const colorFor = (result: string) => {
+  if (result.includes('JACKPOT') || result.includes('레전드')) return RESULT_COLORS.jackpot
+  if (result.includes('클리어') || result.includes('정답'))    return RESULT_COLORS.correct
+  if (result.includes('당첨'))                                  return RESULT_COLORS.win
+  if (result.includes('데미지'))                                return RESULT_COLORS.damage
+  return RESULT_COLORS.default
 }
 
 export default function RecentHistory() {
+  const { history } = useApp()
+
+  const fmtTime = (ts: number) => {
+    const d = new Date(ts)
+    return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}:${d.getSeconds().toString().padStart(2,'0')}`
+  }
+
   return (
     <div className={styles.card}>
       <div className={styles.header}>
         <span className={styles.title}>최근 실행 기록</span>
-        <button className={styles.more}>더보기 ›</button>
+        <span className={styles.count}>{history.length}개</span>
       </div>
       <table className={styles.table}>
         <thead>
@@ -35,35 +43,39 @@ export default function RecentHistory() {
           </tr>
         </thead>
         <tbody>
-          {HISTORY.map((h, i) => (
+          {history.length === 0 && (
+            <tr>
+              <td colSpan={5} className={styles.empty}>게임 기록 없음</td>
+            </tr>
+          )}
+          {history.map((h, i) => (
             <tr key={i}>
               <td>
                 <div className={styles.gameCell}>
-                  <span className={styles.gameIcon}>{h.icon}</span>
-                  {h.game}
+                  <span className={styles.gameIcon}>{h.gameIcon}</span>
+                  {h.gameName}
                 </div>
               </td>
               <td>
                 <div className={styles.userCell}>
                   <div className={styles.userDot} />
-                  {h.user}
+                  {h.triggeredBy}
                 </div>
               </td>
               <td>
-                <div className={styles.balloonCell}>
-                  <span>⭐</span>
-                  <span className={styles.balloonAmt}>{h.balloon.toLocaleString()}</span>
-                </div>
+                {h.balloon > 0 && (
+                  <div className={styles.balloonCell}>
+                    <span>⭐</span>
+                    <span className={styles.balloonAmt}>{h.balloon.toLocaleString()}</span>
+                  </div>
+                )}
               </td>
               <td>
-                <span
-                  className={styles.result}
-                  style={{ color: RESULT_COLORS[h.resultType] }}
-                >
+                <span className={styles.result} style={{ color: colorFor(h.result) }}>
                   {h.result}
                 </span>
               </td>
-              <td className={styles.timeCell}>{h.time}</td>
+              <td className={styles.timeCell}>{fmtTime(h.ts)}</td>
             </tr>
           ))}
         </tbody>

@@ -1,27 +1,28 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
+import { loadSettings }         from './store/settings'
+import { gameEngine }           from './games/engine'
+import { soopClient }           from './soop/client'
+import { overlayServer }        from './overlay/server'
+import { registerIpcHandlers }  from './ipc/handlers'
 
-const isDev = process.env['NODE_ENV'] === 'development' || !app.isPackaged
+const isDev = !app.isPackaged
 
-function createWindow(): void {
+function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
-    width: 1440,
-    height: 900,
-    minWidth: 1100,
-    minHeight: 700,
+    width: 1440, height: 900,
+    minWidth: 1100, minHeight: 700,
     show: false,
     frame: false,
     backgroundColor: '#F4F1FE',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
-      contextIsolation: true
-    }
+      contextIsolation: true,
+    },
   })
 
-  win.on('ready-to-show', () => {
-    win.show()
-  })
+  win.on('ready-to-show', () => win.show())
 
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
@@ -34,23 +35,46 @@ function createWindow(): void {
     win.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
+  // Window controls
   ipcMain.on('window:minimize', () => win.minimize())
-  ipcMain.on('window:maximize', () => {
-    if (win.isMaximized()) win.unmaximize()
-    else win.maximize()
-  })
-  ipcMain.on('window:close', () => win.close())
+  ipcMain.on('window:maximize', () => win.isMaximized() ? win.unmaximize() : win.maximize())
+  ipcMain.on('window:close',    () => win.close())
   ipcMain.handle('window:isMaximized', () => win.isMaximized())
+
+  return win
 }
 
 app.whenReady().then(() => {
   app.setAppUserModelId('com.soop.gamebot')
-  createWindow()
+
+  // Load settings → init engine
+  const settings = loadSettings()
+  gameEngine.init(settings)
+
+  // Start overlay server
+  overlayServer.start(settings.overlay.port ?? 3939)
+
+  // Create window
+  const win = createWindow()
+
+  // Register IPC
+  registerIpcHandlers(win)
+
+  // Auto-connect SOOP (simulation mode by default)
+  soopClient.connect({
+    channelId:  settings.soop.channelId,
+    userId:     settings.soop.userId,
+    token:      settings.soop.token,
+    simulation: settings.soop.simulationMode !== false,
+  })
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
 
 app.on('window-all-closed', () => {
+  soopClient.disconnect()
+  overlayServer.stop()
   if (process.platform !== 'darwin') app.quit()
 })

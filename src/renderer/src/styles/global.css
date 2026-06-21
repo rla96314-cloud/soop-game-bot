@@ -21,10 +21,12 @@
   --border2: #D6CFFA;
 
   /* Text */
-  --text:  #1E1B4B;
-  --text2: #4C4880;
-  --text3: #7B78A8;
-  --muted: #A09DC4;
+  --text:   #1E1B4B;
+  --text2:  #4C4880;
+  --text-2: #4C4880;
+  --text3:  #7B78A8;
+  --text-3: #7B78A8;
+  --muted:  #A09DC4;
 
   /* Semantic */
   --gold:  #F59E0B;

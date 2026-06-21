@@ -113,3 +113,16 @@
   font-family: 'Inter', sans-serif;
   white-space: nowrap;
 }
+
+.count {
+  font-size: 11px;
+  color: var(--text3);
+  font-family: 'Inter', sans-serif;
+}
+
+.empty {
+  text-align: center;
+  padding: 24px;
+  color: var(--muted);
+  font-size: 12px;
+}
