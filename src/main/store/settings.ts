@@ -33,6 +33,7 @@ export interface GameConfig {
 }
 
 export interface Settings {
+  user?: { id: string; name: string } | null
   soop: {
     channelId:          string
     userId:             string

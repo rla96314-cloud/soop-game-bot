@@ -31,3 +31,25 @@
 .placeholderIcon {
   font-size: 40px;
 }
+
+.splash {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.splashSpinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--p200);
+  border-top-color: var(--p500);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

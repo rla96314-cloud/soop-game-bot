@@ -3,6 +3,7 @@ import { gameEngine, type GameId } from '../games/engine'
 import { soopClient }              from '../soop/client'
 import { overlayServer }           from '../overlay/server'
 import { loadSettings, patchSettings, saveSettings } from '../store/settings'
+import { verifyUser, fetchAllowlist }               from '../auth/allowlist'
 
 export function registerIpcHandlers(win: BrowserWindow) {
   const send = (ch: string, ...args: unknown[]) => {
@@ -92,4 +93,23 @@ export function registerIpcHandlers(win: BrowserWindow) {
     todayBalloons: gameEngine.todayBalloons,
     todayViewers:  gameEngine.todayViewers.size,
   }))
+
+  // Auth (allowlist)
+  ipcMain.handle('auth:verify', async (_, id: string) => {
+    const result = await verifyUser(id)
+    if (result.ok && result.user) {
+      patchSettings({ user: result.user })
+    }
+    return result
+  })
+  ipcMain.handle('auth:getUser', () => loadSettings().user ?? null)
+  ipcMain.handle('auth:logout', () => {
+    patchSettings({ user: null })
+    return { ok: true }
+  })
+  ipcMain.handle('auth:recheck', async () => {
+    const s = loadSettings()
+    if (!s.user?.id) return { ok: false, error: '저장된 사용자 없음' }
+    return verifyUser(s.user.id)
+  })
 }

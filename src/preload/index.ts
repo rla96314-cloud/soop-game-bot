@@ -36,6 +36,12 @@ contextBridge.exposeInMainWorld('electron', {
   // Stats
   statsGet: () => ipcRenderer.invoke('stats:get'),
 
+  // Auth
+  authVerify:  (id: string) => ipcRenderer.invoke('auth:verify', id),
+  authGetUser: ()           => ipcRenderer.invoke('auth:getUser'),
+  authLogout:  ()           => ipcRenderer.invoke('auth:logout'),
+  authRecheck: ()           => ipcRenderer.invoke('auth:recheck'),
+
   // Event subscriptions
   onSoopConnected:    (cb: () => void)                        => on('soop:connected',    cb),
   onSoopDisconnected: (cb: () => void)                        => on('soop:disconnected', cb),
