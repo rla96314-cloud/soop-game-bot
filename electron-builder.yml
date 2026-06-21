@@ -1,0 +1,31 @@
+appId: com.soop.gamebot
+productName: SOOP Game Bot
+copyright: Copyright © 2025
+
+directories:
+  buildResources: resources
+  output: dist
+
+files:
+  - out/**/*
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: resources/icon.ico
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  installerIcon: resources/icon.ico
+  uninstallerIcon: resources/icon.ico
+  installerHeaderIcon: resources/icon.ico
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: SOOP Game Bot
+
+publish:
+  provider: github
+  releaseType: release

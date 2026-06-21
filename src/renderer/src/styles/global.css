@@ -1,0 +1,77 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Purple palette */
+  --p50:  #F5F3FF;
+  --p100: #EDE9FE;
+  --p200: #DDD6FE;
+  --p300: #C4B5FD;
+  --p400: #A78BFA;
+  --p500: #8B5CF6;
+  --p600: #7C3AED;
+  --p700: #6D28D9;
+
+  /* Surface */
+  --bg:      #F0EDFE;
+  --surface: #FFFFFF;
+  --surface2: #F8F7FF;
+  --border:  #E9E4FD;
+  --border2: #D6CFFA;
+
+  /* Text */
+  --text:  #1E1B4B;
+  --text2: #4C4880;
+  --text3: #7B78A8;
+  --muted: #A09DC4;
+
+  /* Semantic */
+  --gold:  #F59E0B;
+  --gold-bg: #FFFBEB;
+  --green: #10B981;
+  --green-bg: #ECFDF5;
+  --red:   #EF4444;
+  --red-bg: #FEF2F2;
+  --blue:  #3B82F6;
+  --blue-bg: #EFF6FF;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(109,40,217,0.06), 0 1px 2px rgba(109,40,217,0.04);
+  --shadow:    0 4px 16px rgba(109,40,217,0.08), 0 1px 4px rgba(109,40,217,0.05);
+  --shadow-lg: 0 8px 30px rgba(109,40,217,0.12), 0 2px 8px rgba(109,40,217,0.06);
+}
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'Noto Sans KR', -apple-system, 'Apple SD Gothic Neo', sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--p300); }
+
+button { font-family: inherit; cursor: pointer; border: none; outline: none; }
+input, select { font-family: inherit; outline: none; }
+
+/* Utility classes */
+.flex { display: flex; }
+.flex-col { display: flex; flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-2 { gap: 8px; }
+.gap-3 { gap: 12px; }
+.flex-1 { flex: 1; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.font-num { font-family: 'Inter', sans-serif; }

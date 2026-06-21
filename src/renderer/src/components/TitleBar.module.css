@@ -1,0 +1,70 @@
+.bar {
+  height: 32px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  -webkit-app-region: drag;
+}
+
+.drag {
+  flex: 1;
+  height: 100%;
+  -webkit-app-region: drag;
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+  padding: 0 12px;
+  -webkit-app-region: no-drag;
+}
+
+.btn {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--border2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s;
+  position: relative;
+}
+
+.btn:hover { background: var(--p300); }
+.closeBtn:hover { background: #FF5F57 !important; }
+
+.min, .max, .close {
+  display: none;
+  width: 6px;
+  height: 1px;
+  background: rgba(0,0,0,0.5);
+  position: absolute;
+}
+
+.btn:hover .min,
+.btn:hover .max,
+.btn:hover .close { display: block; }
+
+.max {
+  width: 5px;
+  height: 5px;
+  border: 1px solid rgba(0,0,0,0.5);
+  background: transparent;
+}
+
+.close {
+  width: 7px;
+  height: 1px;
+  transform: rotate(45deg);
+}
+.close::after {
+  content: '';
+  display: block;
+  width: 7px;
+  height: 1px;
+  background: rgba(0,0,0,0.5);
+  transform: rotate(90deg);
+}

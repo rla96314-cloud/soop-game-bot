@@ -1,0 +1,148 @@
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 16px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.more {
+  font-size: 11px;
+  color: var(--p500);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--p50);
+  transition: background 0.08s;
+}
+
+.row:hover { background: var(--p50); }
+.row:last-child { border-bottom: none; }
+
+.avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--p100);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.user {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text2);
+  min-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.balloon {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: var(--gold-bg);
+  border-radius: 5px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+
+.star { font-size: 10px; }
+
+.amount {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gold);
+  font-family: 'Inter', sans-serif;
+}
+
+.cmd {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.time {
+  font-size: 10px;
+  color: var(--muted);
+  flex-shrink: 0;
+  font-family: 'Inter', sans-serif;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.pageBtn {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--p50);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.12s;
+  font-family: inherit;
+}
+
+.pageBtn:hover:not(:disabled) {
+  background: var(--p100);
+  border-color: var(--p300);
+  color: var(--p600);
+}
+
+.pageBtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.pageInfo {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text3);
+  font-family: 'Inter', sans-serif;
+}

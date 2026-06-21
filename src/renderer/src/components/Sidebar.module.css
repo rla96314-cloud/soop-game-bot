@@ -1,0 +1,144 @@
+.sidebar {
+  width: 186px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  padding: 0 10px 16px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 6px 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+
+.logoIcon {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, var(--p500), var(--p700));
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 3px 10px rgba(124,58,237,0.35);
+}
+
+.logoText {
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: var(--text);
+  line-height: 1.1;
+}
+
+.logoSub {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--p500);
+  line-height: 1.2;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text3);
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.13s;
+  text-align: left;
+  width: 100%;
+}
+
+.navItem:hover:not(.active) {
+  background: var(--p50);
+  color: var(--text2);
+}
+
+.active {
+  background: var(--p600) !important;
+  color: #fff !important;
+  font-weight: 700;
+  box-shadow: 0 3px 10px rgba(124,58,237,0.3);
+}
+
+.navIcon {
+  font-size: 15px;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.navLabel { flex: 1; }
+
+.activeArrow {
+  font-size: 16px;
+  opacity: 0.7;
+}
+
+.spacer { flex: 1; }
+
+.user {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.user:hover { background: var(--p50); }
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--p400), var(--p600));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.userText { flex: 1; min-width: 0; }
+
+.userName {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.userRole {
+  font-size: 10px;
+  color: var(--text3);
+  margin-top: 1px;
+}
+
+.userArrow {
+  color: var(--muted);
+  font-size: 15px;
+}
