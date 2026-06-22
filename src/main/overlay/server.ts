@@ -797,7 +797,7 @@ function showResult(result, animType) {
   const txt = result.result
   if (animType === 'text') {
     if (tSlotOuter) tSlotOuter.style.display = 'none'
-    textRes.innerHTML = '<span class="t-res-inner"><span class="t-bar2"></span><span class="t-bar"></span>&nbsp;' + txt + '&nbsp;<span class="t-bar"></span><span class="t-bar2"></span></span>'
+    textRes.textContent = txt
     textRes.style.display = 'block'
   } else {
     wRes.textContent = txt; wRes.style.display = 'block'
