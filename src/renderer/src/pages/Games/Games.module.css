@@ -824,6 +824,118 @@
   line-height: 1.7;
 }
 
+/* ── Ladder mode toggle ───────────────────────────────────────── */
+.ladderModeRow {
+  display: flex;
+  border-bottom: 1.5px solid var(--border);
+}
+.ladderModeBtn {
+  flex: 1;
+  padding: 8px 0;
+  font-size: 12px;
+  font-weight: 700;
+  border: none;
+  background: transparent;
+  color: var(--text3);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.ladderModeBtnActive {
+  color: var(--p500);
+  background: rgba(99,102,241,0.08);
+  border-bottom: 2px solid var(--p500);
+}
+
+/* ── Ladder manual mode ───────────────────────────────────────── */
+.ladderManual {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ladderManualSection {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ladderManualLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ladderManualInputRow {
+  display: flex;
+  gap: 6px;
+}
+.ladderManualInput {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg2);
+  color: var(--text1);
+  font-size: 13px;
+  outline: none;
+}
+.ladderManualInput:focus { border-color: var(--p500); }
+.ladderManualAddBtn {
+  padding: 6px 12px;
+  background: var(--p500);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ladderManualChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-height: 28px;
+}
+.ladderManualChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px 3px 10px;
+  border-radius: 20px;
+  border: 1.5px solid;
+  font-size: 12px;
+  font-weight: 700;
+}
+.ladderManualChipDel {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  color: inherit;
+  opacity: 0.6;
+  padding: 0 1px;
+}
+.ladderManualChipDel:hover { opacity: 1; }
+.ladderManualActions {
+  display: flex;
+  gap: 6px;
+}
+.ladderManualShowBtn, .ladderManualStartBtn, .ladderManualResetBtn {
+  flex: 1;
+  padding: 8px 0;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.ladderManualShowBtn:disabled, .ladderManualStartBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+.ladderManualShowBtn  { background: #3B82F6; color: #fff; }
+.ladderManualStartBtn { background: #10B981; color: #fff; }
+.ladderManualResetBtn { background: var(--bg2); color: var(--text2); border: 1.5px solid var(--border); }
+
 /* ── RoulettePanel ────────────────────────────────────────────── */
 
 .rwPanel {

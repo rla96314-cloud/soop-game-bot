@@ -439,6 +439,66 @@ function renderResult(ld) {
   }, 55)
 }
 
+function renderManualPreview(ld) {
+  phColl.style.display = 'none'
+  phRes.classList.add('on')
+
+  const cols = ld.cols, rows = ld.rows
+  const COL_W = Math.min(120, Math.floor(760 / Math.max(cols - 1, 1)))
+  const ROW_H = 30, PAD_X = 50, PAD_T = 52, PAD_B = 48
+  const W = PAD_X * 2 + (cols - 1) * COL_W
+  const H = PAD_T + rows * ROW_H + PAD_B
+  svgEl.setAttribute('viewBox', '0 0 ' + W + ' ' + H)
+  svgEl.style.height = H + 'px'
+  svgEl.innerHTML = ''
+
+  const xp = c => PAD_X + c * COL_W
+  const mkEl = (tag, attrs) => {
+    const el = document.createElementNS('http://www.w3.org/2000/svg', tag)
+    Object.entries(attrs).forEach(([k,v]) => el.setAttribute(k,v)); return el
+  }
+
+  // Rails only (no rungs shown)
+  for (let c = 0; c < cols; c++) {
+    svgEl.appendChild(mkEl('line', {
+      x1: xp(c), y1: PAD_T, x2: xp(c), y2: PAD_T + rows * ROW_H,
+      stroke: '#333', 'stroke-width': 3.5, 'stroke-linecap': 'round'
+    }))
+    svgEl.appendChild(mkEl('circle', { cx: xp(c), cy: PAD_T, r: 5, fill: '#333' }))
+    svgEl.appendChild(mkEl('circle', { cx: xp(c), cy: PAD_T + rows * ROW_H, r: 5, fill: '#333' }))
+  }
+
+  // Name pills (top)
+  ld.order.forEach((name, c) => {
+    const col = COLORS[c % COLORS.length], bg = BGTINT[c % BGTINT.length]
+    const label = name.length > 5 ? name.slice(0,4)+'…' : name
+    const tw = Math.max(38, label.length * 10 + 18)
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g')
+    g.appendChild(mkEl('rect', { x: xp(c)-tw/2, y: 4, width: tw, height: 26, rx: 13, fill: bg, stroke: col, 'stroke-width': 2.5 }))
+    const t = mkEl('text', { x: xp(c), y: 22, 'text-anchor':'middle', 'font-size': 12, 'font-weight': 800, fill: col, 'font-family': 'Noto Sans KR, sans-serif' })
+    t.textContent = label; g.appendChild(t); svgEl.appendChild(g)
+  })
+
+  // Prize pills (bottom) hidden as "?"
+  ld.prizes.forEach((_, c) => {
+    const col = COLORS[c % COLORS.length], bg = BGTINT[c % BGTINT.length]
+    const tw = 42, py = PAD_T + rows * ROW_H + 11
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g')
+    g.appendChild(mkEl('rect', { x: xp(c)-tw/2, y: py, width: tw, height: 26, rx: 13, fill: bg, stroke: col, 'stroke-width': 2.5 }))
+    const t = mkEl('text', { x: xp(c), y: py+18, 'text-anchor':'middle', 'font-size': 15, 'font-weight': 900, fill: col, 'font-family': 'Noto Sans KR, sans-serif' })
+    t.textContent = '?'; g.appendChild(t); svgEl.appendChild(g)
+  })
+
+  // Frosted cover over rung area
+  svgEl.appendChild(mkEl('rect', {
+    x: PAD_X - 12, y: PAD_T, width: W - (PAD_X - 12) * 2, height: rows * ROW_H,
+    fill: 'rgba(254,252,240,0.82)', rx: 6
+  }))
+
+  resList.innerHTML = ''
+  show()
+}
+
 function connect() {
   const ws = new WebSocket('ws://localhost:${port}/__overlay_ws__')
   ws.onmessage = e => {
@@ -448,6 +508,8 @@ function connect() {
         const s = msg.data
         if (s.status === 'collecting' && s.ladder) renderCollecting(s.ladder)
         else if (s.status === 'showing_result' && s.ladder?.ladderData) renderResult(s.ladder.ladderData)
+        else if (s.status === 'manual_preview' && s.ladder?.ladderData) renderManualPreview(s.ladder.ladderData)
+        else if (s.status === 'manual_running' && s.ladder?.ladderData) renderResult(s.ladder.ladderData)
         else if (s.status === 'idle') hide()
       }
       if (msg.type === 'ping') ws.send(JSON.stringify({type:'pong'}))

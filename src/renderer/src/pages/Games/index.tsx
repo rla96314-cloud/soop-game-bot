@@ -699,6 +699,7 @@ function PickBoardPanel({ rows, cols, items }: { rows: number; cols: number; ite
       <div className={styles.pbHeader}>
         <span className={styles.pbTitle}>뽑기판</span>
         <span className={styles.pbCount}>{revealedCount}/{rows * cols} 오픈</span>
+        <button className={styles.pbResetBtn} onClick={() => broadcastState(cells, rows, cols)}>오버레이 노출</button>
         <button className={styles.pbResetBtn} onClick={reset}>초기화</button>
       </div>
 
@@ -854,10 +855,50 @@ function LadderSVG({ data, animate }: { data: LadderData; animate: boolean }) {
   )
 }
 
+// 엔진과 동일한 사다리 생성 로직 (수동 모드용)
+function buildLadderData(participants: string[], prizes: Prize[]): LadderData {
+  const cols = participants.length
+  const rows = Math.max(8, cols * 2)
+  const rungs: LadderRung[] = []
+
+  for (let r = 0; r < rows; r++) {
+    const used = new Set<number>()
+    for (let c = 0; c < cols - 1; c++) {
+      if (!used.has(c) && !used.has(c + 1) && Math.random() < 0.35) {
+        rungs.push({ row: r, leftCol: c })
+        used.add(c); used.add(c + 1)
+      }
+    }
+  }
+
+  const prizeNames = prizes.map(p => p.name)
+  while (prizeNames.length < cols) prizeNames.push(`${prizeNames.length + 1}등`)
+  const prizeOrder = [...prizeNames].sort(() => Math.random() - 0.5).slice(0, cols)
+
+  const paths: LadderPath[] = participants.map((_, startCol) => {
+    const colPath = [startCol]; let cur = startCol
+    for (let r = 0; r < rows; r++) {
+      if (rungs.some(rg => rg.row === r && rg.leftCol === cur)) cur++
+      else if (rungs.some(rg => rg.row === r && rg.leftCol === cur - 1)) cur--
+      colPath.push(cur)
+    }
+    return { cols: colPath }
+  })
+
+  const results = participants.map((user, i) => {
+    const endCol = paths[i].cols[rows]
+    return { user, prize: prizeOrder[endCol] ?? `${endCol + 1}등`, startCol: i, endCol }
+  })
+
+  return { rows, cols, rungs, paths, order: participants, prizes: prizeOrder, results }
+}
+
 function LadderPanel({ gSettings, gameStates }: {
   gSettings: Record<string, unknown>
   gameStates: Record<string, { status: string; [k: string]: unknown }>
 }) {
+  const el = (window as unknown as Record<string, Record<string, unknown>>).electron
+
   const ladderGameState = gameStates['ladder']
   const status      = ladderGameState?.status as string ?? 'idle'
   const ladderState = ladderGameState?.ladder as LadderState | undefined
@@ -867,6 +908,52 @@ function LadderPanel({ gSettings, gameStates }: {
   const isResult     = status === 'showing_result'
   const prizes       = (gSettings.prizes as Prize[]) ?? []
 
+  // ── 수동 모드 state ──
+  const [manualMode, setManualMode]           = useState(false)
+  const [manualInput, setManualInput]         = useState('')
+  const [manualParticipants, setManualParticipants] = useState<string[]>([])
+  const [previewData, setPreviewData]         = useState<LadderData | null>(null)
+  const [manualResult, setManualResult]       = useState<LadderData | null>(null)
+  const [manualAnimating, setManualAnimating] = useState(false)
+
+  const broadcast = (type: string, data: unknown) => {
+    if (el?.overlayBroadcast)
+      (el.overlayBroadcast as (t: string, d: unknown) => void)(type, data)
+  }
+
+  const addParticipant = () => {
+    const name = manualInput.trim()
+    if (!name || manualParticipants.includes(name)) return
+    setManualParticipants(prev => [...prev, name])
+    setManualInput('')
+    setPreviewData(null); setManualResult(null)
+  }
+
+  const removeParticipant = (i: number) => {
+    setManualParticipants(prev => prev.filter((_, idx) => idx !== i))
+    setPreviewData(null); setManualResult(null)
+  }
+
+  const showOverlay = () => {
+    if (manualParticipants.length < 2) return
+    const data = buildLadderData(manualParticipants, prizes)
+    setPreviewData(data); setManualResult(null)
+    broadcast('game:state', { id: 'ladder', status: 'manual_preview', ladder: { ladderData: data } })
+  }
+
+  const startLadder = () => {
+    if (!previewData) return
+    setManualResult(previewData); setManualAnimating(true)
+    broadcast('game:state', { id: 'ladder', status: 'manual_running', ladder: { ladderData: previewData } })
+    setTimeout(() => setManualAnimating(false), (previewData.rows + 2) * 60 + 500)
+  }
+
+  const resetManual = () => {
+    setPreviewData(null); setManualResult(null)
+    broadcast('game:state', { id: 'ladder', status: 'idle', ladder: null })
+  }
+
+  // ── 자동 모드 state ──
   const [animating, setAnimating] = useState(false)
   useEffect(() => {
     if (isResult && ladderData) {
@@ -876,9 +963,6 @@ function LadderPanel({ gSettings, gameStates }: {
     }
   }, [isResult, ladderData])
 
-  const timeLeft = ladderState
-    ? Math.max(0, Math.ceil((ladderState.deadline - Date.now()) / 1000))
-    : 0
   const [tick, setTick] = useState(0)
   useEffect(() => {
     if (!isCollecting) return
@@ -896,71 +980,154 @@ function LadderPanel({ gSettings, gameStates }: {
 
   return (
     <div className={styles.ladderPanel}>
-      {/* ── Collecting phase ── */}
-      {isCollecting && (
-        <div className={styles.ladderCollect}>
-          <div className={styles.ladderCollectHeader}>
-            <span className={styles.ladderCollectTitle}>참가자 모집 중</span>
-            <span className={styles.ladderCollectCount}>{participants.length}/{maxSlots}명</span>
-            <span className={styles.ladderCollectTime}>{Math.max(0, Math.ceil((deadline - Date.now()) / 1000))}초</span>
-          </div>
-          <div className={styles.ladderTimerBar}>
-            <div className={styles.ladderTimerFill} style={{ width: `${pct}%` }} />
-          </div>
-          <div className={styles.ladderParticipants}>
-            {participants.map((p, i) => (
-              <span key={i} className={styles.ladderChip}
-                style={{ background: PLAYER_COLORS[i % PLAYER_COLORS.length] + '33',
-                         borderColor: PLAYER_COLORS[i % PLAYER_COLORS.length] + '88',
-                         color: PLAYER_COLORS[i % PLAYER_COLORS.length] }}>
-                {p}
-              </span>
-            ))}
-            {participants.length === 0 && (
-              <span className={styles.ladderEmptyHint}>
-                채팅 명령어로 참가 대기 중...
-              </span>
-            )}
-          </div>
-        </div>
-      )}
+      {/* ── 모드 토글 ── */}
+      <div className={styles.ladderModeRow}>
+        <button
+          className={`${styles.ladderModeBtn} ${!manualMode ? styles.ladderModeBtnActive : ''}`}
+          onClick={() => setManualMode(false)}
+        >자동</button>
+        <button
+          className={`${styles.ladderModeBtn} ${manualMode ? styles.ladderModeBtnActive : ''}`}
+          onClick={() => setManualMode(true)}
+        >수동</button>
+      </div>
 
-      {/* ── Result + SVG ── */}
-      {isResult && ladderData && (
-        <div className={styles.ladderResult}>
-          <div className={styles.ladderSvgWrap}>
-            <LadderSVG data={ladderData} animate={animating} />
-          </div>
-          <div className={styles.ladderResultList}>
-            {ladderData.results.map((r, i) => (
-              <div key={i} className={styles.ladderResultRow}
-                style={{ borderLeftColor: PLAYER_COLORS[r.startCol % PLAYER_COLORS.length] }}>
-                <span className={styles.ladderResultUser}
-                  style={{ color: PLAYER_COLORS[r.startCol % PLAYER_COLORS.length] }}>
-                  {r.user}
+      {/* ══ 수동 모드 ══ */}
+      {manualMode && (
+        <div className={styles.ladderManual}>
+          {/* 참가자 입력 */}
+          <div className={styles.ladderManualSection}>
+            <span className={styles.ladderManualLabel}>참가자</span>
+            <div className={styles.ladderManualInputRow}>
+              <input
+                className={styles.ladderManualInput}
+                placeholder="이름 입력 후 Enter"
+                value={manualInput}
+                onChange={e => setManualInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && addParticipant()}
+              />
+              <button className={styles.ladderManualAddBtn} onClick={addParticipant}>추가</button>
+            </div>
+            <div className={styles.ladderManualChips}>
+              {manualParticipants.map((p, i) => (
+                <span key={i} className={styles.ladderManualChip}
+                  style={{ borderColor: PLAYER_COLORS[i % PLAYER_COLORS.length], color: PLAYER_COLORS[i % PLAYER_COLORS.length], background: PLAYER_COLORS[i % PLAYER_COLORS.length] + '22' }}>
+                  {p}
+                  <button className={styles.ladderManualChipDel} onClick={() => removeParticipant(i)}>×</button>
                 </span>
-                <span className={styles.ladderResultArrow}>→</span>
-                <span className={styles.ladderResultPrize}>{r.prize}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── Idle hint ── */}
-      {!isCollecting && !isResult && (
-        <div className={styles.ladderIdle}>
-          <div className={styles.ladderIdleIcon} />
-          <div>
-            <div className={styles.ladderIdleText}>사다리타기 대기 중</div>
-            <div className={styles.ladderIdleHint}>
-              상단 ▶ 수동 실행으로 참가자 모집을 시작하거나,<br/>
-              별풍선 / 채팅 트리거로 자동 시작됩니다.<br/>
-              등록된 상품: {prizes.length > 0 ? prizes.map(p => p.name).join(', ') : '없음'}
+              ))}
+              {manualParticipants.length === 0 && <span className={styles.ladderEmptyHint}>참가자를 추가하세요 (최소 2명)</span>}
             </div>
           </div>
+
+          {/* 상품 목록 표시 */}
+          <div className={styles.ladderManualSection}>
+            <span className={styles.ladderManualLabel}>상품 ({prizes.length > 0 ? prizes.map(p => p.name).join(', ') : '없음'})</span>
+          </div>
+
+          {/* 버튼 */}
+          <div className={styles.ladderManualActions}>
+            <button
+              className={styles.ladderManualShowBtn}
+              disabled={manualParticipants.length < 2 || !!previewData}
+              onClick={showOverlay}
+            >오버레이 노출</button>
+            <button
+              className={styles.ladderManualStartBtn}
+              disabled={!previewData || !!manualResult}
+              onClick={startLadder}
+            >사다리 타기</button>
+            <button className={styles.ladderManualResetBtn} onClick={resetManual}>초기화</button>
+          </div>
+
+          {/* 수동 결과 */}
+          {manualResult && (
+            <div className={styles.ladderResult}>
+              <div className={styles.ladderSvgWrap}>
+                <LadderSVG data={manualResult} animate={manualAnimating} />
+              </div>
+              <div className={styles.ladderResultList}>
+                {manualResult.results.map((r, i) => (
+                  <div key={i} className={styles.ladderResultRow}
+                    style={{ borderLeftColor: PLAYER_COLORS[r.startCol % PLAYER_COLORS.length] }}>
+                    <span className={styles.ladderResultUser}
+                      style={{ color: PLAYER_COLORS[r.startCol % PLAYER_COLORS.length] }}>{r.user}</span>
+                    <span className={styles.ladderResultArrow}>→</span>
+                    <span className={styles.ladderResultPrize}>{r.prize}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
+
+      {/* ══ 자동 모드 ══ */}
+      {!manualMode && (<>
+        {/* ── Collecting phase ── */}
+        {isCollecting && (
+          <div className={styles.ladderCollect}>
+            <div className={styles.ladderCollectHeader}>
+              <span className={styles.ladderCollectTitle}>참가자 모집 중</span>
+              <span className={styles.ladderCollectCount}>{participants.length}/{maxSlots}명</span>
+              <span className={styles.ladderCollectTime}>{Math.max(0, Math.ceil((deadline - Date.now()) / 1000))}초</span>
+            </div>
+            <div className={styles.ladderTimerBar}>
+              <div className={styles.ladderTimerFill} style={{ width: `${pct}%` }} />
+            </div>
+            <div className={styles.ladderParticipants}>
+              {participants.map((p, i) => (
+                <span key={i} className={styles.ladderChip}
+                  style={{ background: PLAYER_COLORS[i % PLAYER_COLORS.length] + '33',
+                           borderColor: PLAYER_COLORS[i % PLAYER_COLORS.length] + '88',
+                           color: PLAYER_COLORS[i % PLAYER_COLORS.length] }}>
+                  {p}
+                </span>
+              ))}
+              {participants.length === 0 && (
+                <span className={styles.ladderEmptyHint}>채팅 명령어로 참가 대기 중...</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Result + SVG ── */}
+        {isResult && ladderData && (
+          <div className={styles.ladderResult}>
+            <div className={styles.ladderSvgWrap}>
+              <LadderSVG data={ladderData} animate={animating} />
+            </div>
+            <div className={styles.ladderResultList}>
+              {ladderData.results.map((r, i) => (
+                <div key={i} className={styles.ladderResultRow}
+                  style={{ borderLeftColor: PLAYER_COLORS[r.startCol % PLAYER_COLORS.length] }}>
+                  <span className={styles.ladderResultUser}
+                    style={{ color: PLAYER_COLORS[r.startCol % PLAYER_COLORS.length] }}>
+                    {r.user}
+                  </span>
+                  <span className={styles.ladderResultArrow}>→</span>
+                  <span className={styles.ladderResultPrize}>{r.prize}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Idle hint ── */}
+        {!isCollecting && !isResult && (
+          <div className={styles.ladderIdle}>
+            <div className={styles.ladderIdleIcon} />
+            <div>
+              <div className={styles.ladderIdleText}>사다리타기 대기 중</div>
+              <div className={styles.ladderIdleHint}>
+                상단 ▶ 수동 실행으로 참가자 모집을 시작하거나,<br/>
+                별풍선 / 채팅 트리거로 자동 시작됩니다.<br/>
+                등록된 상품: {prizes.length > 0 ? prizes.map(p => p.name).join(', ') : '없음'}
+              </div>
+            </div>
+          </div>
+        )}
+      </>)}
     </div>
   )
 }
