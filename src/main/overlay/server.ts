@@ -1116,98 +1116,147 @@ const NUMBER_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 <meta charset="UTF-8">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { background: transparent !important; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
-  #num-wrap {
-    position: fixed; top: 50%; left: 50%;
-    transform: translate(-50%, -50%) scale(0.7);
-    opacity: 0; text-align: center;
-    transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
-    pointer-events: none;
-  }
-  #num-wrap.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  .num-bg {
-    background: rgba(10,6,28,0.93);
-    border: 3px solid rgba(139,92,246,0.7);
-    border-radius: 32px; padding: 32px 56px 28px;
-    box-shadow: 0 16px 60px rgba(109,40,217,0.5);
-    backdrop-filter: blur(24px);
-    min-width: 320px;
-  }
-  .num-label { font-size: 11px; font-weight: 800; letter-spacing: 0.25em; color: #A78BFA; margin-bottom: 16px; text-transform: uppercase; }
-  .num-display {
-    font-size: 120px; font-weight: 900; color: #fff;
-    letter-spacing: -0.04em; line-height: 1;
-    min-width: 240px; display: inline-block; text-align: center;
-    transition: color 0.3s;
-  }
-  .num-display.rolling { color: rgba(167,139,250,0.6); }
-  .num-display.landed  { color: #fff; animation: landPop 0.4s cubic-bezier(0.34,1.56,0.64,1); }
-  @keyframes landPop { 0%{transform:scale(0.8)} 60%{transform:scale(1.08)} 100%{transform:scale(1)} }
-  .num-range { font-size: 14px; color: rgba(255,255,255,0.4); margin-top: 10px; font-weight: 600; }
-  .num-chips { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
-  .num-chip {
-    padding: 6px 16px; border-radius: 20px;
-    background: rgba(139,92,246,0.2); border: 2px solid rgba(139,92,246,0.5);
-    font-size: 24px; font-weight: 900; color: #fff;
-    animation: chipIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
-  }
-  @keyframes chipIn { from{transform:scale(0);opacity:0} to{transform:scale(1);opacity:1} }
-  .num-by { font-size: 13px; color: rgba(255,255,255,0.4); margin-top: 12px; font-weight: 600; }
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:transparent !important;overflow:hidden;font-family:'Noto Sans KR',sans-serif}
+#nw{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.75);opacity:0;pointer-events:none;width:520px;transition:opacity 0.5s ease,transform 0.5s cubic-bezier(0.34,1.56,0.64,1)}
+#nw.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.n-hd{text-align:center;position:relative;height:34px;display:flex;align-items:center;justify-content:center;margin-bottom:14px}
+.n-ti{font-size:20px;font-weight:900;background:linear-gradient(135deg,#0d47a1 20%,#1976d2 60%,#0288d1 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.cd{position:absolute;border-radius:50%;animation:cdB 1.8s ease-in-out infinite}
+@keyframes cdB{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.mc{background:linear-gradient(180deg,#e3f2fd 0%,#f0f4ff 55%,#ede7f6 100%);border-radius:28px;padding:20px 20px 16px;box-shadow:0 10px 48px rgba(13,71,161,0.18),0 2px 8px rgba(0,0,0,0.06);border:2px solid rgba(255,255,255,0.95)}
+.ts{position:relative;height:112px;margin-bottom:4px}
+.brow{position:absolute;left:56px;right:56px;top:9px;bottom:9px;display:flex;align-items:center;justify-content:center;gap:5px;overflow:hidden}
+.ball{border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.4);position:relative}
+.ball::after{content:'';position:absolute;top:10%;left:16%;width:32%;height:28%;background:rgba(255,255,255,0.55);border-radius:50%;filter:blur(2px)}
+.bfar{width:54px;height:54px;font-size:14px;filter:blur(3.5px);opacity:0.55}
+.bnear{width:68px;height:68px;font-size:18px;filter:blur(1.5px);opacity:0.78}
+.bctr{width:86px;height:86px;font-size:26px;opacity:1;z-index:1;box-shadow:0 0 28px rgba(255,200,50,0.55),0 6px 18px rgba(0,0,0,0.25)}
+.bctr.glow{box-shadow:0 0 60px rgba(255,200,50,1),0 0 100px rgba(255,160,0,0.5),0 6px 18px rgba(0,0,0,0.3);animation:bGl 0.7s cubic-bezier(0.34,1.56,0.64,1)}
+@keyframes bGl{0%{transform:scale(0.8)}55%{transform:scale(1.1)}100%{transform:scale(1)}}
+.byd{background:radial-gradient(circle at 33% 28%,#FFE57F 0%,#FF6F00 100%);color:#3E2000}
+.brd{background:radial-gradient(circle at 33% 28%,#EF9A9A 0%,#B71C1C 100%)}
+.bbl{background:radial-gradient(circle at 33% 28%,#90CAF9 0%,#0D47A1 100%)}
+.bgr{background:radial-gradient(circle at 33% 28%,#A5D6A7 0%,#1B5E20 100%)}
+.bpu{background:radial-gradient(circle at 33% 28%,#CE93D8 0%,#6A1B9A 100%)}
+.gt{position:absolute;left:56px;right:56px;top:9px;bottom:9px;border-radius:80px;background:linear-gradient(180deg,rgba(255,255,255,0.35) 0%,rgba(200,230,255,0.05) 30%,rgba(200,230,255,0.05) 65%,rgba(150,200,240,0.22) 100%);border:1.5px solid rgba(255,255,255,0.7);box-shadow:inset 0 2px 10px rgba(255,255,255,0.5),inset 0 -2px 8px rgba(80,140,200,0.2);pointer-events:none;z-index:2}
+.gt::before{content:'';position:absolute;top:0;left:0;right:0;height:38%;background:linear-gradient(180deg,rgba(255,255,255,0.5) 0%,transparent 100%);border-radius:80px 80px 60% 60% / 38px 38px 30px 30px}
+.cap{position:absolute;top:0;bottom:0;width:78px;z-index:3}
+.cap-l{left:0}.cap-r{right:0}
+.cap::before{content:'';position:absolute;inset:0;border-radius:50%;background:linear-gradient(135deg,#1e88e5 0%,#0d47a1 55%,#1565c0 100%);box-shadow:0 4px 16px rgba(13,71,161,0.45)}
+.cap::after{content:'';position:absolute;top:18%;left:22%;width:30%;height:24%;background:rgba(255,255,255,0.32);border-radius:50%;filter:blur(3px)}
+.cap-r::after{left:auto;right:22%}
+.plat{position:relative;height:28px;margin:0 16px 14px}
+.pb{position:absolute;inset:0;background:linear-gradient(180deg,#1e88e5 0%,#0d47a1 100%);border-radius:50%;box-shadow:0 5px 18px rgba(13,71,161,0.45),inset 0 2px 4px rgba(255,255,255,0.2)}
+.pl{position:absolute;inset:0;display:flex;align-items:center;justify-content:space-evenly;padding:0 20px}
+.led{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.9);box-shadow:0 0 5px rgba(255,255,255,0.8)}
+.rb{background:#fff;border-radius:18px;padding:12px 28px 14px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,0.07);border:1.5px solid rgba(180,210,255,0.6);min-height:100px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px}
+.rbadge{background:#1565c0;color:#fff;font-size:11px;font-weight:800;letter-spacing:0.1em;padding:3px 14px;border-radius:20px}
+#rbn{font-size:64px;font-weight:900;line-height:1.05;background:linear-gradient(135deg,#0d47a1,#1976d2);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-0.04em}
+#rbn.rolling{-webkit-text-fill-color:#b0bec5;background:none}
+#rbn.landed{animation:nLd 0.5s cubic-bezier(0.34,1.56,0.64,1)}
+@keyframes nLd{0%{transform:scale(0.7)}60%{transform:scale(1.12)}100%{transform:scale(1)}}
+.rchips{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.rchip{padding:6px 16px;border-radius:16px;background:linear-gradient(135deg,#1565c0,#1976d2);color:#fff;font-size:24px;font-weight:900;box-shadow:0 3px 10px rgba(21,101,192,0.35);animation:chIn 0.4s cubic-bezier(0.34,1.56,0.64,1)}
+@keyframes chIn{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
+.rrange{font-size:12px;color:#90a4ae;font-weight:600}
+.rby{font-size:12px;color:#b0bec5;font-weight:600}
 </style>
 </head>
 <body>
-<div id="num-wrap">
-  <div class="num-bg">
-    <div class="num-label">🔢 숫자 추첨</div>
-    <div class="num-display rolling" id="num-display">?</div>
-    <div class="num-chips" id="num-chips" style="display:none"></div>
-    <div class="num-range" id="num-range"></div>
-    <div class="num-by" id="num-by"></div>
+<div id="nw">
+  <div class="n-hd">
+    <span class="cd" style="width:8px;height:8px;background:#EF5350;left:90px;top:3px;animation-delay:0s"></span>
+    <span class="cd" style="width:6px;height:6px;background:#FFB300;left:118px;top:16px;animation-delay:0.3s"></span>
+    <span class="cd" style="width:7px;height:7px;background:#43A047;left:148px;top:0px;animation-delay:0.6s"></span>
+    <span class="n-ti">랜덤 번호 추첨기</span>
+    <span class="cd" style="width:7px;height:7px;background:#1E88E5;right:148px;top:0px;animation-delay:0.9s"></span>
+    <span class="cd" style="width:6px;height:6px;background:#8E24AA;right:118px;top:16px;animation-delay:0.45s"></span>
+    <span class="cd" style="width:8px;height:8px;background:#FF7043;right:90px;top:3px;animation-delay:0.7s"></span>
+  </div>
+  <div class="mc">
+    <div class="ts">
+      <div class="brow" id="brow"></div>
+      <div class="gt"></div>
+      <div class="cap cap-l"></div>
+      <div class="cap cap-r"></div>
+    </div>
+    <div class="plat">
+      <div class="pb"></div>
+      <div class="pl" id="pl"></div>
+    </div>
+    <div class="rb">
+      <div class="rbadge">당첨 번호</div>
+      <div id="rbn" class="rolling">?</div>
+      <div class="rchips" id="rchips" style="display:none"></div>
+      <div class="rrange" id="rrange"></div>
+      <div class="rby" id="rby"></div>
+    </div>
   </div>
 </div>
 <script>
-const wrap=document.getElementById('num-wrap'),display=document.getElementById('num-display'),chips=document.getElementById('num-chips'),range=document.getElementById('num-range'),byEl=document.getElementById('num-by')
-let rolling=false
+const ledW=document.getElementById('pl')
+for(let i=0;i<20;i++){const d=document.createElement('div');d.className='led';ledW.appendChild(d)}
+const POS=[['bfar','brd'],['bnear','bgr'],['bctr','byd'],['bnear','bpu'],['bfar','bbl']]
+function buildBalls(nums,glow){
+  const row=document.getElementById('brow');row.innerHTML=''
+  POS.forEach(([sz,cl],i)=>{
+    const b=document.createElement('div');b.className='ball '+sz+' '+cl
+    if(i===2){b.id='cb';if(glow)b.classList.add('glow')}
+    b.textContent=nums[i]??'';row.appendChild(b)
+  })
+}
+function rnd(a,b){return Math.floor(Math.random()*(b-a+1))+a}
+function rndArr(a,b){return[rnd(a,b),rnd(a,b),rnd(a,b),rnd(a,b),rnd(a,b)]}
+const wrap=document.getElementById('nw'),rbn=document.getElementById('rbn'),rchips=document.getElementById('rchips'),rrange=document.getElementById('rrange'),rby=document.getElementById('rby')
+let rolling=false,rollIv=null
+function tick(a,b){const n=rndArr(a,b);buildBalls(n);rbn.textContent=n[2]}
 function rollAnimation(min,max,targets,spinMs,triggeredBy){
-  if(rolling)return
-  rolling=true
+  if(rolling)return;rolling=true
   wrap.classList.add('show')
-  chips.style.display='none'; chips.innerHTML=''
-  byEl.textContent=triggeredBy+'님 추첨'
-  range.textContent=min+' ~ '+max
-  display.className='num-display rolling'; display.textContent='?'
+  rchips.style.display='none';rchips.innerHTML=''
+  rby.textContent=triggeredBy?triggeredBy+'님 추첨':''
+  rrange.textContent=min+' ~ '+max
+  rbn.className='rolling';rbn.style.display='block';rbn.textContent='?'
+  buildBalls(rndArr(min,max))
   if(targets.length>1){
-    display.style.display='none'; chips.style.display='flex'
+    rbn.style.display='none';rchips.style.display='flex'
+    rollIv=setInterval(()=>tick(min,max),80)
     let idx=0
     function landNext(){
-      if(idx>=targets.length){setTimeout(hide,4000);rolling=false;return}
-      const chip=document.createElement('div'); chip.className='num-chip'; chip.textContent='?'; chips.appendChild(chip)
-      let f=0; const iv=setInterval(()=>{ chip.textContent=Math.floor(Math.random()*(max-min+1))+min; if(++f>=18){clearInterval(iv);chip.textContent=targets[idx];idx++;setTimeout(landNext,500)} },60)
+      if(idx>=targets.length){clearInterval(rollIv);setTimeout(hide,5000);rolling=false;return}
+      const chip=document.createElement('div');chip.className='rchip';chip.textContent='?';rchips.appendChild(chip)
+      let f=0;const iv=setInterval(()=>{chip.textContent=rnd(min,max);if(++f>=20){clearInterval(iv);chip.textContent=targets[idx];idx++;setTimeout(landNext,600)}},60)
     }
     landNext()
   } else {
-    display.style.display='inline-block'
-    const end=Date.now()+spinMs-400; let interval=40
-    function tick(){
-      const now=Date.now(),progress=1-Math.max(0,(end-now)/(spinMs-400)); interval=40+progress*200
-      display.textContent=Math.floor(Math.random()*(max-min+1))+min
-      if(now<end){ setTimeout(tick,interval) } else { display.textContent=targets[0]; display.className='num-display landed'; setTimeout(hide,4000); rolling=false }
-    }
-    tick()
+    rollIv=setInterval(()=>tick(min,max),80)
+    setTimeout(()=>{
+      clearInterval(rollIv)
+      let delay=80,steps=12
+      function slowStep(){
+        if(steps<=0){
+          const n=rndArr(min,max);n[2]=targets[0];buildBalls(n,true)
+          const cb=document.getElementById('cb');if(cb)cb.classList.add('glow')
+          rbn.textContent=targets[0];rbn.className='landed';rolling=false;setTimeout(hide,4500);return
+        }
+        const n=rndArr(min,max);n[2]=steps<=4?targets[0]:rnd(min,max);buildBalls(n)
+        rbn.textContent=n[2];delay=Math.min(delay*1.3,450);steps--;setTimeout(slowStep,delay)
+      }
+      slowStep()
+    },Math.max(spinMs-1800,300))
   }
 }
-function hide(){ wrap.classList.remove('show'); display.style.display='inline-block'; chips.innerHTML='' }
+function hide(){wrap.classList.remove('show');clearInterval(rollIv);rolling=false;rchips.innerHTML=''}
 function connect(){
   const ws=new WebSocket('ws://localhost:${port}/__overlay_ws__')
   ws.onmessage=e=>{
     try{
       const msg=JSON.parse(e.data)
       if(msg.type==='game:state'&&msg.data?.id==='number'&&msg.data?.status==='running'){
-        const ns=msg.data.number
-        if(ns?.result) rollAnimation(ns.min,ns.max,ns.result,ns.spinMs??3000,ns.triggeredBy??'')
+        const ns=msg.data.number;if(ns?.result)rollAnimation(ns.min,ns.max,ns.result,ns.spinMs??3000,ns.triggeredBy??'')
       }
-      if(msg.type==='ping') ws.send(JSON.stringify({type:'pong'}))
+      if(msg.type==='ping')ws.send(JSON.stringify({type:'pong'}))
     }catch{}
   }
   ws.onclose=()=>setTimeout(connect,2000)
