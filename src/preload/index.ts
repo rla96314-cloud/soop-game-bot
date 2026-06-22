@@ -31,8 +31,9 @@ contextBridge.exposeInMainWorld('electron', {
   bossReset:   ()                      => ipcRenderer.invoke('boss:reset'),
 
   // Overlay
-  overlayUrl:  (gameId: string) => ipcRenderer.invoke('overlay:url', gameId),
-  overlayOpen: (gameId: string) => ipcRenderer.invoke('overlay:open', gameId),
+  overlayUrl:       (gameId: string)                  => ipcRenderer.invoke('overlay:url', gameId),
+  overlayOpen:      (gameId: string)                  => ipcRenderer.invoke('overlay:open', gameId),
+  overlayBroadcast: (type: string, data: unknown)     => ipcRenderer.invoke('overlay:broadcast', type, data),
 
   // Stats
   statsGet: () => ipcRenderer.invoke('stats:get'),

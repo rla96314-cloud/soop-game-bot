@@ -85,7 +85,8 @@ export function registerIpcHandlers(win: BrowserWindow) {
   ipcMain.handle('boss:reset',   ()                   => { gameEngine.resetBoss(); return { ok: true } })
 
   // Overlay
-  ipcMain.handle('overlay:url',  (_, gameId: string)  => overlayServer.getUrl(gameId))
+  ipcMain.handle('overlay:url',       (_, gameId: string)        => overlayServer.getUrl(gameId))
+  ipcMain.handle('overlay:broadcast', (_, type: string, data: unknown) => { overlayServer.broadcast(type, data); return { ok: true } })
   ipcMain.handle('overlay:open', (_, gameId: string)  => {
     shell.openExternal(overlayServer.getUrl(gameId))
     return { ok: true }

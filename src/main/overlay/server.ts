@@ -176,11 +176,11 @@ const LADDER_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
     transform: translateX(-50%) translateY(120px);
     width: 680px; max-width: 95vw;
     background: rgba(10,6,28,0.92);
-    border: 2px solid rgba(59,130,246,0.5);
+    border: 2px solid rgba(139,92,246,0.7);
     border-radius: 20px;
     overflow: hidden;
     backdrop-filter: blur(18px);
-    box-shadow: 0 12px 48px rgba(37,99,235,0.3);
+    box-shadow: 0 12px 48px rgba(109,40,217,0.45);
     opacity: 0;
     transition: transform 0.5s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
   }
@@ -191,10 +191,10 @@ const LADDER_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
     padding: 12px 18px;
     border-bottom: 1px solid rgba(255,255,255,0.08);
   }
-  .hdr-title { font-size: 13px; font-weight: 800; color: #93C5FD; flex: 1; }
+  .hdr-title { font-size: 13px; font-weight: 800; color: #A78BFA; flex: 1; }
   .hdr-count { font-size: 12px; color: rgba(255,255,255,0.5); }
   .timer-bar { height: 4px; background: rgba(255,255,255,0.1); }
-  .timer-fill { height: 100%; background: #3B82F6; transition: width 0.9s linear; }
+  .timer-fill { height: 100%; background: #8B5CF6; transition: width 0.9s linear; }
 
   #chips {
     display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px;
@@ -699,6 +699,267 @@ function connect() {
       }
       if (msg.type === 'game:result' && msg.data?.gameId === 'roulette') {
         showResult(msg.data, lastAnimType)
+      }
+      if (msg.type === 'ping') ws.send(JSON.stringify({type:'pong'}))
+    } catch {}
+  }
+  ws.onclose = () => setTimeout(connect, 2000)
+}
+connect()
+<\/script>
+</body>
+</html>`
+
+// ── Pickboard overlay (ticket board) ─────────────────────────────────────────
+
+const PICKBOARD_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: transparent !important; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
+
+  #pb-wrap {
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0.85);
+    opacity: 0;
+    transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34,1.56,0.64,1);
+    pointer-events: none;
+  }
+  #pb-wrap.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+  /* Outer blue frame */
+  #pb-board {
+    background: #3B6AC7;
+    border-radius: 22px;
+    padding: 7px;
+    box-shadow: 0 16px 60px rgba(59,106,199,0.5);
+  }
+
+  /* Inner white area with dashed border */
+  #pb-inner {
+    background: #EEF4FF;
+    border-radius: 16px;
+    border: 3px dashed #7AABDF;
+    padding: 14px 14px 10px;
+    min-width: 560px;
+  }
+
+  /* Header row */
+  #pb-title-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px; padding: 0 4px;
+  }
+  .pb-title { font-size: 13px; font-weight: 800; color: #3B6AC7; letter-spacing: 0.05em; }
+  .pb-count { font-size: 11px; font-weight: 700; color: #7AABDF; }
+
+  /* Grid */
+  #pb-grid {
+    display: grid;
+    gap: 8px;
+  }
+
+  /* Ticket wrapper (for notch effect) */
+  .pb-ticket-wrap {
+    position: relative;
+    padding-top: 10px;
+  }
+  /* Notch circle - same color as inner bg */
+  .pb-ticket-wrap::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 50%; transform: translateX(-50%);
+    width: 20px; height: 20px;
+    background: #EEF4FF;
+    border-radius: 50%;
+    z-index: 3;
+  }
+
+  /* The ticket card */
+  .pb-ticket {
+    background: #C8CAD4;
+    border-radius: 10px;
+    height: 96px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    position: relative; overflow: hidden;
+    transition: transform 0.3s ease, background 0.4s ease, box-shadow 0.3s;
+    cursor: default;
+  }
+
+  /* Star watermark */
+  .pb-ticket-star {
+    font-size: 48px; opacity: 0.13; color: #888;
+    position: absolute; pointer-events: none;
+    user-select: none;
+  }
+
+  /* Number label (unrevealed) */
+  .pb-ticket-num {
+    position: absolute; bottom: 6px; right: 8px;
+    font-size: 10px; color: rgba(0,0,0,0.25); font-weight: 700;
+  }
+
+  /* Revealed ticket */
+  .pb-ticket.revealed {
+    background: #fff;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  }
+  .pb-ticket.revealed .pb-ticket-star { display: none; }
+  .pb-ticket.just-revealed {
+    animation: ticketFlip 0.5s cubic-bezier(0.4,0,0.2,1);
+  }
+  @keyframes ticketFlip {
+    0%   { transform: scaleX(1); }
+    40%  { transform: scaleX(0); }
+    100% { transform: scaleX(1); }
+  }
+
+  /* Prize content */
+  .pb-ticket-content {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 3px; padding: 6px 8px; text-align: center; z-index: 1;
+  }
+  .pb-ticket-name {
+    font-size: 13px; font-weight: 800; line-height: 1.2;
+    word-break: keep-all;
+  }
+  .pb-ticket-desc {
+    font-size: 10px; color: rgba(0,0,0,0.45); line-height: 1.2;
+    word-break: keep-all;
+  }
+
+  /* Highlight animation for just-revealed */
+  .pb-ticket.revealed {
+    outline: 3px solid transparent;
+  }
+  .pb-ticket.just-revealed.revealed {
+    outline-color: rgba(139,92,246,0.7);
+    animation: ticketFlip 0.5s, ticketGlow 2s ease-out 0.5s;
+  }
+  @keyframes ticketGlow {
+    0%   { outline-color: rgba(139,92,246,0.9); box-shadow: 0 0 20px rgba(139,92,246,0.6); }
+    100% { outline-color: rgba(139,92,246,0.2); box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
+  }
+</style>
+</head>
+<body>
+<div id="pb-wrap">
+  <div id="pb-board">
+    <div id="pb-inner">
+      <div id="pb-title-row">
+        <span class="pb-title">🎯 뽑기판</span>
+        <span class="pb-count" id="pb-count">0 / 0 오픈</span>
+      </div>
+      <div id="pb-grid"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const wrap   = document.getElementById('pb-wrap')
+const grid   = document.getElementById('pb-grid')
+const countEl= document.getElementById('pb-count')
+let currentCells = [], currentRows = 4, currentCols = 5
+
+function buildGrid(cells, rows, cols) {
+  grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)'
+  grid.innerHTML = ''
+  cells.forEach((cell, i) => {
+    const ticketWrap = document.createElement('div')
+    ticketWrap.className = 'pb-ticket-wrap'
+
+    const ticket = document.createElement('div')
+    ticket.className = 'pb-ticket' + (cell.revealed ? ' revealed' : '')
+    ticket.id = 'ticket-' + i
+
+    if (!cell.revealed) {
+      const star = document.createElement('div')
+      star.className = 'pb-ticket-star'
+      star.textContent = '★'
+      ticket.appendChild(star)
+
+      const num = document.createElement('div')
+      num.className = 'pb-ticket-num'
+      num.textContent = (i + 1)
+      ticket.appendChild(num)
+    } else {
+      const content = document.createElement('div')
+      content.className = 'pb-ticket-content'
+      const name = document.createElement('div')
+      name.className = 'pb-ticket-name'
+      name.textContent = cell.name
+      name.style.color = cell.color || '#333'
+      content.appendChild(name)
+      if (cell.description) {
+        const desc = document.createElement('div')
+        desc.className = 'pb-ticket-desc'
+        desc.textContent = cell.description
+        content.appendChild(desc)
+      }
+      ticket.appendChild(content)
+    }
+    ticketWrap.appendChild(ticket)
+    grid.appendChild(ticketWrap)
+  })
+
+  const revealed = cells.filter(c => c.revealed).length
+  countEl.textContent = revealed + ' / ' + cells.length + ' 오픈'
+  if (cells.length > 0) wrap.classList.add('show')
+  else wrap.classList.remove('show')
+}
+
+function updateGrid(cells, rows, cols) {
+  if (cells.length === 0) { wrap.classList.remove('show'); return }
+
+  // If grid is fresh (no tickets rendered yet), build from scratch
+  if (currentCells.length !== cells.length || currentRows !== rows || currentCols !== cols) {
+    currentCells = cells; currentRows = rows; currentCols = cols
+    buildGrid(cells, rows, cols)
+    return
+  }
+
+  // Otherwise update incrementally (just-revealed cells)
+  cells.forEach((cell, i) => {
+    if (!currentCells[i].revealed && cell.revealed) {
+      const ticket = document.getElementById('ticket-' + i)
+      if (!ticket) return
+      ticket.classList.add('just-revealed')
+      setTimeout(() => {
+        ticket.innerHTML = ''
+        ticket.classList.add('revealed')
+        const content = document.createElement('div')
+        content.className = 'pb-ticket-content'
+        const name = document.createElement('div')
+        name.className = 'pb-ticket-name'
+        name.textContent = cell.name
+        name.style.color = cell.color || '#333'
+        content.appendChild(name)
+        if (cell.description) {
+          const desc = document.createElement('div')
+          desc.className = 'pb-ticket-desc'
+          desc.textContent = cell.description
+          content.appendChild(desc)
+        }
+        ticket.appendChild(content)
+      }, 200)
+    }
+  })
+  currentCells = cells
+
+  const revealed = cells.filter(c => c.revealed).length
+  countEl.textContent = revealed + ' / ' + cells.length + ' 오픈'
+}
+
+function connect() {
+  const ws = new WebSocket('ws://localhost:${port}/__overlay_ws__')
+  ws.onmessage = e => {
+    try {
+      const msg = JSON.parse(e.data)
+      if (msg.type === 'pickboard:state') {
+        updateGrid(msg.data.cells, msg.data.rows, msg.data.cols)
       }
       if (msg.type === 'ping') ws.send(JSON.stringify({type:'pong'}))
     } catch {}
@@ -1338,12 +1599,13 @@ export class OverlayServer {
 
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
       let html: string
-      if      (gameId === 'quiz')     html = QUIZ_OVERLAY_HTML(port)
-      else if (gameId === 'ladder')   html = LADDER_OVERLAY_HTML(port)
-      else if (gameId === 'roulette') html = ROULETTE_OVERLAY_HTML(port)
-      else if (gameId === 'slot')     html = SLOT_OVERLAY_HTML(port)
-      else if (gameId === 'boss')     html = BOSS_OVERLAY_HTML(port)
-      else if (gameId === 'number')   html = NUMBER_OVERLAY_HTML(port)
+      if      (gameId === 'quiz')      html = QUIZ_OVERLAY_HTML(port)
+      else if (gameId === 'ladder')    html = LADDER_OVERLAY_HTML(port)
+      else if (gameId === 'roulette')  html = ROULETTE_OVERLAY_HTML(port)
+      else if (gameId === 'slot')      html = SLOT_OVERLAY_HTML(port)
+      else if (gameId === 'boss')      html = BOSS_OVERLAY_HTML(port)
+      else if (gameId === 'number')    html = NUMBER_OVERLAY_HTML(port)
+      else if (gameId === 'pickboard') html = PICKBOARD_OVERLAY_HTML(port)
       else html = OVERLAY_HTML(gameId, 'purple', port)
       res.end(html)
     })

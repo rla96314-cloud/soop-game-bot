@@ -111,6 +111,23 @@ export default function BossPage() {
         </div>
       </div>
 
+      {/* ── 항상 노출: 현재 보스 HP 미니 바 ── */}
+      {boss && (
+        <div className={styles.hpStatusBar}>
+          <span className={styles.hpStatusName}>{boss.bossName}</span>
+          <div className={styles.hpStatusTrack}>
+            <div className={styles.hpStatusFill} style={{ width: `${hpPct}%`, background: hpColor }} />
+          </div>
+          <span className={styles.hpStatusNum}>
+            {boss.currentHp.toLocaleString()} / {boss.maxHp.toLocaleString()}
+          </span>
+          <span className={styles.hpStatusPct}>{hpPct.toFixed(0)}%</span>
+          {status === 'running' && <span className={styles.hpStatusBadge}>⚔️ 전투 중</span>}
+          {status === 'collecting' && <span className={styles.hpStatusBadge}>🎲 주사위 대기</span>}
+          {status === 'showing_result' && <span className={styles.hpStatusBadge} style={{ background: 'rgba(245,158,11,0.2)', color: '#F59E0B' }}>🏆 처치!</span>}
+        </div>
+      )}
+
       {status === 'idle' && (
         <div className={styles.body}>
           <div className={styles.col}>

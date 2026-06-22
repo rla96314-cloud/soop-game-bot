@@ -658,11 +658,23 @@ function buildCells(rows: number, cols: number, items: PickItem[]): Cell[] {
 function PickBoardPanel({ rows, cols, items }: { rows: number; cols: number; items: PickItem[] }) {
   const [cells, setCells] = useState<Cell[]>(() => buildCells(rows, cols, items))
   const [lastResult, setLastResult] = useState<PickItem | null>(null)
+  const el = (window as unknown as Record<string, Record<string, unknown>>).electron
+
+  const broadcastState = (nextCells: Cell[], r: number, c: number) => {
+    if (el?.overlayBroadcast) {
+      (el.overlayBroadcast as (type: string, data: unknown) => void)(
+        'pickboard:state',
+        { cells: nextCells.map(cell => ({ revealed: cell.revealed, name: cell.prize.name, description: cell.prize.description, color: cell.prize.color })), rows: r, cols: c }
+      )
+    }
+  }
 
   // Rebuild when size/items change
   useEffect(() => {
-    setCells(buildCells(rows, cols, items))
+    const next = buildCells(rows, cols, items)
+    setCells(next)
     setLastResult(null)
+    broadcastState(next, rows, cols)
   }, [rows, cols, JSON.stringify(items)])
 
   const reveal = (idx: number) => {
@@ -670,11 +682,14 @@ function PickBoardPanel({ rows, cols, items }: { rows: number; cols: number; ite
     const next = cells.map((c, i) => i === idx ? { ...c, revealed: true } : c)
     setCells(next)
     setLastResult(cells[idx].prize)
+    broadcastState(next, rows, cols)
   }
 
   const reset = () => {
-    setCells(buildCells(rows, cols, items))
+    const next = buildCells(rows, cols, items)
+    setCells(next)
     setLastResult(null)
+    broadcastState(next, rows, cols)
   }
 
   const revealedCount = cells.filter(c => c.revealed).length
@@ -1794,9 +1809,7 @@ export default function GamesPage() {
               </span>
             </label>
             {/* OBS URL copy */}
-            {game.id !== 'pickboard' && (
-              <ObsUrlBtn gameId={game.id} port={OVERLAY_PORT} />
-            )}
+            <ObsUrlBtn gameId={game.id} port={OVERLAY_PORT} />
             {/* Manual run */}
             {game.id !== 'pickboard' && (
               <button
