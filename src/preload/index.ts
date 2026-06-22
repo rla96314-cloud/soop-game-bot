@@ -42,6 +42,9 @@ contextBridge.exposeInMainWorld('electron', {
   authLogout:  ()           => ipcRenderer.invoke('auth:logout'),
   authRecheck: ()           => ipcRenderer.invoke('auth:recheck'),
 
+  // Schedule
+  scheduleToday: (force?: boolean) => ipcRenderer.invoke('schedule:today', force ?? false),
+
   // Event subscriptions
   onSoopConnected:    (cb: () => void)                        => on('soop:connected',    cb),
   onSoopDisconnected: (cb: () => void)                        => on('soop:disconnected', cb),

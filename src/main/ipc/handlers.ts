@@ -4,6 +4,7 @@ import { soopClient }              from '../soop/client'
 import { overlayServer }           from '../overlay/server'
 import { loadSettings, patchSettings, saveSettings } from '../store/settings'
 import { verifyUser, fetchAllowlist }               from '../auth/allowlist'
+import { fetchTodaySchedule }                       from '../schedule/fetcher'
 
 export function registerIpcHandlers(win: BrowserWindow) {
   const send = (ch: string, ...args: unknown[]) => {
@@ -111,5 +112,14 @@ export function registerIpcHandlers(win: BrowserWindow) {
     const s = loadSettings()
     if (!s.user?.id) return { ok: false, error: '저장된 사용자 없음' }
     return verifyUser(s.user.id)
+  })
+
+  // Schedule
+  ipcMain.handle('schedule:today', async (_, force: boolean) => {
+    try {
+      return { ok: true, data: await fetchTodaySchedule(force) }
+    } catch (err) {
+      return { ok: false, error: String(err) }
+    }
   })
 }

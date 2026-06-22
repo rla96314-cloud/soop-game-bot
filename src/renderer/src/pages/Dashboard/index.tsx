@@ -3,7 +3,7 @@ import LiveChat from './LiveChat'
 import GameShortcuts from './GameShortcuts'
 import RecentHistory from './RecentHistory'
 import TodayStats from './TodayStats'
-import Announcements from './Announcements'
+import Schedule from './Schedule'
 import GameGrid from './GameGrid'
 import styles from './Dashboard.module.css'
 
@@ -23,7 +23,7 @@ export default function Dashboard() {
           </div>
           <div className={styles.colRight}>
             <TodayStats />
-            <Announcements />
+            <Schedule />
           </div>
         </div>
         {/* Game grid */}
