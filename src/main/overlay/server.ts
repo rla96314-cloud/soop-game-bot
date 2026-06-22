@@ -166,210 +166,264 @@ const LADDER_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { background: transparent !important; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
 
-  #box {
-    position: fixed; bottom: 40px; left: 50%;
-    transform: translateX(-50%) translateY(120px);
-    width: 680px; max-width: 95vw;
-    background: rgba(10,6,28,0.92);
-    border: 2px solid rgba(139,92,246,0.7);
+  #card {
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%,-50%) scale(0.88); opacity: 0;
+    width: 900px;
+    background: #FEFCF0;
+    border: 7px solid #2B5CE6;
+    border-radius: 26px;
+    padding: 7px;
+    box-shadow: 0 20px 60px rgba(43,92,230,0.28), 0 0 0 2px rgba(43,92,230,0.12);
+    transition: transform 0.55s cubic-bezier(0.34,1.56,0.64,1), opacity 0.35s;
+  }
+  #card.show { transform: translate(-50%,-50%) scale(1); opacity: 1; }
+
+  .inner {
+    border: 3px dashed #6A9EF5;
     border-radius: 20px;
-    overflow: hidden;
-    backdrop-filter: blur(18px);
-    box-shadow: 0 12px 48px rgba(109,40,217,0.45);
-    opacity: 0;
-    transition: transform 0.5s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
+    padding: 20px 26px 18px;
+    background: #FEFCF0;
+    min-height: 540px;
+    display: flex; flex-direction: column;
   }
-  #box.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 
-  .hdr {
-    display: flex; align-items: center; gap: 10px;
-    padding: 12px 18px;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-  }
-  .hdr-title { font-size: 13px; font-weight: 800; color: #A78BFA; flex: 1; }
-  .hdr-count { font-size: 12px; color: rgba(255,255,255,0.5); }
-  .timer-bar { height: 4px; background: rgba(255,255,255,0.1); }
-  .timer-fill { height: 100%; background: #8B5CF6; transition: width 0.9s linear; }
+  /* Title */
+  .title-area { text-align: center; margin-bottom: 6px; }
+  .game-title { font-size: 46px; font-weight: 900; letter-spacing: -0.01em; line-height: 1.1; }
+  .tc1{color:#F95959}.tc2{color:#F5C000}.tc3{color:#5BC95B}
+  .tc4{color:#3B8FF5}.tc5{color:#B760F0}.tc6{color:#F5A623}.tc7{color:#5BC95B}
 
-  #chips {
-    display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-    min-height: 38px;
+  .subtitle {
+    display: inline-block; background: #5B87EE; color: #fff;
+    border-radius: 20px; padding: 5px 22px;
+    font-size: 14px; font-weight: 700; margin-bottom: 14px;
   }
+
+  /* Collecting */
+  .header-row { display: flex; align-items: flex-end; gap: 12px; margin-bottom: 6px; }
+
+  .flag-post { display: flex; flex-direction: column; align-items: flex-start; flex-shrink: 0; }
+  .flag-fabric {
+    background: #5B87EE; color: #fff; font-size: 12px; font-weight: 900;
+    padding: 4px 10px; border-radius: 5px; margin-bottom: 0;
+    position: relative; white-space: nowrap;
+  }
+  .flag-fabric::after {
+    content: ''; position: absolute; right: -8px; top: 50%;
+    transform: translateY(-50%);
+    border: 6px solid transparent; border-left-color: #5B87EE;
+  }
+  .flag-stick { width: 3px; height: 38px; background: #555; border-radius: 2px; margin-top: 1px; }
+
+  .chips-wrap { flex: 1; display: flex; flex-wrap: wrap; gap: 7px; align-items: center; min-height: 42px; }
   .chip {
-    padding: 3px 10px; border-radius: 20px;
-    border: 1px solid; font-size: 11px; font-weight: 700;
+    padding: 5px 14px; border-radius: 20px; border: 2.5px solid;
+    font-size: 13px; font-weight: 800; background: #fff; white-space: nowrap;
   }
+  .count-lbl { font-size: 12px; color: #6B7280; font-weight: 700; flex-shrink: 0; }
 
-  #svg-wrap {
-    background: rgba(0,0,0,0.35);
-    padding: 4px 0;
-    display: none;
-  }
-  #svg-wrap.visible { display: block; }
-  svg { width: 100%; display: block; }
+  .timer-wrap { height: 5px; background: #E5E7EB; border-radius: 3px; overflow: hidden; margin: 7px 0 10px; }
+  .timer-fill { height: 100%; background: #5B87EE; border-radius: 3px; transition: width 0.9s linear; }
 
-  #results {
-    padding: 10px 16px; display: none;
-    flex-direction: column; gap: 5px;
-  }
-  #results.visible { display: flex; }
+  .wait-hint { text-align: center; font-size: 13px; color: #9CA3AF; font-weight: 700; padding: 16px 0; flex: 1; display: flex; align-items: center; justify-content: center; }
+
+  /* Result */
+  #phase-result { display: none; flex: 1; flex-direction: column; }
+  #phase-result.on { display: flex; }
+  #lsvg { width: 100%; display: block; }
+
+  .res-list { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
   .res-row {
-    display: flex; align-items: center; gap: 8px;
-    padding: 6px 10px; border-radius: 7px;
-    background: rgba(255,255,255,0.05);
-    border-left: 3px solid;
-    font-size: 12px; color: rgba(255,255,255,0.85);
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 14px; border-radius: 10px;
+    background: #fff; border: 2.5px solid;
+    font-size: 13px;
   }
-  .res-user  { font-weight: 700; }
-  .res-arrow { color: rgba(255,255,255,0.3); }
-  .res-prize { color: #fff; font-weight: 600; }
+  .res-user  { font-weight: 800; }
+  .res-arrow { color: #9CA3AF; }
+  .res-prize { font-weight: 800; color: #374151; margin-left: auto; }
 </style>
 </head>
 <body>
-<div id="box">
-  <div class="hdr">
-    <span class="hdr-title">🪜 사다리타기</span>
-    <span class="hdr-count" id="count"></span>
+<div id="card">
+  <div class="inner">
+    <div class="title-area">
+      <div class="game-title">
+        <span class="tc1">사</span><span class="tc2">다</span><span class="tc3">리</span>&thinsp;
+        <span class="tc4">타</span><span class="tc5">기</span>&thinsp;
+        <span class="tc6">게</span><span class="tc7">임</span>
+      </div>
+    </div>
+    <div style="text-align:center;margin-bottom:14px">
+      <span class="subtitle">출발! 선을 따라 내려가서 결과를 확인해 보세요!</span>
+    </div>
+
+    <!-- Collecting -->
+    <div id="phase-collecting">
+      <div class="header-row">
+        <div class="flag-post">
+          <div class="flag-fabric">출발!</div>
+          <div class="flag-stick"></div>
+        </div>
+        <div class="chips-wrap" id="chips"></div>
+        <span class="count-lbl" id="count-lbl"></span>
+      </div>
+      <div class="timer-wrap"><div class="timer-fill" id="tfill" style="width:100%"></div></div>
+      <div class="wait-hint" id="wait-hint">참가자 모집 중... 채팅에서 명령어를 입력하세요!</div>
+    </div>
+
+    <!-- Result -->
+    <div id="phase-result">
+      <svg id="lsvg" viewBox="0 0 800 300"></svg>
+      <div class="res-list" id="res-list"></div>
+    </div>
   </div>
-  <div class="timer-bar"><div class="timer-fill" id="tfill" style="width:100%"></div></div>
-  <div id="chips"></div>
-  <div id="svg-wrap"><svg id="lsvg" viewBox="0 0 600 240"></svg></div>
-  <div id="results"></div>
 </div>
 <script>
-const COLORS = ['#8B5CF6','#EC4899','#3B82F6','#10B981','#F59E0B','#EF4444','#14B8A6','#6366F1']
-const box    = document.getElementById('box')
-const countEl= document.getElementById('count')
-const tfill  = document.getElementById('tfill')
-const chips  = document.getElementById('chips')
-const svgWrap= document.getElementById('svg-wrap')
-const svgEl  = document.getElementById('lsvg')
-const resDiv = document.getElementById('results')
-let hideTimer= null
+const COLORS = ['#F95959','#F5C000','#5BC95B','#3B8FF5','#B760F0','#F5A623','#14B8A6','#EC4899']
+const BGTINT = ['#FFF0F0','#FFFDE0','#F0FFF0','#EFF7FF','#F9F0FF','#FFF7ED','#EDFCFC','#FFF0F7']
 
-function show() { box.classList.add('show') }
-function hide() { box.classList.remove('show') }
+const card    = document.getElementById('card')
+const chips   = document.getElementById('chips')
+const cntLbl  = document.getElementById('count-lbl')
+const tfill   = document.getElementById('tfill')
+const waitHint= document.getElementById('wait-hint')
+const phColl  = document.getElementById('phase-collecting')
+const phRes   = document.getElementById('phase-result')
+const svgEl   = document.getElementById('lsvg')
+const resList = document.getElementById('res-list')
+let hideTimer = null
+
+function show() { card.classList.add('show') }
+function hide() { card.classList.remove('show') }
 
 function renderCollecting(ladder) {
-  svgWrap.classList.remove('visible')
-  resDiv.classList.remove('visible')
-  chips.style.display = ''
+  phColl.style.display = ''
+  phRes.classList.remove('on')
 
-  countEl.textContent = ladder.participants.length + '/' + ladder.maxSlots + '명'
-  const elapsed = (ladder.deadline - Date.now()) / 1000
-  const total   = (ladder.deadline - Date.now() + elapsed * 1000) / 1000
-  tfill.style.width = Math.max(0, Math.min(100, (elapsed / 30) * 100)) + '%'
+  cntLbl.textContent = ladder.participants.length + '/' + ladder.maxSlots + '명'
+  const pct = Math.max(0, Math.min(100, ((ladder.deadline - Date.now()) / 30000) * 100))
+  tfill.style.width = pct + '%'
 
   chips.innerHTML = ''
   ladder.participants.forEach((p, i) => {
     const c = document.createElement('span')
     c.className = 'chip'
     c.textContent = p
-    c.style.color = COLORS[i % COLORS.length]
-    c.style.borderColor = COLORS[i % COLORS.length] + '88'
-    c.style.background  = COLORS[i % COLORS.length] + '22'
+    c.style.color       = COLORS[i % COLORS.length]
+    c.style.borderColor = COLORS[i % COLORS.length]
+    c.style.background  = BGTINT[i % BGTINT.length]
     chips.appendChild(c)
   })
+  waitHint.style.display = ladder.participants.length === 0 ? '' : 'none'
   show()
 }
 
 function renderResult(ld) {
-  chips.style.display = 'none'
-  tfill.style.width = '0%'
+  phColl.style.display = 'none'
+  phRes.classList.add('on')
 
-  // Draw SVG ladder
-  const COL_W = 72, ROW_H = 22, PAD_X = 36, PAD_T = 36, PAD_B = 36
   const cols = ld.cols, rows = ld.rows
+  const COL_W = Math.min(120, Math.floor(760 / Math.max(cols - 1, 1)))
+  const ROW_H = 30, PAD_X = 50, PAD_T = 52, PAD_B = 48
   const W = PAD_X * 2 + (cols - 1) * COL_W
   const H = PAD_T + rows * ROW_H + PAD_B
   svgEl.setAttribute('viewBox', '0 0 ' + W + ' ' + H)
   svgEl.style.height = H + 'px'
   svgEl.innerHTML = ''
-  svgWrap.classList.add('visible')
 
-  const x = c => PAD_X + c * COL_W
-  const svg = (tag, attrs) => {
+  const xp = c => PAD_X + c * COL_W
+  const mkEl = (tag, attrs) => {
     const el = document.createElementNS('http://www.w3.org/2000/svg', tag)
-    Object.entries(attrs).forEach(([k,v]) => el.setAttribute(k, v))
-    return el
+    Object.entries(attrs).forEach(([k,v]) => el.setAttribute(k,v)); return el
   }
 
   // Rails
   for (let c = 0; c < cols; c++) {
-    svgEl.appendChild(svg('line', {
-      x1: x(c), y1: PAD_T, x2: x(c), y2: PAD_T + rows * ROW_H,
-      stroke: 'rgba(255,255,255,0.18)', 'stroke-width': 2
+    svgEl.appendChild(mkEl('line', {
+      x1: xp(c), y1: PAD_T, x2: xp(c), y2: PAD_T + rows * ROW_H,
+      stroke: '#333', 'stroke-width': 3.5, 'stroke-linecap': 'round'
     }))
+    svgEl.appendChild(mkEl('circle', { cx: xp(c), cy: PAD_T, r: 5, fill: '#333' }))
+    svgEl.appendChild(mkEl('circle', { cx: xp(c), cy: PAD_T + rows * ROW_H, r: 5, fill: '#333' }))
   }
+
   // Rungs
   ld.rungs.forEach(rg => {
-    svgEl.appendChild(svg('line', {
-      x1: x(rg.leftCol), y1: PAD_T + rg.row * ROW_H,
-      x2: x(rg.leftCol + 1), y2: PAD_T + rg.row * ROW_H,
-      stroke: 'rgba(255,255,255,0.3)', 'stroke-width': 2
+    svgEl.appendChild(mkEl('line', {
+      x1: xp(rg.leftCol), y1: PAD_T + rg.row * ROW_H,
+      x2: xp(rg.leftCol + 1), y2: PAD_T + rg.row * ROW_H,
+      stroke: '#333', 'stroke-width': 3, 'stroke-linecap': 'round'
     }))
   })
-  // Names top
+
+  // Name pills (top)
   ld.order.forEach((name, c) => {
-    const t = svg('text', { x: x(c), y: PAD_T - 8, 'text-anchor':'middle',
-      'font-size': 10, 'font-weight': 700, fill: COLORS[c % COLORS.length] })
-    t.textContent = name.length > 6 ? name.slice(0,5) + '…' : name
-    svgEl.appendChild(t)
+    const col = COLORS[c % COLORS.length], bg = BGTINT[c % BGTINT.length]
+    const label = name.length > 5 ? name.slice(0,4)+'…' : name
+    const tw = Math.max(38, label.length * 10 + 18)
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g')
+    g.appendChild(mkEl('rect', { x: xp(c)-tw/2, y: 4, width: tw, height: 26, rx: 13, fill: bg, stroke: col, 'stroke-width': 2.5 }))
+    const t = mkEl('text', { x: xp(c), y: 22, 'text-anchor':'middle', 'font-size': 12, 'font-weight': 800, fill: col, 'font-family': 'Noto Sans KR, sans-serif' })
+    t.textContent = label; g.appendChild(t); svgEl.appendChild(g)
   })
-  // Prizes bottom
+
+  // Prize pills (bottom)
   ld.prizes.forEach((prize, c) => {
-    const t = svg('text', { x: x(c), y: PAD_T + rows * ROW_H + 18, 'text-anchor':'middle',
-      'font-size': 9, fill: 'rgba(255,255,255,0.55)' })
-    t.textContent = prize.length > 6 ? prize.slice(0,5)+'…' : prize
-    svgEl.appendChild(t)
+    const col = COLORS[c % COLORS.length], bg = BGTINT[c % BGTINT.length]
+    const label = prize.length > 5 ? prize.slice(0,4)+'…' : prize
+    const tw = Math.max(38, label.length * 10 + 18)
+    const py = PAD_T + rows * ROW_H + 11
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g')
+    g.appendChild(mkEl('rect', { x: xp(c)-tw/2, y: py, width: tw, height: 26, rx: 13, fill: bg, stroke: col, 'stroke-width': 2.5 }))
+    const t = mkEl('text', { x: xp(c), y: py+18, 'text-anchor':'middle', 'font-size': 12, 'font-weight': 800, fill: col, 'font-family': 'Noto Sans KR, sans-serif' })
+    t.textContent = label; g.appendChild(t); svgEl.appendChild(g)
   })
 
   // Animate paths
   let step = 0
   const lines = ld.paths.map((path, pi) => {
-    const pl = svg('polyline', { fill:'none', stroke: COLORS[pi % COLORS.length],
-      'stroke-width': 2, 'stroke-opacity': 0.85, points: x(path.cols[0]) + ',' + PAD_T })
-    svgEl.appendChild(pl)
-    return pl
+    const pl = mkEl('polyline', { fill:'none', stroke: COLORS[pi % COLORS.length],
+      'stroke-width': 3.5, 'stroke-opacity': 0.9,
+      'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+      points: xp(path.cols[0]) + ',' + PAD_T })
+    svgEl.appendChild(pl); return pl
   })
   const dots = ld.paths.map((path, pi) => {
-    const c = svg('circle', { r:4, fill: COLORS[pi % COLORS.length],
-      cx: x(path.cols[0]), cy: PAD_T })
-    svgEl.appendChild(c)
-    return c
+    const d = mkEl('circle', { r: 6, fill: COLORS[pi % COLORS.length],
+      cx: xp(path.cols[0]), cy: PAD_T, stroke:'#fff', 'stroke-width': 2 })
+    svgEl.appendChild(d); return d
   })
 
   const tick = setInterval(() => {
     step++
     ld.paths.forEach((path, pi) => {
-      const pts = path.cols.slice(0, step + 1).map((c, r) => x(c) + ',' + (PAD_T + r * ROW_H)).join(' ')
+      const pts = path.cols.slice(0, step+1).map((c,r) => xp(c)+','+(PAD_T+r*ROW_H)).join(' ')
       lines[pi].setAttribute('points', pts)
       const cr = Math.min(step, rows)
-      dots[pi].setAttribute('cx', x(path.cols[cr]))
+      dots[pi].setAttribute('cx', xp(path.cols[cr]))
       dots[pi].setAttribute('cy', PAD_T + cr * ROW_H)
     })
     if (step >= rows) {
       clearInterval(tick)
-      // Show result list
-      resDiv.innerHTML = ''
+      resList.innerHTML = ''
       ld.results.forEach(r => {
+        const col = COLORS[r.startCol % COLORS.length], bg = BGTINT[r.startCol % BGTINT.length]
         const row = document.createElement('div')
         row.className = 'res-row'
-        row.style.borderLeftColor = COLORS[r.startCol % COLORS.length]
-        row.innerHTML =
-          '<span class="res-user" style="color:' + COLORS[r.startCol % COLORS.length] + '">' + r.user + '</span>' +
+        row.style.borderColor = col; row.style.background = bg
+        row.innerHTML = '<span class="res-user" style="color:' + col + '">' + r.user + '</span>' +
           '<span class="res-arrow">→</span><span class="res-prize">' + r.prize + '</span>'
-        resDiv.appendChild(row)
+        resList.appendChild(row)
       })
-      resDiv.classList.add('visible')
       if (hideTimer) clearTimeout(hideTimer)
-      hideTimer = setTimeout(hide, 10000)
+      hideTimer = setTimeout(hide, 12000)
     }
   }, 55)
 }
@@ -1086,76 +1140,189 @@ const SLOT_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { background: transparent !important; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
+
   #slot-wrap {
     position: fixed; bottom: 60px; left: 50%;
-    transform: translateX(-50%) translateY(180px); opacity: 0;
-    transition: transform 0.5s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
+    transform: translateX(-50%) translateY(200px); opacity: 0;
+    transition: transform 0.55s cubic-bezier(0.34,1.56,0.64,1), opacity 0.35s;
   }
   #slot-wrap.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-  .slot-machine {
-    background: rgba(10,6,28,0.95); border: 3px solid rgba(139,92,246,0.7);
-    border-radius: 24px; padding: 18px 22px 16px;
-    box-shadow: 0 8px 40px rgba(109,40,217,0.5); backdrop-filter: blur(20px);
+
+  /* ── Machine body ── */
+  .machine {
+    position: relative; width: 420px;
+    background: linear-gradient(175deg, #E83232 0%, #C01E1E 55%, #A81818 100%);
+    border-radius: 52px 52px 24px 24px;
+    border: 5px solid #F5C518;
+    padding: 16px 20px 18px;
+    box-shadow: 0 0 0 3px #B8880E, 0 24px 64px rgba(0,0,0,0.55), inset 0 3px 0 rgba(255,210,80,0.35);
   }
-  .slot-label { text-align: center; font-size: 11px; font-weight: 800; letter-spacing: 0.2em; color: #A78BFA; margin-bottom: 12px; }
-  .reels-row  { display: flex; gap: 10px; margin-bottom: 14px; }
+  .machine::before {
+    content: ''; position: absolute; inset: 5px;
+    border-radius: 46px 46px 18px 18px;
+    border: 2px solid rgba(255,200,70,0.35); pointer-events: none;
+  }
+
+  /* ── Title display ── */
+  .title-panel {
+    background: linear-gradient(180deg, #FFFDE7 0%, #FFF5B0 100%);
+    border: 4px solid #F5C518; border-radius: 14px;
+    padding: 6px 16px 10px; text-align: center; margin-bottom: 12px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.9);
+  }
+  .title-dots { display: flex; justify-content: center; gap: 7px; margin-bottom: 5px; }
+  .tdot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #F5E040, #D4960A);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    transition: box-shadow 0.3s;
+  }
+  .tdot.lit { background: radial-gradient(circle at 35% 35%, #FFF176, #F5C518); box-shadow: 0 0 10px #F5C518, 0 0 18px #F5C518; }
+  .title-inner { display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .title-star { color: #F5C518; font-size: 18px; line-height: 1; }
+  .title-text { font-size: 28px; font-weight: 900; color: #4A2000; letter-spacing: -0.02em; }
+
+  /* ── Reels frame ── */
+  .reels-frame {
+    background: linear-gradient(180deg, #1E0E00, #140A00);
+    border-radius: 12px; padding: 8px 10px 10px;
+    border: 3px solid #0D0600; margin-bottom: 10px;
+    box-shadow: inset 0 4px 14px rgba(0,0,0,0.6);
+  }
+  .reels-row { display: flex; gap: 8px; }
   .reel {
-    width: 100px; height: 100px; background: rgba(0,0,0,0.4);
-    border-radius: 16px; border: 2px solid rgba(255,255,255,0.08); overflow: hidden; position: relative;
+    flex: 1; height: 108px; background: #fff;
+    border-radius: 9px; border: 2px solid #CCC;
+    overflow: hidden; position: relative;
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.2), 0 2px 5px rgba(0,0,0,0.35);
   }
-  .reel.lit { border-color: #F59E0B; box-shadow: 0 0 20px rgba(245,158,11,0.5); }
+  .reel.lit { border-color: #F5C518; box-shadow: inset 0 2px 5px rgba(0,0,0,0.1), 0 0 22px rgba(245,197,24,0.7); }
   .reel-inner { display: flex; flex-direction: column; align-items: center; transition: transform 0s; }
-  .reel-cell  { width: 100px; height: 100px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 46px; }
+  .reel-cell { width: 100%; height: 108px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 50px; background: #fff; }
+  .reel-cell img { width: 68px; height: 68px; object-fit: contain; }
   .reel::before {
     content: ''; position: absolute; inset: 0;
-    background: linear-gradient(to bottom, rgba(10,6,28,0.9) 0%, transparent 30%, transparent 70%, rgba(10,6,28,0.9) 100%);
-    z-index: 2; pointer-events: none;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.88) 0%, transparent 22%, transparent 78%, rgba(255,255,255,0.88) 100%);
+    z-index: 2; pointer-events: none; border-radius: 7px;
   }
-  .reel::after {
-    content: ''; position: absolute; top: 50%; left: 4px; right: 4px;
-    height: 2px; background: rgba(139,92,246,0.4); transform: translateY(-50%); z-index: 3;
+
+  /* ── Lever ── */
+  .lever {
+    position: absolute; right: -38px; top: 55px;
+    display: flex; flex-direction: column; align-items: center;
   }
+  .lever-knob {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #FF6E6E, #BB1010);
+    border: 3px solid #8A0000;
+    box-shadow: 0 3px 7px rgba(0,0,0,0.45);
+    transition: transform 0.18s ease;
+  }
+  .lever-knob.pulled { transform: translateY(58px); }
+  .lever-rod {
+    width: 8px; height: 64px; margin-top: -3px;
+    background: linear-gradient(to right, #7A7A7A, #D0D0D0, #7A7A7A);
+    border-radius: 4px; box-shadow: 2px 0 5px rgba(0,0,0,0.35);
+  }
+  .lever-base {
+    width: 22px; height: 11px;
+    background: linear-gradient(180deg, #AAAAAA, #555);
+    border-radius: 4px; border: 2px solid #333;
+  }
+
+  /* ── Result bar ── */
   .result-bar {
-    display: flex; align-items: center; justify-content: center; gap: 10px;
-    height: 36px; font-size: 16px; font-weight: 800; color: #fff; opacity: 0; transition: opacity 0.4s;
+    height: 34px; display: flex; align-items: center; justify-content: center;
+    font-size: 17px; font-weight: 900; color: #fff;
+    opacity: 0; transition: opacity 0.4s;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.5); margin-bottom: 4px;
+    letter-spacing: 0.03em;
   }
   .result-bar.show    { opacity: 1; }
-  .result-bar.jackpot { color: #F59E0B; animation: jackpotPulse 0.6s ease infinite alternate; }
-  .result-bar.twoKind { color: #A78BFA; }
-  @keyframes jackpotPulse { from { text-shadow: 0 0 20px #F59E0B; } to { text-shadow: 0 0 60px #F59E0B, 0 0 100px #EF4444; } }
+  .result-bar.jackpot { color: #F5C518; animation: jackpotPulse 0.55s ease infinite alternate; }
+  .result-bar.twoKind { color: #FFD0D0; }
+
+  /* ── START button ── */
+  .start-btn {
+    width: 100%; height: 36px;
+    background: linear-gradient(180deg, #FFD740 0%, #F59F00 100%);
+    border: none; border-radius: 22px;
+    font-size: 15px; font-weight: 900; color: #5A2800;
+    letter-spacing: 0.25em; cursor: default; font-family: inherit;
+    box-shadow: 0 4px 0 #B87200, 0 6px 14px rgba(0,0,0,0.4);
+    transition: transform 0.1s, box-shadow 0.1s;
+    position: relative;
+  }
+  .start-btn.active { transform: translateY(3px); box-shadow: 0 1px 0 #B87200, 0 3px 7px rgba(0,0,0,0.4); }
+
+  @keyframes jackpotPulse { from { text-shadow: 0 0 20px #F5C518; } to { text-shadow: 0 0 55px #F5C518, 0 0 90px #EF4444; } }
   @keyframes confettiFall { to { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
-  .confetti-piece { position: fixed; top: -20px; width: 8px; height: 12px; border-radius: 2px; animation: confettiFall 2.5s ease-in forwards; }
+  .confetti-piece { position: fixed; top: -20px; width: 8px; height: 14px; border-radius: 2px; animation: confettiFall 2.5s ease-in forwards; }
 </style>
 </head>
 <body>
 <div id="slot-wrap">
-  <div class="slot-machine">
-    <div class="slot-label">🎰 SLOT MACHINE</div>
-    <div class="reels-row">
-      <div class="reel" id="reel0"><div class="reel-inner" id="inner0"></div></div>
-      <div class="reel" id="reel1"><div class="reel-inner" id="inner1"></div></div>
-      <div class="reel" id="reel2"><div class="reel-inner" id="inner2"></div></div>
+  <div class="machine">
+    <!-- Gold lever -->
+    <div class="lever">
+      <div class="lever-knob" id="lever-knob"></div>
+      <div class="lever-rod"></div>
+      <div class="lever-base"></div>
     </div>
+
+    <!-- Title -->
+    <div class="title-panel">
+      <div class="title-dots">
+        <div class="tdot" id="td0"></div>
+        <div class="tdot lit" id="td1"></div>
+        <div class="tdot" id="td2"></div>
+        <div class="tdot lit" id="td3"></div>
+        <div class="tdot" id="td4"></div>
+        <div class="tdot lit" id="td5"></div>
+        <div class="tdot" id="td6"></div>
+      </div>
+      <div class="title-inner">
+        <span class="title-star">&#9733;</span>
+        <span class="title-text">슬롯머신</span>
+        <span class="title-star">&#9733;</span>
+      </div>
+    </div>
+
+    <!-- Reels -->
+    <div class="reels-frame">
+      <div class="reels-row">
+        <div class="reel" id="reel0"><div class="reel-inner" id="inner0"></div></div>
+        <div class="reel" id="reel1"><div class="reel-inner" id="inner1"></div></div>
+        <div class="reel" id="reel2"><div class="reel-inner" id="inner2"></div></div>
+      </div>
+    </div>
+
+    <!-- Result + START -->
     <div class="result-bar" id="result-bar"></div>
+    <button class="start-btn" id="start-btn">START</button>
   </div>
 </div>
 <script>
-const wrap = document.getElementById('slot-wrap')
+const wrap      = document.getElementById('slot-wrap')
 const resultBar = document.getElementById('result-bar')
+const startBtn  = document.getElementById('start-btn')
+const leverKnob = document.getElementById('lever-knob')
 let spinning = false
 
-function rand(arr) { return arr[Math.floor(Math.random() * arr.length)] }
+// Dot twinkle
+setInterval(() => {
+  document.querySelectorAll('.tdot').forEach(d => d.classList.toggle('lit', Math.random() > 0.5))
+}, 420)
 
+function rand(arr) { return arr[Math.floor(Math.random() * arr.length)] }
 function isUrl(s) { return s && (s.startsWith('http') || s.startsWith('data:')) }
+
 function makeCell(sym) {
   const c = document.createElement('div'); c.className = 'reel-cell'
   if (isUrl(sym)) {
     const img = document.createElement('img')
-    img.src = sym; img.style.cssText = 'width:64px;height:64px;object-fit:contain;border-radius:8px'
-    c.appendChild(img)
-  } else {
-    c.textContent = sym
-  }
+    img.src = sym; c.appendChild(img)
+  } else { c.textContent = sym }
   return c
 }
 function buildReel(innerEl, target, symbols, rows) {
@@ -1163,9 +1330,8 @@ function buildReel(innerEl, target, symbols, rows) {
   for (let i = 0; i < rows - 1; i++) innerEl.appendChild(makeCell(rand(symbols)))
   innerEl.appendChild(makeCell(target))
 }
-
 function spinReel(reelEl, innerEl, target, symbols, stopMs) {
-  const rows = 32, cellH = 100
+  const rows = 32, cellH = 108
   buildReel(innerEl, target, symbols, rows)
   innerEl.style.transition = 'none'
   innerEl.style.transform  = 'translateY(0)'
@@ -1181,13 +1347,13 @@ function spinReel(reelEl, innerEl, target, symbols, stopMs) {
 }
 
 function showConfetti() {
-  const colors = ['#8B5CF6','#F59E0B','#EF4444','#10B981','#3B82F6','#EC4899']
-  for (let i = 0; i < 60; i++) {
+  const colors = ['#F5C518','#EF4444','#10B981','#3B82F6','#EC4899','#8B5CF6']
+  for (let i = 0; i < 80; i++) {
     const el = document.createElement('div'); el.className = 'confetti-piece'
     el.style.left = Math.random() * 100 + 'vw'
     el.style.background = colors[Math.floor(Math.random() * colors.length)]
-    el.style.animationDelay = Math.random() * 0.8 + 's'
-    el.style.animationDuration = (2 + Math.random()) + 's'
+    el.style.animationDelay = Math.random() + 's'
+    el.style.animationDuration = (2 + Math.random() * 1.5) + 's'
     document.body.appendChild(el)
     el.addEventListener('animationend', () => el.remove())
   }
@@ -1195,26 +1361,38 @@ function showConfetti() {
 
 function startSpin(slot) {
   if (spinning) return; spinning = true
-  const symbols  = slot.symbols.length >= 3 ? slot.symbols : ['🍒','🍋','🍊','⭐','🎰','💎']
-  const targets  = slot.symbols
-  const spinMs   = slot.spinMs ?? 3000
-  const ratio    = spinMs / 3000
-  const stops    = [Math.round(1100 * ratio), Math.round(1700 * ratio), Math.round(2300 * ratio)]
-  const hideAt   = stops[2] + Math.round(4200 * ratio)
+  const symbols = slot.symbols.length >= 3 ? slot.symbols : ['🍒','🍋','🍊','⭐','🎰','💎']
+  const targets = slot.symbols
+  const spinMs  = slot.spinMs ?? 3000
+  const ratio   = spinMs / 3000
+  const stops   = [Math.round(1100 * ratio), Math.round(1700 * ratio), Math.round(2300 * ratio)]
+  const hideAt  = stops[2] + Math.round(4500 * ratio)
+
   resultBar.className = 'result-bar'; resultBar.textContent = ''
   ;[0,1,2].forEach(i => document.getElementById('reel' + i).classList.remove('lit'))
+
+  leverKnob.classList.add('pulled')
+  setTimeout(() => leverKnob.classList.remove('pulled'), 600)
+  startBtn.classList.add('active')
+  setTimeout(() => startBtn.classList.remove('active'), 300)
+
   wrap.classList.add('show')
   ;[0,1,2].forEach(i => spinReel(
     document.getElementById('reel' + i), document.getElementById('inner' + i),
     targets[i], symbols, stops[i]
   ))
+
   setTimeout(() => {
     resultBar.classList.add('show')
-    if (slot.jackpot) { resultBar.className = 'result-bar show jackpot'; resultBar.textContent = '🎉 JACKPOT! 🎉'; showConfetti() }
-    else if (slot.twoKind) { resultBar.className = 'result-bar show twoKind'; resultBar.textContent = '✨ 2개 일치!' }
-    else { resultBar.className = 'result-bar show'; resultBar.textContent = '꽝 😢' }
+    if (slot.jackpot)      { resultBar.className = 'result-bar show jackpot'; resultBar.textContent = 'JACKPOT!'; showConfetti() }
+    else if (slot.twoKind) { resultBar.className = 'result-bar show twoKind'; resultBar.textContent = '2개 일치!' }
+    else                   { resultBar.className = 'result-bar show'; resultBar.textContent = '꽝' }
   }, stops[2] + 600)
-  setTimeout(() => { wrap.classList.remove('show'); spinning = false; [0,1,2].forEach(i => document.getElementById('reel'+i).classList.remove('lit')) }, hideAt)
+
+  setTimeout(() => {
+    wrap.classList.remove('show'); spinning = false
+    ;[0,1,2].forEach(i => document.getElementById('reel' + i).classList.remove('lit'))
+  }, hideAt)
 }
 
 function connect() {
