@@ -160,8 +160,19 @@ function getPath() {
 
 export function loadSettings(): Settings {
   try {
-    const raw = readFileSync(getPath(), 'utf-8')
-    return { ...DEFAULTS, ...JSON.parse(raw) }
+    const raw = JSON.parse(readFileSync(getPath(), 'utf-8'))
+    return {
+      ...DEFAULTS,
+      ...raw,
+      soop:    { ...DEFAULTS.soop,    ...(raw.soop    ?? {}) },
+      overlay: { ...DEFAULTS.overlay, ...(raw.overlay ?? {}) },
+      weflab:  { ...DEFAULTS.weflab,  ...(raw.weflab  ?? {}) },
+      games: Object.fromEntries(
+        Object.keys(DEFAULTS.games).map(k => [
+          k, { ...DEFAULTS.games[k], ...(raw.games?.[k] ?? {}) }
+        ])
+      ),
+    }
   } catch {
     return structuredClone(DEFAULTS)
   }

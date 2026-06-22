@@ -10,6 +10,9 @@ const GAMES = [
   { id: 'slot',     icon: '🎰', name: '슬롯머신'  },
   { id: 'race',     icon: '🏁', name: '경주'      },
   { id: 'rps',      icon: '✊', name: '가위바위보' },
+  { id: 'fish',     icon: '🎣', name: '낚시'      },
+  { id: 'lottery',  icon: '🎟️', name: '복권'      },
+  { id: 'number',   icon: '🔢', name: '숫자 추첨' },
 ]
 
 export default function GameShortcuts() {

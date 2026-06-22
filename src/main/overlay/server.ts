@@ -805,7 +805,7 @@ function connect(){
       const msg=JSON.parse(e.data)
       if(msg.type==='game:state'&&msg.data?.id==='number'&&msg.data?.status==='running'){
         const ns=msg.data.number
-        if(ns?.result) rollAnimation(ns.min,ns.max,ns.result,3000,msg.data?.number?.triggeredBy??'')
+        if(ns?.result) rollAnimation(ns.min,ns.max,ns.result,ns.spinMs??3000,ns.triggeredBy??'')
       }
       if(msg.type==='ping') ws.send(JSON.stringify({type:'pong'}))
     }catch{}
@@ -926,8 +926,12 @@ function showConfetti() {
 
 function startSpin(slot) {
   if (spinning) return; spinning = true
-  const symbols = slot.symbols.length >= 3 ? slot.symbols : ['🍒','🍋','🍊','⭐','🎰','💎']
-  const targets = slot.symbols, stops = [1100, 1700, 2300]
+  const symbols  = slot.symbols.length >= 3 ? slot.symbols : ['🍒','🍋','🍊','⭐','🎰','💎']
+  const targets  = slot.symbols
+  const spinMs   = slot.spinMs ?? 3000
+  const ratio    = spinMs / 3000
+  const stops    = [Math.round(1100 * ratio), Math.round(1700 * ratio), Math.round(2300 * ratio)]
+  const hideAt   = stops[2] + Math.round(4200 * ratio)
   resultBar.className = 'result-bar'; resultBar.textContent = ''
   ;[0,1,2].forEach(i => document.getElementById('reel' + i).classList.remove('lit'))
   wrap.classList.add('show')
@@ -941,7 +945,7 @@ function startSpin(slot) {
     else if (slot.twoKind) { resultBar.className = 'result-bar show twoKind'; resultBar.textContent = '✨ 2개 일치!' }
     else { resultBar.className = 'result-bar show'; resultBar.textContent = '꽝 😢' }
   }, stops[2] + 600)
-  setTimeout(() => { wrap.classList.remove('show'); spinning = false; [0,1,2].forEach(i => document.getElementById('reel'+i).classList.remove('lit')) }, 6500)
+  setTimeout(() => { wrap.classList.remove('show'); spinning = false; [0,1,2].forEach(i => document.getElementById('reel'+i).classList.remove('lit')) }, hideAt)
 }
 
 function connect() {
@@ -1179,7 +1183,7 @@ connect()
 </body>
 </html>`
 
-const OVERLAY_HTML = (gameId: string, theme: string) => `<!DOCTYPE html>
+const OVERLAY_HTML = (gameId: string, theme: string, port: number) => `<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -1252,7 +1256,7 @@ const OVERLAY_HTML = (gameId: string, theme: string) => `<!DOCTYPE html>
   const GAME_NAMES = {
     roulette:'룰렛', ladder:'사다리타기', boss:'보스전', gacha:'뽑기',
     quiz:'퀴즈', slot:'슬롯머신', race:'경주', rps:'가위바위보',
-    fish:'낚시', lottery:'복권'
+    fish:'낚시', lottery:'복권', number:'숫자 추첨'
   }
 
   const overlay  = document.getElementById('overlay')
@@ -1296,7 +1300,7 @@ const OVERLAY_HTML = (gameId: string, theme: string) => `<!DOCTYPE html>
 
   // WebSocket
   function connect() {
-    const ws = new WebSocket('ws://localhost:${3939}/__overlay_ws__')
+    const ws = new WebSocket('ws://localhost:${port}/__overlay_ws__')
     ws.onmessage = e => {
       try {
         const msg = JSON.parse(e.data)
@@ -1332,7 +1336,7 @@ export class OverlayServer {
       else if (gameId === 'slot')     html = SLOT_OVERLAY_HTML(port)
       else if (gameId === 'boss')     html = BOSS_OVERLAY_HTML(port)
       else if (gameId === 'number')   html = NUMBER_OVERLAY_HTML(port)
-      else html = OVERLAY_HTML(gameId, 'purple')
+      else html = OVERLAY_HTML(gameId, 'purple', port)
       res.end(html)
     })
 

@@ -95,17 +95,20 @@ export interface RouletteSpinState {
 }
 
 export interface NumberPickState {
-  min:    number
-  max:    number
-  count:  number
-  result: number[]   // pre-determined results
+  min:         number
+  max:         number
+  count:       number
+  result:      number[]
+  triggeredBy: string
+  spinMs:      number
 }
 
 export interface SlotSpinState {
-  symbols:     string[]   // 3 pre-determined symbols
+  symbols:     string[]
   jackpot:     boolean
   twoKind:     boolean
   triggeredBy: string
+  spinMs:      number
 }
 
 export interface GameState {
@@ -229,7 +232,10 @@ export class GameEngine extends EventEmitter {
         if (id === 'ladder') {
           this.ladderJoin(username)
         } else if (id === 'boss') {
-          this.bossDamage(username, 0, cfg.damagePerChat as number ?? 1)
+          const bossState = this.getState('boss')
+          if (bossState.status === 'running' && bossState.boss?.alive) {
+            this.bossRollDice(username, bossState)
+          }
         } else if (id === 'quiz') {
           this.quizAnswer(username, msg.replace(cfg.chatCommand as string, '').trim())
         } else if (this.getState(id as GameId).status === 'idle') {
@@ -660,7 +666,7 @@ export class GameEngine extends EventEmitter {
 
     const state  = this.getState('slot')
     state.status = 'running'
-    state.slot   = { symbols: s, jackpot, twoKind, triggeredBy: by }
+    state.slot   = { symbols: s, jackpot, twoKind, triggeredBy: by, spinMs }
     this.emit('game:update', 'slot', state)
 
     setTimeout(() => {
@@ -798,7 +804,7 @@ export class GameEngine extends EventEmitter {
 
     const state  = this.getState('number')
     state.status = 'running'
-    state.number = { min, max, count, result: results }
+    state.number = { min, max, count, result: results, triggeredBy: by, spinMs }
     this.emit('game:update', 'number', state)
 
     setTimeout(() => {
@@ -832,10 +838,11 @@ export class GameEngine extends EventEmitter {
         if (s2) {
           s2.status = 'idle'
           s2.result = null
-          if (id === 'ladder') s2.ladder = undefined
-          if (id === 'quiz')   s2.quiz   = undefined
-          if (id === 'slot')   s2.slot   = undefined
-          if (id === 'number') s2.number = undefined
+          if (id === 'roulette') s2.roulette = undefined
+          if (id === 'ladder')  s2.ladder   = undefined
+          if (id === 'quiz')    s2.quiz     = undefined
+          if (id === 'slot')    s2.slot     = undefined
+          if (id === 'number')  s2.number   = undefined
           this.emit('game:update', id, s2)
         }
       }, 5000)

@@ -337,17 +337,19 @@ function RouletteWheelPreview({ items }: { items: Array<{ name: string; probabil
   return <canvas ref={canvasRef} width={160} height={160} className={styles.rwPreviewCanvas} />
 }
 
-function RoulettePanel({ gSettings, gameStates, saveSetting }: {
-  gSettings:   Record<string, unknown>
-  gameStates:  Record<string, { status: string; [k: string]: unknown }>
-  saveSetting: (key: string, value: unknown) => void
+function RoulettePanel({ gSettings, gameStates, saveSetting, weflabSettings, saveWeflabSetting }: {
+  gSettings:          Record<string, unknown>
+  gameStates:         Record<string, { status: string; [k: string]: unknown }>
+  saveSetting:        (key: string, value: unknown) => void
+  weflabSettings:     Record<string, unknown>
+  saveWeflabSetting:  (key: string, value: unknown) => void
 }) {
   const el = (window as unknown as Record<string, unknown>).electron as
     Record<string, (...args: unknown[]) => unknown>
 
-  const [weflabUrl,     setWeflabUrl]     = useState((gSettings.weflabUrl as string) ?? '')
+  const [weflabUrl,     setWeflabUrl]     = useState((weflabSettings.url as string) ?? '')
   const [triggers,      setTriggers]      = useState<WeflabTrigger[]>(
-    (gSettings.weflabTriggers as WeflabTrigger[]) ?? []
+    (weflabSettings.triggers as WeflabTrigger[]) ?? []
   )
   const [weflabRunning, setWeflabRunning] = useState(false)
   const [lastResult,    setLastResult]    = useState('')
@@ -395,7 +397,7 @@ function RoulettePanel({ gSettings, gameStates, saveSetting }: {
 
   const saveTriggers = (next: WeflabTrigger[]) => {
     setTriggers(next)
-    saveSetting('weflabTriggers', next)
+    saveWeflabSetting('triggers', next)
   }
 
   return (
@@ -468,7 +470,7 @@ function RoulettePanel({ gSettings, gameStates, saveSetting }: {
             <input className={styles.rwInput}
               placeholder="https://weflab.io/your-channel"
               value={weflabUrl}
-              onChange={e => { setWeflabUrl(e.target.value); saveSetting('weflabUrl', e.target.value) }}
+              onChange={e => { setWeflabUrl(e.target.value); saveWeflabSetting('url', e.target.value) }}
             />
             <button
               className={`${styles.rwToggleBtn} ${weflabRunning ? styles.rwToggleBtnOn : ''}`}
@@ -1273,7 +1275,7 @@ function SlotPanel({
 
 // ── Number Panel ─────────────────────────────────────────────────────────────
 
-interface NumberPickState { min: number; max: number; count: number; result: number[] }
+interface NumberPickState { min: number; max: number; count: number; result: number[]; triggeredBy: string; spinMs: number }
 
 function NumberPanel({
   gSettings, gameStates, saveSetting,
@@ -1705,6 +1707,11 @@ export default function GamesPage() {
     patchSettings({ games: { [game.settingKey]: { [key]: value } } })
   }
 
+  const weflabSettings = (settings?.weflab as Record<string, unknown> | undefined) ?? {}
+  const saveWeflabSetting = (key: string, value: unknown) => {
+    patchSettings({ weflab: { [key]: value } } as Parameters<typeof patchSettings>[0])
+  }
+
   return (
     <div className={styles.layout}>
 
@@ -1808,6 +1815,8 @@ export default function GamesPage() {
             gSettings={gSettings}
             gameStates={gameStates}
             saveSetting={saveSetting}
+            weflabSettings={weflabSettings}
+            saveWeflabSetting={saveWeflabSetting}
           />
         )}
 

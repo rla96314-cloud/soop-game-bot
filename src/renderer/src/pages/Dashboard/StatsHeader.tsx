@@ -11,6 +11,9 @@ const GAMES = [
   { id: 'slot',     icon: '🎰', name: '슬롯머신'  },
   { id: 'race',     icon: '🏁', name: '경주'      },
   { id: 'rps',      icon: '✊', name: '가위바위보' },
+  { id: 'fish',     icon: '🎣', name: '낚시'      },
+  { id: 'lottery',  icon: '🎟️', name: '복권'      },
+  { id: 'number',   icon: '🔢', name: '숫자 추첨' },
 ]
 
 export default function StatsHeader() {
@@ -69,7 +72,7 @@ export default function StatsHeader() {
       <StatCard label="오늘 실행 횟수"  value={stats.todayRuns.toLocaleString()}      delta={undefined} icon={<BarIcon />} />
       <StatCard label="참여 시청자 수"  value={stats.todayViewers.toLocaleString()}    delta={undefined} icon={<PeopleIcon />} />
       <StatCard label="소모 별풍선"     value={stats.todayBalloons.toLocaleString()}   delta={undefined} icon={<StarIcon />} valueColor="var(--gold)" />
-      <StatCard label="누적 실행 횟수"  value={stats.todayRuns.toLocaleString()}       delta={undefined} icon={<CrownIcon />} />
+      <StatCard label="진행중인 게임"   value={String(Object.values(gameStates).filter(s => s?.status === 'running' || s?.status === 'collecting').length)} delta={undefined} icon={<CrownIcon />} />
 
       <div className={styles.actions}>
         <div className={styles.runWrap}>
