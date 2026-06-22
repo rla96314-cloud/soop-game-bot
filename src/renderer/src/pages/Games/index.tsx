@@ -1024,7 +1024,7 @@ function LadderPanel({ gSettings, gameStates }: {
 
 // ── Quiz panel ────────────────────────────────────────────────────────────────
 
-type QuizMode = 'manual' | 'list' | 'auto'
+type QuizMode = 'manual' | 'list'
 
 interface QuizStateData {
   question: string; answer: string; deadline: number; winner: string | null
@@ -1054,7 +1054,7 @@ function QuizPanel({
   const resultData    = quizGameState?.result as { result: string; detail: string } | undefined
 
   const questions     = (gSettings.questions as Array<{ question: string; answer: string }>) ?? []
-  const autoThreshold = (gSettings.balloonThreshold as number) ?? 0
+
 
   // Countdown ticker
   useEffect(() => {
@@ -1112,13 +1112,13 @@ function QuizPanel({
 
       {/* ── Mode tabs ── */}
       <div className={styles.qpTabs}>
-        {(['manual','list','auto'] as QuizMode[]).map(m => (
+        {(['manual','list'] as QuizMode[]).map(m => (
           <button
             key={m}
             className={`${styles.qpTab} ${mode === m ? styles.qpTabActive : ''}`}
             onClick={() => setMode(m)}
           >
-            {{ manual:'수동 출제', list:'문항 목록', auto:'자동 트리거' }[m]}
+            {{ manual:'수동 출제', list:'문항 목록' }[m]}
           </button>
         ))}
       </div>
@@ -1200,48 +1200,6 @@ function QuizPanel({
         </div>
       )}
 
-      {/* ── Tab: 자동 트리거 ── */}
-      {mode === 'auto' && (
-        <div className={styles.qpTabContent}>
-          <div className={styles.qpAutoInfo}>
-            <span className={styles.qpAutoIcon}>!</span>
-            <div>
-              <strong>별풍선 자동 트리거</strong>가 활성화되면 아래 조건을 충족하는
-              별풍선 후원 시 등록된 문항 중 랜덤으로 자동 출제됩니다.
-            </div>
-          </div>
-          <div className={styles.qpField}>
-            <label>트리거 별풍선 수 (0=비활성)</label>
-            <div className={styles.qpRow}>
-              <input
-                className={styles.qpInput}
-                type="number" min={0} style={{ width: 100 }}
-                value={autoThreshold}
-                onChange={e => saveSetting('balloonThreshold', Number(e.target.value))}
-              />
-              <span className={styles.qpUnit}>개 이상</span>
-            </div>
-          </div>
-          <div className={styles.qpField}>
-            <label>자동 출제 제한 시간</label>
-            <div className={styles.qpRow}>
-              <input
-                className={styles.qpInput}
-                type="number" min={5} max={300} style={{ width: 80 }}
-                value={(gSettings.timeLimit as number) ?? 30}
-                onChange={e => saveSetting('timeLimit', Number(e.target.value))}
-              />
-              <span className={styles.qpUnit}>초</span>
-            </div>
-          </div>
-          <div className={styles.qpAutoNote}>
-            {questions.length === 0
-              ? '⚠ 등록된 문항이 없습니다. 문항 목록 탭에서 추가하세요.'
-              : `✅ 등록된 문항 ${questions.length}개 중 랜덤 출제`
-            }
-          </div>
-        </div>
-      )}
     </div>
   )
 }
@@ -1913,6 +1871,17 @@ export default function GamesPage() {
                 type="number" min={1000} step={500}
                 value={(gSettings.spinDuration as number) ?? 3000}
                 onChange={e => saveSetting('spinDuration', Number(e.target.value))}
+              />
+            </Field>
+          )}
+
+          {/* Quiz */}
+          {game.id === 'quiz' && (
+            <Field label="자동 출제 제한 시간 (초)">
+              <input
+                type="number" min={5} max={300}
+                value={(gSettings.timeLimit as number) ?? 30}
+                onChange={e => saveSetting('timeLimit', Number(e.target.value))}
               />
             </Field>
           )}
