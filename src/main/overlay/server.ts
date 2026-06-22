@@ -533,276 +533,267 @@ const ROULETTE_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { background: transparent !important; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
 
-  /* ── Shared wrapper ── */
   #rbox {
     position: fixed; bottom: 60px; left: 50%;
-    transform: translateX(-50%) translateY(140px);
-    opacity: 0;
-    transition: transform 0.5s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
+    transform: translateX(-50%) translateY(160px); opacity: 0;
+    transition: transform 0.55s cubic-bezier(0.34,1.56,0.64,1), opacity 0.35s;
   }
   #rbox.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 
   /* ── Wheel mode ── */
-  #wheel-wrap {
-    display: none;
-    flex-direction: column; align-items: center; gap: 12px;
-  }
+  #wheel-wrap { display: none; flex-direction: column; align-items: center; gap: 14px; }
   #wheel-wrap.active { display: flex; }
-  .wheel-pointer {
-    width: 0; height: 0;
-    border-left: 14px solid transparent;
-    border-right: 14px solid transparent;
-    border-top: 28px solid #fff;
-    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
-    z-index: 10;
-    margin-bottom: -10px;
+  .wheel-canvas-wrap { position: relative; }
+  .wheel-pin {
+    position: absolute; top: -22px; left: 50%; transform: translateX(-50%);
+    z-index: 10; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.4));
   }
-  canvas#wcanvas { border-radius: 50%; box-shadow: 0 0 40px rgba(139,92,246,0.6); }
+  canvas#wcanvas { display: block; filter: drop-shadow(0 10px 30px rgba(0,0,0,0.3)); }
   #wheel-result {
-    display: none; padding: 14px 32px; border-radius: 16px;
-    background: rgba(10,6,28,0.92); border: 2px solid rgba(139,92,246,0.6);
-    font-size: 22px; font-weight: 900; color: #fff; text-align: center;
-    backdrop-filter: blur(12px);
+    display: none;
+    background: linear-gradient(135deg, #7B4FCE, #5B30A8);
+    border-radius: 50px; padding: 12px 40px;
+    color: #fff; font-size: 24px; font-weight: 900;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.35);
     animation: wPop 0.4s ease;
   }
-  @keyframes wPop { 0%{transform:scale(0.7);opacity:0} 60%{transform:scale(1.08)} 100%{transform:scale(1);opacity:1} }
+  @keyframes wPop { 0%{transform:scale(0.7);opacity:0} 60%{transform:scale(1.1)} 100%{transform:scale(1);opacity:1} }
 
-  /* ── Text slot mode ── */
-  #text-wrap {
-    display: none;
-    width: 420px;
-    background: rgba(10,6,28,0.92);
-    border: 2px solid rgba(139,92,246,0.6);
-    border-radius: 20px;
-    overflow: hidden;
-    backdrop-filter: blur(16px);
-    box-shadow: 0 12px 48px rgba(109,40,217,0.45);
-  }
+  /* ── Text mode ── */
+  #text-wrap { display: none; }
   #text-wrap.active { display: block; }
-  .text-header {
-    padding: 12px 20px;
-    font-size: 11px; font-weight: 800; letter-spacing: 0.15em;
-    color: #A78BFA; border-bottom: 1px solid rgba(255,255,255,0.08);
+
+  .t-label-wrap { text-align: center; margin-bottom: -18px; position: relative; z-index: 2; }
+  .t-label {
+    display: inline-flex; align-items: center; gap: 12px;
+    background: linear-gradient(135deg, #7B4FCE, #5930AA);
+    border-radius: 50px; padding: 10px 28px;
+    color: #fff; font-size: 18px; font-weight: 900;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
   }
-  .text-slot-outer {
-    height: 72px; overflow: hidden; position: relative;
+  .t-star { color: #FFD700; }
+
+  .t-body {
+    background: linear-gradient(180deg, #8E60CC 0%, #6B40AA 100%);
+    border-radius: 52px; padding: 26px 20px 22px;
+    position: relative; overflow: hidden;
+    box-shadow: 5px 6px 22px rgba(0,0,0,0.42), inset 0 2px 0 rgba(255,200,255,0.22);
+    min-width: 580px;
   }
-  .text-slot-outer::before, .text-slot-outer::after {
-    content: ''; position: absolute; left: 0; right: 0; height: 20px; z-index: 2; pointer-events: none;
+  .led-dot {
+    position: absolute; width: 16px; height: 16px; border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 10px rgba(255,255,255,0.95), 0 0 20px rgba(255,255,255,0.5);
+    pointer-events: none; z-index: 0;
   }
-  .text-slot-outer::before { top: 0; background: linear-gradient(to bottom, rgba(10,6,28,0.9), transparent); }
-  .text-slot-outer::after  { bottom: 0; background: linear-gradient(to top,   rgba(10,6,28,0.9), transparent); }
-  .text-slot-inner {
-    display: flex; flex-direction: column; align-items: center;
-    transition: transform 0s;
+  .t-inner {
+    background: #fff; border-radius: 34px;
+    overflow: hidden; position: relative; z-index: 1;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.1);
   }
-  .text-slot-item {
-    height: 72px; display: flex; align-items: center; justify-content: center;
-    font-size: 26px; font-weight: 900; color: #fff; letter-spacing: -0.02em;
-    flex-shrink: 0; width: 100%; padding: 0 24px; text-align: center;
+  .t-slot-outer { height: 78px; overflow: hidden; position: relative; }
+  .t-slot-outer::before, .t-slot-outer::after {
+    content: ''; position: absolute; left: 0; right: 0; height: 22px; z-index: 2; pointer-events: none;
   }
-  .text-highlight-line {
-    position: absolute; top: 50%; left: 12px; right: 12px;
-    height: 2px; background: rgba(139,92,246,0.5); transform: translateY(-50%); z-index: 1;
+  .t-slot-outer::before { top: 0; background: linear-gradient(to bottom, rgba(255,255,255,0.96), transparent); }
+  .t-slot-outer::after  { bottom: 0; background: linear-gradient(to top, rgba(255,255,255,0.96), transparent); }
+  .t-slot-inner { display: flex; flex-direction: column; align-items: center; transition: transform 0s; }
+  .t-slot-item {
+    height: 78px; display: flex; align-items: center; justify-content: center;
+    font-size: 30px; font-weight: 900; color: #5B30A8;
+    flex-shrink: 0; width: 100%; text-align: center; letter-spacing: -0.02em;
   }
   #text-result {
-    display: none; padding: 12px 20px; border-top: 1px solid rgba(255,255,255,0.08);
-    font-size: 18px; font-weight: 800; color: #fff; text-align: center;
+    display: none; padding: 10px 24px 14px;
+    font-size: 26px; font-weight: 900; color: #5B30A8;
+    text-align: center; letter-spacing: -0.02em;
   }
+  .t-res-inner { display: inline-flex; align-items: center; gap: 14px; }
+  .t-bar  { display: inline-block; width: 22px; height: 3.5px; background: #8B5EC7; transform: skewX(-14deg); }
+  .t-bar2 { display: inline-block; width: 14px; height: 3.5px; background: #8B5EC7; transform: skewX(-14deg); }
 </style>
 </head>
 <body>
 <div id="rbox">
   <!-- Wheel mode -->
   <div id="wheel-wrap">
-    <div class="wheel-pointer"></div>
-    <canvas id="wcanvas" width="340" height="340"></canvas>
+    <div class="wheel-canvas-wrap">
+      <div class="wheel-pin">
+        <svg width="44" height="60" viewBox="0 0 44 60" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="pg" cx="38%" cy="28%" r="68%">
+              <stop offset="0%" stop-color="#FF7070"/>
+              <stop offset="100%" stop-color="#CC1010"/>
+            </radialGradient>
+          </defs>
+          <ellipse cx="22" cy="21" rx="20" ry="20" fill="url(#pg)" stroke="#AA0000" stroke-width="2"/>
+          <path d="M 4 33 Q 6 50 22 60 Q 38 50 40 33" fill="url(#pg)" stroke="#AA0000" stroke-width="1.5" stroke-linejoin="round"/>
+          <circle cx="22" cy="21" r="7.5" fill="rgba(255,255,255,0.93)"/>
+        </svg>
+      </div>
+      <canvas id="wcanvas" width="380" height="380"></canvas>
+    </div>
     <div id="wheel-result"></div>
   </div>
 
-  <!-- Text slot mode -->
+  <!-- Text mode -->
   <div id="text-wrap">
-    <div class="text-header">🎡 룰렛 돌아가는 중...</div>
-    <div class="text-slot-outer">
-      <div class="text-highlight-line"></div>
-      <div class="text-slot-inner" id="slot-inner"></div>
+    <div class="t-label-wrap">
+      <span class="t-label">
+        <span class="t-star">★</span>룰렛 추첨기<span class="t-star">★</span>
+      </span>
     </div>
-    <div id="text-result"></div>
+    <div class="t-body" id="t-body">
+      <div class="t-inner">
+        <div class="t-slot-outer">
+          <div class="t-slot-inner" id="slot-inner"></div>
+        </div>
+        <div id="text-result"></div>
+      </div>
+    </div>
   </div>
 </div>
 
 <script>
-const COLORS = [
-  '#8B5CF6','#EC4899','#3B82F6','#10B981',
-  '#F59E0B','#EF4444','#14B8A6','#6366F1',
-  '#F97316','#06B6D4','#84CC16','#A855F7',
-]
+const PASTEL = ['#FFD6D8','#FFE2C4','#FFF5C0','#D6F5D6','#C4EEE0','#C2E8FF','#D2D8FF','#E2D0FF','#F2D2FA','#FFD6D8']
+const DARK   = ['#C03040','#B86018','#A08000','#2A7A30','#1A7060','#1A5098','#3040A0','#5030A0','#8030A0','#C03040']
 
-const rbox        = document.getElementById('rbox')
-const wheelWrap   = document.getElementById('wheel-wrap')
-const textWrap    = document.getElementById('text-wrap')
-const wcanvas     = document.getElementById('wcanvas')
-const ctx         = wcanvas.getContext('2d')
-const wheelResult = document.getElementById('wheel-result')
-const slotInner   = document.getElementById('slot-inner')
-const textResult  = document.getElementById('text-result')
-
-let hideTimer = null
+const rbox      = document.getElementById('rbox')
+const wheelWrap = document.getElementById('wheel-wrap')
+const textWrap  = document.getElementById('text-wrap')
+const wcanvas   = document.getElementById('wcanvas')
+const ctx       = wcanvas.getContext('2d')
+const wRes      = document.getElementById('wheel-result')
+const slotInner = document.getElementById('slot-inner')
+const textRes   = document.getElementById('text-result')
+let hideTimer   = null
 
 function show() { rbox.classList.add('show') }
 function hide() { rbox.classList.remove('show') }
-function setMode(mode) {
-  wheelWrap.classList.toggle('active', mode === 'wheel')
-  textWrap.classList.toggle('active', mode === 'text')
+function setMode(m) {
+  wheelWrap.classList.toggle('active', m === 'wheel')
+  textWrap.classList.toggle('active', m === 'text')
 }
 
-// ── Wheel helpers ──────────────────────────────────────────────────────────────
+// ── LED dots for text frame ────────────────────────────────────────────────────
+function buildDots(el) {
+  const W = el.offsetWidth, H = el.offsetHeight
+  const R = 52, inset = 14, gap = 33
+  const add = (x, y) => {
+    const d = document.createElement('div'); d.className = 'led-dot'
+    d.style.left = (x - 8) + 'px'; d.style.top = (y - 8) + 'px'
+    el.appendChild(d)
+  }
+  for (let x = R + gap/2; x < W - R; x += gap) { add(x, inset); add(x, H - inset) }
+  for (let y = R + gap/2; y < H - R; y += gap) { add(inset, y); add(W - inset, y) }
+}
+setTimeout(() => { const b = document.getElementById('t-body'); if (b) buildDots(b) }, 80)
 
+// ── Wheel drawing ─────────────────────────────────────────────────────────────
 function drawWheel(items, angle) {
-  const cx = 170, cy = 170, r = 160
-  const total = items.reduce((s, i) => s + i.probability, 0)
-  ctx.clearRect(0, 0, 340, 340)
-  let start = angle
+  const SIZE = 380, cx = 190, cy = 190
+  const outerR = 188, ringW = 28, segR = outerR - ringW
+  ctx.clearRect(0, 0, SIZE, SIZE)
 
+  // Gold ring
+  const grd = ctx.createRadialGradient(cx - 10, cy - 10, segR, cx, cy, outerR)
+  grd.addColorStop(0, '#D48800'); grd.addColorStop(0.5, '#FFD740'); grd.addColorStop(1, '#B87000')
+  ctx.beginPath(); ctx.arc(cx, cy, outerR, 0, Math.PI*2); ctx.fillStyle = grd; ctx.fill()
+
+  // Segments
+  const total = items.reduce((s, i) => s + i.probability, 0)
+  let start = angle
   items.forEach((item, i) => {
     const sweep = (item.probability / total) * Math.PI * 2
-    const color = COLORS[i % COLORS.length]
-
-    ctx.beginPath()
-    ctx.moveTo(cx, cy)
-    ctx.arc(cx, cy, r, start, start + sweep)
-    ctx.closePath()
-    ctx.fillStyle = color
-    ctx.fill()
-    ctx.strokeStyle = 'rgba(0,0,0,0.3)'
-    ctx.lineWidth = 1.5
-    ctx.stroke()
-
-    // Label
-    const mid  = start + sweep / 2
-    const lx   = cx + Math.cos(mid) * r * 0.65
-    const ly   = cy + Math.sin(mid) * r * 0.65
-    const maxW = r * sweep * 0.8
-
-    ctx.save()
-    ctx.translate(lx, ly)
-    ctx.rotate(mid + Math.PI / 2)
-    ctx.fillStyle = '#fff'
-    ctx.font = 'bold 12px "Noto Sans KR", sans-serif'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-
-    const label = item.name.length > 8 ? item.name.slice(0, 7) + '…' : item.name
-    ctx.fillText(label, 0, 0)
-    ctx.restore()
-
-    start += sweep
+    ctx.beginPath(); ctx.moveTo(cx, cy)
+    ctx.arc(cx, cy, segR - 1, start, start + sweep); ctx.closePath()
+    ctx.fillStyle = PASTEL[i % PASTEL.length]; ctx.fill()
+    ctx.strokeStyle = 'rgba(255,255,255,0.88)'; ctx.lineWidth = 2; ctx.stroke()
+    const mid = start + sweep / 2
+    const lx = cx + Math.cos(mid) * segR * 0.62, ly = cy + Math.sin(mid) * segR * 0.62
+    ctx.save(); ctx.translate(lx, ly); ctx.rotate(mid + Math.PI / 2)
+    ctx.fillStyle = DARK[i % DARK.length]; ctx.font = '800 15px "Noto Sans KR",sans-serif'
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.fillText(item.name.length > 5 ? item.name.slice(0,4)+'…' : item.name, 0, 0)
+    ctx.restore(); start += sweep
   })
 
-  // Center circle
-  ctx.beginPath()
-  ctx.arc(cx, cy, 22, 0, Math.PI * 2)
-  ctx.fillStyle = 'rgba(10,6,28,0.8)'
-  ctx.fill()
-  ctx.strokeStyle = 'rgba(255,255,255,0.3)'
-  ctx.lineWidth = 2
-  ctx.stroke()
+  // White LED dots on gold ring
+  const nDots = 20, dotRingR = outerR - ringW / 2, dotR = 9
+  for (let i = 0; i < nDots; i++) {
+    const a = (i / nDots) * Math.PI * 2
+    ctx.beginPath(); ctx.arc(cx + Math.cos(a)*dotRingR, cy + Math.sin(a)*dotRingR, dotR, 0, Math.PI*2)
+    ctx.fillStyle = '#fff'; ctx.fill()
+    ctx.strokeStyle = 'rgba(180,140,0,0.2)'; ctx.lineWidth = 1; ctx.stroke()
+  }
+
+  // Center gold circle
+  const cgrd = ctx.createRadialGradient(cx-5, cy-8, 5, cx, cy, 52)
+  cgrd.addColorStop(0, '#FFE566'); cgrd.addColorStop(0.65, '#FFC400'); cgrd.addColorStop(1, '#CC8800')
+  ctx.beginPath(); ctx.arc(cx, cy, 52, 0, Math.PI*2); ctx.fillStyle = cgrd; ctx.fill()
+  ctx.strokeStyle = '#886600'; ctx.lineWidth = 2.5; ctx.stroke()
+  ctx.save()
+  ctx.beginPath(); ctx.arc(cx, cy, 46, 0, Math.PI*2)
+  ctx.strokeStyle = 'rgba(100,60,0,0.35)'; ctx.lineWidth = 1.5; ctx.setLineDash([4,4]); ctx.stroke()
+  ctx.restore()
+  ctx.fillStyle = '#5A2800'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  ctx.font = '800 12px "Noto Sans KR",sans-serif'
+  ctx.fillText('룰렛', cx, cy - 10); ctx.fillText('돌리기', cx, cy + 4)
+  ctx.font = '700 11px sans-serif'; ctx.fillText('★', cx, cy + 18)
 }
 
 function spinWheel(items, winnerIdx, spinMs) {
-  const total   = items.reduce((s, i) => s + i.probability, 0)
-  let cumAngle  = -Math.PI / 2  // start at top
-  let winStart  = 0
-
+  const total = items.reduce((s, i) => s + i.probability, 0)
+  let cum = -Math.PI/2, winMid = 0
   items.forEach((item, i) => {
     const sweep = (item.probability / total) * Math.PI * 2
-    if (i === winnerIdx) winStart = cumAngle + sweep / 2
-    cumAngle += sweep
+    if (i === winnerIdx) winMid = cum + sweep / 2
+    cum += sweep
   })
-
-  // We want winner at top (-π/2). targetAngle = -(winStart - (-π/2)) = -winStart - π/2
-  // Add extra full rotations for drama
-  const extraRots  = 5
-  const finalAngle = -Math.PI / 2 - winStart + extraRots * Math.PI * 2
-
-  const startTime  = performance.now()
-  const startAngle = 0
-
-  function ease(t) {
-    // Ease out cubic
-    return 1 - Math.pow(1 - t, 3)
-  }
-
-  function tick(now) {
-    const t = Math.min(1, (now - startTime) / spinMs)
-    const currentAngle = startAngle + ease(t) * finalAngle
-    drawWheel(items, currentAngle)
+  const finalAngle = -Math.PI/2 - winMid + 6 * Math.PI * 2
+  const t0 = performance.now()
+  function ease(t) { return 1 - Math.pow(1-t, 3) }
+  ;(function tick(now) {
+    const t = Math.min(1, (now - t0) / spinMs)
+    drawWheel(items, ease(t) * finalAngle)
     if (t < 1) requestAnimationFrame(tick)
-  }
-
-  requestAnimationFrame(tick)
+  })(t0)
 }
 
-// ── Text slot helpers ──────────────────────────────────────────────────────────
-
+// ── Text spin ─────────────────────────────────────────────────────────────────
 function spinText(items, winner, spinMs) {
   slotInner.innerHTML = ''
-  const nameList = items.map(i => i.name)
-  // Repeat list multiple times + end with winner
-  const repeats    = 4
-  const full       = []
-  for (let r = 0; r < repeats; r++) {
-    const shuffled = [...nameList].sort(() => Math.random() - 0.5)
-    full.push(...shuffled)
-  }
+  const names = items.map(i => i.name), full = []
+  for (let r = 0; r < 5; r++) full.push(...[...names].sort(() => Math.random() - 0.5))
   full.push(winner)
-
-  // Build DOM
   full.forEach(name => {
-    const el = document.createElement('div')
-    el.className = 'text-slot-item'
-    el.textContent = name
+    const el = document.createElement('div'); el.className = 't-slot-item'; el.textContent = name
     slotInner.appendChild(el)
   })
-
-  const ITEM_H = 72
-  const totalH = full.length * ITEM_H
-  // Start at top, scroll to winner (last item at center = offset of (full.length - 1) * ITEM_H)
-  const targetY = -(full.length - 1) * ITEM_H
-
-  slotInner.style.transition = 'none'
-  slotInner.style.transform  = 'translateY(0)'
-
+  const targetY = -(full.length - 1) * 78
+  slotInner.style.transition = 'none'; slotInner.style.transform = 'translateY(0)'
   requestAnimationFrame(() => {
     slotInner.style.transition = 'transform ' + spinMs + 'ms cubic-bezier(0.2,0,0.1,1)'
     slotInner.style.transform  = 'translateY(' + targetY + 'px)'
   })
 }
 
-// ── Main spin handler ──────────────────────────────────────────────────────────
-
+// ── Handlers ──────────────────────────────────────────────────────────────────
 function startSpin(data) {
   if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }
-  wheelResult.style.display = 'none'
-  textResult.style.display  = 'none'
-
-  setMode(data.animType ?? 'wheel')
-  show()
-
-  if (data.animType === 'text') {
-    spinText(data.items, data.winner, data.spinMs)
-  } else {
-    spinWheel(data.items, data.winnerIdx, data.spinMs)
-  }
+  wRes.style.display = 'none'; textRes.style.display = 'none'
+  setMode(data.animType ?? 'wheel'); show()
+  if (data.animType === 'text') spinText(data.items, data.winner, data.spinMs)
+  else spinWheel(data.items, data.winnerIdx, data.spinMs)
 }
 
 function showResult(result, animType) {
+  const txt = result.result
   if (animType === 'text') {
-    textResult.textContent = '🎉 ' + result.result
-    textResult.style.display = 'block'
+    textRes.innerHTML = '<span class="t-res-inner"><span class="t-bar2"></span><span class="t-bar"></span>&nbsp;' + txt + '&nbsp;<span class="t-bar"></span><span class="t-bar2"></span></span>'
+    textRes.style.display = 'block'
   } else {
-    wheelResult.textContent = '🎉 ' + result.result
-    wheelResult.style.display = 'block'
+    wRes.textContent = txt; wRes.style.display = 'block'
   }
   if (hideTimer) clearTimeout(hideTimer)
   hideTimer = setTimeout(hide, 7000)
@@ -817,16 +808,10 @@ function connect() {
       const msg = JSON.parse(e.data)
       if (msg.type === 'game:state' && msg.data?.id === 'roulette') {
         const s = msg.data
-        if (s.status === 'running' && s.roulette) {
-          lastAnimType = s.roulette.animType ?? 'wheel'
-          startSpin(s.roulette)
-        } else if (s.status === 'idle') {
-          hide()
-        }
+        if (s.status === 'running' && s.roulette) { lastAnimType = s.roulette.animType ?? 'wheel'; startSpin(s.roulette) }
+        else if (s.status === 'idle') hide()
       }
-      if (msg.type === 'game:result' && msg.data?.gameId === 'roulette') {
-        showResult(msg.data, lastAnimType)
-      }
+      if (msg.type === 'game:result' && msg.data?.gameId === 'roulette') showResult(msg.data, lastAnimType)
       if (msg.type === 'ping') ws.send(JSON.stringify({type:'pong'}))
     } catch {}
   }
