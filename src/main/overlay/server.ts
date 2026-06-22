@@ -1118,75 +1118,118 @@ const NUMBER_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{background:transparent !important;overflow:hidden;font-family:'Noto Sans KR',sans-serif}
-#nw{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.75);opacity:0;pointer-events:none;width:520px;transition:opacity 0.5s ease,transform 0.5s cubic-bezier(0.34,1.56,0.64,1)}
+#nw{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.78);opacity:0;pointer-events:none;width:540px;transition:opacity 0.5s ease,transform 0.55s cubic-bezier(0.34,1.56,0.64,1)}
 #nw.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
-.n-hd{text-align:center;position:relative;height:34px;display:flex;align-items:center;justify-content:center;margin-bottom:14px}
-.n-ti{font-size:20px;font-weight:900;background:linear-gradient(135deg,#0d47a1 20%,#1976d2 60%,#0288d1 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.cd{position:absolute;border-radius:50%;animation:cdB 1.8s ease-in-out infinite}
-@keyframes cdB{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
-.mc{background:linear-gradient(180deg,#e3f2fd 0%,#f0f4ff 55%,#ede7f6 100%);border-radius:28px;padding:20px 20px 16px;box-shadow:0 10px 48px rgba(13,71,161,0.18),0 2px 8px rgba(0,0,0,0.06);border:2px solid rgba(255,255,255,0.95)}
-.ts{position:relative;height:112px;margin-bottom:4px}
-.brow{position:absolute;left:56px;right:56px;top:9px;bottom:9px;display:flex;align-items:center;justify-content:center;gap:5px;overflow:hidden}
-.ball{border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.4);position:relative}
-.ball::after{content:'';position:absolute;top:10%;left:16%;width:32%;height:28%;background:rgba(255,255,255,0.55);border-radius:50%;filter:blur(2px)}
-.bfar{width:54px;height:54px;font-size:14px;filter:blur(3.5px);opacity:0.55}
-.bnear{width:68px;height:68px;font-size:18px;filter:blur(1.5px);opacity:0.78}
-.bctr{width:86px;height:86px;font-size:26px;opacity:1;z-index:1;box-shadow:0 0 28px rgba(255,200,50,0.55),0 6px 18px rgba(0,0,0,0.25)}
-.bctr.glow{box-shadow:0 0 60px rgba(255,200,50,1),0 0 100px rgba(255,160,0,0.5),0 6px 18px rgba(0,0,0,0.3);animation:bGl 0.7s cubic-bezier(0.34,1.56,0.64,1)}
-@keyframes bGl{0%{transform:scale(0.8)}55%{transform:scale(1.1)}100%{transform:scale(1)}}
-.byd{background:radial-gradient(circle at 33% 28%,#FFE57F 0%,#FF6F00 100%);color:#3E2000}
-.brd{background:radial-gradient(circle at 33% 28%,#EF9A9A 0%,#B71C1C 100%)}
-.bbl{background:radial-gradient(circle at 33% 28%,#90CAF9 0%,#0D47A1 100%)}
-.bgr{background:radial-gradient(circle at 33% 28%,#A5D6A7 0%,#1B5E20 100%)}
-.bpu{background:radial-gradient(circle at 33% 28%,#CE93D8 0%,#6A1B9A 100%)}
-.gt{position:absolute;left:56px;right:56px;top:9px;bottom:9px;border-radius:80px;background:linear-gradient(180deg,rgba(255,255,255,0.35) 0%,rgba(200,230,255,0.05) 30%,rgba(200,230,255,0.05) 65%,rgba(150,200,240,0.22) 100%);border:1.5px solid rgba(255,255,255,0.7);box-shadow:inset 0 2px 10px rgba(255,255,255,0.5),inset 0 -2px 8px rgba(80,140,200,0.2);pointer-events:none;z-index:2}
-.gt::before{content:'';position:absolute;top:0;left:0;right:0;height:38%;background:linear-gradient(180deg,rgba(255,255,255,0.5) 0%,transparent 100%);border-radius:80px 80px 60% 60% / 38px 38px 30px 30px}
-.cap{position:absolute;top:0;bottom:0;width:78px;z-index:3}
-.cap-l{left:0}.cap-r{right:0}
-.cap::before{content:'';position:absolute;inset:0;border-radius:50%;background:linear-gradient(135deg,#1e88e5 0%,#0d47a1 55%,#1565c0 100%);box-shadow:0 4px 16px rgba(13,71,161,0.45)}
-.cap::after{content:'';position:absolute;top:18%;left:22%;width:30%;height:24%;background:rgba(255,255,255,0.32);border-radius:50%;filter:blur(3px)}
-.cap-r::after{left:auto;right:22%}
-.plat{position:relative;height:28px;margin:0 16px 14px}
-.pb{position:absolute;inset:0;background:linear-gradient(180deg,#1e88e5 0%,#0d47a1 100%);border-radius:50%;box-shadow:0 5px 18px rgba(13,71,161,0.45),inset 0 2px 4px rgba(255,255,255,0.2)}
-.pl{position:absolute;inset:0;display:flex;align-items:center;justify-content:space-evenly;padding:0 20px}
-.led{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.9);box-shadow:0 0 5px rgba(255,255,255,0.8)}
-.rb{background:#fff;border-radius:18px;padding:12px 28px 14px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,0.07);border:1.5px solid rgba(180,210,255,0.6);min-height:100px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px}
-.rbadge{background:#1565c0;color:#fff;font-size:11px;font-weight:800;letter-spacing:0.1em;padding:3px 14px;border-radius:20px}
-#rbn{font-size:64px;font-weight:900;line-height:1.05;background:linear-gradient(135deg,#0d47a1,#1976d2);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-0.04em}
-#rbn.rolling{-webkit-text-fill-color:#b0bec5;background:none}
-#rbn.landed{animation:nLd 0.5s cubic-bezier(0.34,1.56,0.64,1)}
-@keyframes nLd{0%{transform:scale(0.7)}60%{transform:scale(1.12)}100%{transform:scale(1)}}
-.rchips{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
-.rchip{padding:6px 16px;border-radius:16px;background:linear-gradient(135deg,#1565c0,#1976d2);color:#fff;font-size:24px;font-weight:900;box-shadow:0 3px 10px rgba(21,101,192,0.35);animation:chIn 0.4s cubic-bezier(0.34,1.56,0.64,1)}
+/* ── Machine card ── */
+.mc{background:linear-gradient(175deg,#06102e 0%,#0c1d55 40%,#0d2060 70%,#081540 100%);border-radius:24px;padding:24px 20px 18px;box-shadow:0 24px 80px rgba(0,0,50,0.9),0 0 0 1.5px rgba(100,160,255,0.25);display:flex;flex-direction:column;align-items:center;gap:0}
+/* Title */
+.n-ti{font-size:18px;font-weight:900;color:#fff;letter-spacing:0.04em;text-align:center;margin-bottom:16px;text-shadow:0 0 20px rgba(100,180,255,0.6);opacity:0.9}
+/* Sphere scene */
+.scene{position:relative;width:290px;height:290px;margin-bottom:0}
+/* Sphere bg (interior dark) */
+.sph{position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 50% 55%,#1a3a7a 0%,#0d1f50 45%,#060e28 100%);box-shadow:0 0 0 3px rgba(130,190,255,0.35),0 0 50px rgba(60,130,255,0.25),0 20px 60px rgba(0,0,40,0.8)}
+/* Balls container inside sphere */
+.bf{position:absolute;inset:2px;border-radius:50%;overflow:hidden}
+/* Glass overlay on sphere */
+.sgl{position:absolute;inset:0;border-radius:50%;pointer-events:none;z-index:4}
+.sgl::before{content:'';position:absolute;top:6%;left:15%;width:58%;height:38%;background:rgba(255,255,255,0.2);border-radius:50%;filter:blur(10px)}
+.sgl::after{content:'';position:absolute;top:10%;left:22%;width:28%;height:20%;background:rgba(255,255,255,0.38);border-radius:50%;filter:blur(4px)}
+/* Sphere rim */
+.srim{position:absolute;inset:-3px;border-radius:50%;border:3px solid rgba(150,210,255,0.5);box-shadow:inset 0 0 30px rgba(100,180,255,0.2);pointer-events:none;z-index:5}
+/* Side arms */
+.arm-l,.arm-r{position:absolute;bottom:-32px;width:34px;height:90px;background:linear-gradient(180deg,#1565c0 0%,#0d47a1 100%);border-radius:6px 6px 0 0;z-index:6}
+.arm-l{left:20px}.arm-r{right:20px}
+.arm-l::before,.arm-r::before{content:'';position:absolute;top:8px;left:0;right:0;height:4px;background:rgba(255,255,255,0.15);border-radius:2px}
+/* Ball orbits (8 balls) */
+.b{position:absolute;top:50%;left:50%;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.6)}
+.b::after{content:'';position:absolute;top:10%;left:18%;width:30%;height:24%;background:rgba(255,255,255,0.55);border-radius:50%;filter:blur(2px)}
+.b1{width:46px;height:46px;font-size:14px;margin:-23px 0 0 -23px;background:radial-gradient(circle at 35% 30%,#EF9A9A,#C62828);animation:ob1 4.2s linear infinite}
+.b2{width:44px;height:44px;font-size:13px;margin:-22px 0 0 -22px;background:radial-gradient(circle at 35% 30%,#90CAF9,#1565C0);animation:ob2 5.1s linear infinite;filter:blur(0.5px)}
+.b3{width:42px;height:42px;font-size:13px;margin:-21px 0 0 -21px;background:radial-gradient(circle at 35% 30%,#A5D6A7,#2E7D32);animation:ob3 3.4s linear infinite}
+.b4{width:46px;height:46px;font-size:14px;margin:-23px 0 0 -23px;background:radial-gradient(circle at 35% 30%,#FFCC80,#E65100);animation:ob4 4.8s linear infinite;filter:blur(0.8px)}
+.b5{width:44px;height:44px;font-size:13px;margin:-22px 0 0 -22px;background:radial-gradient(circle at 35% 30%,#FFE082,#F9A825);color:#3E2000;animation:ob5 3.8s linear infinite}
+.b6{width:42px;height:42px;font-size:13px;margin:-21px 0 0 -21px;background:radial-gradient(circle at 35% 30%,#CE93D8,#6A1B9A);animation:ob6 6.2s linear infinite;filter:blur(1px)}
+.b7{width:40px;height:40px;font-size:12px;margin:-20px 0 0 -20px;background:radial-gradient(circle at 35% 30%,#ffffff,#90A4AE);color:#263238;animation:ob7 2.9s linear infinite}
+.b8{width:44px;height:44px;font-size:13px;margin:-22px 0 0 -22px;background:radial-gradient(circle at 35% 30%,#80DEEA,#006064);animation:ob8 5.5s linear infinite;filter:blur(0.5px)}
+/* Orbital keyframes (8 different paths) */
+@keyframes ob1{0%{transform:translate(0,-105px)}12.5%{transform:translate(74px,-74px)}25%{transform:translate(105px,0)}37.5%{transform:translate(74px,74px)}50%{transform:translate(0,105px)}62.5%{transform:translate(-74px,74px)}75%{transform:translate(-105px,0)}87.5%{transform:translate(-74px,-74px)}100%{transform:translate(0,-105px)}}
+@keyframes ob2{0%{transform:translate(95px,0)}12.5%{transform:translate(67px,67px)}25%{transform:translate(0,95px)}37.5%{transform:translate(-67px,67px)}50%{transform:translate(-95px,0)}62.5%{transform:translate(-67px,-67px)}75%{transform:translate(0,-95px)}87.5%{transform:translate(67px,-67px)}100%{transform:translate(95px,0)}}
+@keyframes ob3{0%{transform:translate(-55px,-80px)}33%{transform:translate(85px,30px)}66%{transform:translate(-30px,90px)}100%{transform:translate(-55px,-80px)}}
+@keyframes ob4{0%{transform:translate(50px,85px)}25%{transform:translate(-90px,20px)}50%{transform:translate(20px,-95px)}75%{transform:translate(80px,-40px)}100%{transform:translate(50px,85px)}}
+@keyframes ob5{0%{transform:translate(-80px,-55px)}33%{transform:translate(40px,90px)}66%{transform:translate(85px,-60px)}100%{transform:translate(-80px,-55px)}}
+@keyframes ob6{0%{transform:translate(70px,-70px)}20%{transform:translate(85px,50px)}40%{transform:translate(-30px,95px)}60%{transform:translate(-90px,-10px)}80%{transform:translate(-30px,-90px)}100%{transform:translate(70px,-70px)}}
+@keyframes ob7{0%{transform:translate(-40px,-60px)}25%{transform:translate(60px,-40px)}50%{transform:translate(40px,60px)}75%{transform:translate(-60px,40px)}100%{transform:translate(-40px,-60px)}}
+@keyframes ob8{0%{transform:translate(0,80px)}16%{transform:translate(-80px,35px)}33%{transform:translate(-75px,-45px)}50%{transform:translate(0,-85px)}66%{transform:translate(75px,-45px)}83%{transform:translate(80px,35px)}100%{transform:translate(0,80px)}}
+/* Chute (funnel from sphere bottom to display) */
+.chute-wrap{position:relative;display:flex;flex-direction:column;align-items:center;width:290px;margin-top:-2px}
+.chute{width:0;height:0;border-left:28px solid transparent;border-right:28px solid transparent;border-top:40px solid rgba(100,170,255,0.18);filter:drop-shadow(0 0 4px rgba(100,180,255,0.3))}
+.chute::after{content:'';display:block;width:40px;height:12px;background:rgba(100,170,255,0.18);margin:0 auto;border-radius:0 0 6px 6px}
+/* Display bay */
+.bay{width:130px;height:96px;background:rgba(255,255,255,0.06);border:1.5px solid rgba(200,230,255,0.35);border-radius:14px;display:flex;align-items:center;justify-content:center;position:relative;backdrop-filter:blur(4px);box-shadow:inset 0 0 20px rgba(100,180,255,0.1),0 8px 24px rgba(0,0,30,0.5)}
+.bay::before{content:'';position:absolute;top:0;left:10%;width:80%;height:30%;background:rgba(255,255,255,0.08);border-radius:50%;filter:blur(4px)}
+/* Winner ball in bay */
+.wball{width:68px;height:68px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#FFE082,#F9A825);color:#3E2000;font-size:22px;font-weight:900;display:flex;align-items:center;justify-content:center;opacity:0;transform:scale(0.3);transition:opacity 0.5s ease,transform 0.5s cubic-bezier(0.34,1.56,0.64,1);box-shadow:0 0 0 rgba(255,200,50,0);position:relative}
+.wball::after{content:'';position:absolute;top:10%;left:18%;width:30%;height:24%;background:rgba(255,255,255,0.55);border-radius:50%;filter:blur(2px)}
+.wball.show{opacity:1;transform:scale(1);box-shadow:0 0 30px rgba(255,200,50,0.9),0 0 60px rgba(255,150,0,0.5);animation:wbPulse 1.5s ease-in-out infinite 0.5s}
+@keyframes wbPulse{0%,100%{box-shadow:0 0 30px rgba(255,200,50,0.9),0 0 60px rgba(255,150,0,0.5)}50%{box-shadow:0 0 50px rgba(255,220,80,1),0 0 90px rgba(255,180,0,0.7)}}
+/* Platform */
+.plat-wrap{width:340px;margin-top:8px;display:flex;flex-direction:column;align-items:center;gap:0}
+.plat1{width:100%;height:28px;background:linear-gradient(180deg,#1976d2 0%,#1565c0 100%);border-radius:8px 8px 0 0;box-shadow:0 -2px 8px rgba(0,0,50,0.4)}
+.plat2{width:110%;height:22px;background:linear-gradient(180deg,#1565c0 0%,#0d47a1 100%);border-radius:0}
+.plat3{width:120%;height:18px;background:linear-gradient(180deg,#0d47a1 0%,#093380 100%);border-radius:0 0 8px 8px;display:flex;align-items:center;justify-content:space-evenly;padding:0 12px}
+.led{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.9);box-shadow:0 0 7px rgba(255,255,255,0.8)}
+/* Result panel */
+.rp{background:rgba(13,71,161,0.85);border:1.5px solid rgba(100,160,255,0.3);border-radius:16px;padding:14px 28px 12px;text-align:center;width:100%;margin-top:14px;box-shadow:inset 0 2px 8px rgba(0,0,50,0.5),0 4px 16px rgba(0,0,50,0.4);min-height:88px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+.rp-badge{background:rgba(255,255,255,0.15);color:#fff;font-size:11px;font-weight:800;letter-spacing:0.12em;padding:3px 14px;border-radius:20px;text-transform:uppercase}
+#rbn{font-size:62px;font-weight:900;color:#fff;line-height:1;letter-spacing:-0.04em;text-shadow:0 0 30px rgba(150,220,255,0.8)}
+#rbn.rolling{color:rgba(150,200,255,0.5)}
+#rbn.landed{animation:nLd 0.55s cubic-bezier(0.34,1.56,0.64,1)}
+@keyframes nLd{0%{transform:scale(0.6)}60%{transform:scale(1.1)}100%{transform:scale(1)}}
+.rchips{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.rchip{padding:5px 14px;border-radius:14px;background:rgba(255,255,255,0.18);color:#fff;font-size:22px;font-weight:900;box-shadow:0 2px 8px rgba(0,0,50,0.3);animation:chIn 0.4s cubic-bezier(0.34,1.56,0.64,1)}
 @keyframes chIn{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
-.rrange{font-size:12px;color:#90a4ae;font-weight:600}
-.rby{font-size:12px;color:#b0bec5;font-weight:600}
+.rrange{font-size:11px;color:rgba(200,220,255,0.6);font-weight:600}
+.rby{font-size:11px;color:rgba(200,220,255,0.5);font-weight:600}
 </style>
 </head>
 <body>
 <div id="nw">
-  <div class="n-hd">
-    <span class="cd" style="width:8px;height:8px;background:#EF5350;left:90px;top:3px;animation-delay:0s"></span>
-    <span class="cd" style="width:6px;height:6px;background:#FFB300;left:118px;top:16px;animation-delay:0.3s"></span>
-    <span class="cd" style="width:7px;height:7px;background:#43A047;left:148px;top:0px;animation-delay:0.6s"></span>
-    <span class="n-ti">랜덤 번호 추첨기</span>
-    <span class="cd" style="width:7px;height:7px;background:#1E88E5;right:148px;top:0px;animation-delay:0.9s"></span>
-    <span class="cd" style="width:6px;height:6px;background:#8E24AA;right:118px;top:16px;animation-delay:0.45s"></span>
-    <span class="cd" style="width:8px;height:8px;background:#FF7043;right:90px;top:3px;animation-delay:0.7s"></span>
-  </div>
   <div class="mc">
-    <div class="ts">
-      <div class="brow" id="brow"></div>
-      <div class="gt"></div>
-      <div class="cap cap-l"></div>
-      <div class="cap cap-r"></div>
+    <div class="n-ti">랜덤 번호 추첨기</div>
+    <!-- Sphere machine -->
+    <div class="scene">
+      <div class="sph"></div>
+      <div class="bf" id="bf">
+        <div class="b b1" id="bl0">?</div>
+        <div class="b b2" id="bl1">?</div>
+        <div class="b b3" id="bl2">?</div>
+        <div class="b b4" id="bl3">?</div>
+        <div class="b b5" id="bl4">?</div>
+        <div class="b b6" id="bl5">?</div>
+        <div class="b b7" id="bl6">?</div>
+        <div class="b b8" id="bl7">?</div>
+      </div>
+      <div class="sgl"></div>
+      <div class="srim"></div>
+      <div class="arm-l"></div>
+      <div class="arm-r"></div>
     </div>
-    <div class="plat">
-      <div class="pb"></div>
-      <div class="pl" id="pl"></div>
+    <!-- Chute + display bay -->
+    <div class="chute-wrap">
+      <div class="chute"></div>
+      <div class="bay">
+        <div class="wball" id="wball">?</div>
+      </div>
     </div>
-    <div class="rb">
-      <div class="rbadge">당첨 번호</div>
+    <!-- Platform -->
+    <div class="plat-wrap">
+      <div class="plat1"></div>
+      <div class="plat2"></div>
+      <div class="plat3" id="pleds"></div>
+    </div>
+    <!-- Result -->
+    <div class="rp">
+      <div class="rp-badge">당첨 번호</div>
       <div id="rbn" class="rolling">?</div>
       <div class="rchips" id="rchips" style="display:none"></div>
       <div class="rrange" id="rrange"></div>
@@ -1195,22 +1238,15 @@ html,body{background:transparent !important;overflow:hidden;font-family:'Noto Sa
   </div>
 </div>
 <script>
-const ledW=document.getElementById('pl')
-for(let i=0;i<20;i++){const d=document.createElement('div');d.className='led';ledW.appendChild(d)}
-const POS=[['bfar','brd'],['bnear','bgr'],['bctr','byd'],['bnear','bpu'],['bfar','bbl']]
-function buildBalls(nums,glow){
-  const row=document.getElementById('brow');row.innerHTML=''
-  POS.forEach(([sz,cl],i)=>{
-    const b=document.createElement('div');b.className='ball '+sz+' '+cl
-    if(i===2){b.id='cb';if(glow)b.classList.add('glow')}
-    b.textContent=nums[i]??'';row.appendChild(b)
-  })
-}
-function rnd(a,b){return Math.floor(Math.random()*(b-a+1))+a}
-function rndArr(a,b){return[rnd(a,b),rnd(a,b),rnd(a,b),rnd(a,b),rnd(a,b)]}
-const wrap=document.getElementById('nw'),rbn=document.getElementById('rbn'),rchips=document.getElementById('rchips'),rrange=document.getElementById('rrange'),rby=document.getElementById('rby')
+// Build LEDs
+const pled=document.getElementById('pleds')
+for(let i=0;i<16;i++){const d=document.createElement('div');d.className='led';pled.appendChild(d)}
+// Ball refs
+const BALLS=[...Array(8)].map((_,i)=>document.getElementById('bl'+i))
+const wrap=document.getElementById('nw'),rbn=document.getElementById('rbn'),rchips=document.getElementById('rchips'),rrange=document.getElementById('rrange'),rby=document.getElementById('rby'),wball=document.getElementById('wball')
 let rolling=false,rollIv=null
-function tick(a,b){const n=rndArr(a,b);buildBalls(n);rbn.textContent=n[2]}
+function rnd(a,b){return Math.floor(Math.random()*(b-a+1))+a}
+function tickBalls(a,b){BALLS.forEach(bl=>{bl.textContent=rnd(a,b)})}
 function rollAnimation(min,max,targets,spinMs,triggeredBy){
   if(rolling)return;rolling=true
   wrap.classList.add('show')
@@ -1218,10 +1254,11 @@ function rollAnimation(min,max,targets,spinMs,triggeredBy){
   rby.textContent=triggeredBy?triggeredBy+'님 추첨':''
   rrange.textContent=min+' ~ '+max
   rbn.className='rolling';rbn.style.display='block';rbn.textContent='?'
-  buildBalls(rndArr(min,max))
+  wball.textContent='?';wball.classList.remove('show')
+  tickBalls(min,max)
   if(targets.length>1){
     rbn.style.display='none';rchips.style.display='flex'
-    rollIv=setInterval(()=>tick(min,max),80)
+    rollIv=setInterval(()=>tickBalls(min,max),80)
     let idx=0
     function landNext(){
       if(idx>=targets.length){clearInterval(rollIv);setTimeout(hide,5000);rolling=false;return}
@@ -1230,24 +1267,17 @@ function rollAnimation(min,max,targets,spinMs,triggeredBy){
     }
     landNext()
   } else {
-    rollIv=setInterval(()=>tick(min,max),80)
+    rollIv=setInterval(()=>tickBalls(min,max),80)
     setTimeout(()=>{
       clearInterval(rollIv)
-      let delay=80,steps=12
-      function slowStep(){
-        if(steps<=0){
-          const n=rndArr(min,max);n[2]=targets[0];buildBalls(n,true)
-          const cb=document.getElementById('cb');if(cb)cb.classList.add('glow')
-          rbn.textContent=targets[0];rbn.className='landed';rolling=false;setTimeout(hide,4500);return
-        }
-        const n=rndArr(min,max);n[2]=steps<=4?targets[0]:rnd(min,max);buildBalls(n)
-        rbn.textContent=n[2];delay=Math.min(delay*1.3,450);steps--;setTimeout(slowStep,delay)
-      }
-      slowStep()
-    },Math.max(spinMs-1800,300))
+      // Show winner
+      wball.textContent=targets[0];wball.classList.add('show')
+      rbn.textContent=targets[0];rbn.className='landed'
+      rolling=false;setTimeout(hide,5000)
+    },Math.max(spinMs-800,500))
   }
 }
-function hide(){wrap.classList.remove('show');clearInterval(rollIv);rolling=false;rchips.innerHTML=''}
+function hide(){wrap.classList.remove('show');clearInterval(rollIv);rolling=false;rchips.innerHTML='';setTimeout(()=>{wball.classList.remove('show');rbn.className='rolling';rbn.textContent='?'},600)}
 function connect(){
   const ws=new WebSocket('ws://localhost:${port}/__overlay_ws__')
   ws.onmessage=e=>{
@@ -1255,6 +1285,219 @@ function connect(){
       const msg=JSON.parse(e.data)
       if(msg.type==='game:state'&&msg.data?.id==='number'&&msg.data?.status==='running'){
         const ns=msg.data.number;if(ns?.result)rollAnimation(ns.min,ns.max,ns.result,ns.spinMs??3000,ns.triggeredBy??'')
+      }
+      if(msg.type==='ping')ws.send(JSON.stringify({type:'pong'}))
+    }catch{}
+  }
+  ws.onclose=()=>setTimeout(connect,2000)
+}
+connect()
+<\/script>
+</body>
+</html>`
+
+const LOTTERY_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:transparent !important;overflow:hidden;font-family:'Noto Sans KR',sans-serif}
+#lw{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.82);opacity:0;pointer-events:none;width:620px;transition:opacity 0.5s ease,transform 0.5s cubic-bezier(0.34,1.56,0.64,1)}
+#lw.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.card{position:relative;border-radius:18px;overflow:hidden;box-shadow:0 0 0 5px #C9A227,0 0 0 8px rgba(60,0,120,0.6),0 28px 80px rgba(0,0,0,0.75)}
+.cbg{position:absolute;inset:0;background:linear-gradient(172deg,#210055 0%,#440096 38%,#5800b0 62%,#360070 100%)}
+/* Sunburst rays via conic gradient */
+.rays{position:absolute;top:0;left:0;right:0;height:148px;overflow:hidden;background:repeating-conic-gradient(from 0deg at 50% -5%,rgba(255,255,255,0.09) 0deg 7deg,rgba(255,255,255,0) 7deg 17deg);mask:linear-gradient(180deg,rgba(0,0,0,0.55) 0%,transparent 100%);-webkit-mask:linear-gradient(180deg,rgba(0,0,0,0.55) 0%,transparent 100%)}
+/* Gold frame */
+.fo{position:absolute;inset:8px;border:2.5px solid #C9A227;border-radius:12px;pointer-events:none;z-index:10}
+.fi{position:absolute;inset:13px;border:1px solid rgba(201,162,39,0.5);border-radius:8px;pointer-events:none;z-index:10}
+.fo::before,.fo::after{content:'';position:absolute;width:10px;height:10px;border-radius:50%;background:#C9A227;box-shadow:0 0 6px rgba(201,162,39,0.8)}
+.fo::before{top:5px;left:5px}.fo::after{bottom:5px;right:5px}
+/* Header */
+.hdr{position:relative;height:148px;display:flex;align-items:center;justify-content:center;gap:8px;padding:0 20px}
+.sp{color:#FFD700;font-size:34px;line-height:1;text-shadow:0 0 10px rgba(255,215,0,0.8),0 0 24px rgba(255,215,0,0.4);animation:spA 2s ease-in-out infinite;display:inline-block}
+.sp2{color:#FFD700;font-size:22px;line-height:1;text-shadow:0 0 7px rgba(255,215,0,0.7);animation:spA 2.5s ease-in-out infinite reverse;display:inline-block;align-self:flex-end;margin-bottom:18px}
+@keyframes spA{0%,100%{transform:rotate(0deg) scale(1)}50%{transform:rotate(22deg) scale(1.2)}}
+.title{display:flex;align-items:baseline}
+.ty{font-size:64px;font-weight:900;color:#FFD700;-webkit-text-stroke:4px #2a0060;text-shadow:4px 4px 0 #2a0060,-1px -1px 0 #2a0060,0 0 24px rgba(255,215,0,0.5);line-height:1}
+.tw{font-size:64px;font-weight:900;color:#FFFFFF;-webkit-text-stroke:4px #2a0060;text-shadow:4px 4px 0 #2a0060,-1px -1px 0 #2a0060;line-height:1}
+.msp{position:absolute;color:#FFD700;text-shadow:0 0 5px rgba(255,215,0,0.9);animation:mspA 1.6s ease-in-out infinite}
+@keyframes mspA{0%,100%{opacity:0.35;transform:scale(1)}50%{opacity:1;transform:scale(1.35)}}
+/* Scratch wrap */
+.sw{position:relative;margin:0 18px 18px;border-radius:12px;overflow:hidden;background:#C8C8C8}
+/* Prize zone (underneath canvas) */
+.pz{position:relative;min-height:218px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 24px 20px;gap:6px;background:linear-gradient(145deg,#f5f5f5 0%,#ebebeb 45%,#f2f2f2 100%)}
+.pz-bg{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 40%,rgba(255,255,255,0.65) 0%,transparent 70%)}
+#pm{font-size:54px;font-weight:900;text-align:center;line-height:1;position:relative;z-index:1;transition:color 0.3s}
+#pd{font-size:18px;font-weight:700;color:#555;text-align:center;position:relative;z-index:1}
+#pb{font-size:13px;color:#999;position:relative;z-index:1;margin-top:4px}
+/* Canvas (silver foil) */
+#sc{position:absolute;inset:0;width:100%;height:100%;display:block}
+/* Scratch particles hint */
+.scratch-hint{position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:12px;font-weight:800;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.5);z-index:20;pointer-events:none;animation:hintP 1s ease-in-out infinite}
+@keyframes hintP{0%,100%{opacity:0.4}50%{opacity:1}}
+/* Pop animation when revealed */
+@keyframes popIn{0%{transform:scale(0.4) rotate(-5deg);opacity:0}60%{transform:scale(1.1) rotate(2deg)}100%{transform:scale(1) rotate(0deg);opacity:1}}
+.popin{animation:popIn 0.65s cubic-bezier(0.34,1.56,0.64,1) both}
+/* Jackpot shimmer */
+@keyframes shimmer{0%{filter:hue-rotate(0deg) brightness(1)}50%{filter:hue-rotate(30deg) brightness(1.2)}100%{filter:hue-rotate(0deg) brightness(1)}}
+.shimmer{animation:shimmer 1.2s ease-in-out infinite}
+</style>
+</head>
+<body>
+<div id="lw">
+  <div class="card">
+    <div class="cbg"></div>
+    <div class="rays"></div>
+    <div class="fo"></div>
+    <div class="fi"></div>
+    <!-- mini sparkles -->
+    <span class="msp" style="left:28px;top:26px;font-size:14px;animation-delay:0s">✦</span>
+    <span class="msp" style="left:76px;top:74px;font-size:10px;animation-delay:0.4s">✧</span>
+    <span class="msp" style="left:115px;top:18px;font-size:12px;animation-delay:0.2s">✦</span>
+    <span class="msp" style="right:28px;top:26px;font-size:14px;animation-delay:0.7s">✦</span>
+    <span class="msp" style="right:76px;top:74px;font-size:10px;animation-delay:0.9s">✧</span>
+    <span class="msp" style="right:115px;top:18px;font-size:12px;animation-delay:0.5s">✦</span>
+    <div class="hdr">
+      <span class="sp">✦</span>
+      <span class="sp2">✦</span>
+      <div class="title"><span class="ty">행운</span><span class="tw">복권</span></div>
+      <span class="sp2">✦</span>
+      <span class="sp">✦</span>
+    </div>
+    <div class="sw" id="sw">
+      <div class="pz">
+        <div class="pz-bg"></div>
+        <div id="pm">?</div>
+        <div id="pd"></div>
+        <div id="pb"></div>
+      </div>
+      <canvas id="sc"></canvas>
+    </div>
+  </div>
+</div>
+<script>
+const cvs=document.getElementById('sc'),ctx=cvs.getContext('2d')
+const swEl=document.getElementById('sw'),wrap=document.getElementById('lw')
+const pmEl=document.getElementById('pm'),pdEl=document.getElementById('pd'),pbEl=document.getElementById('pb')
+let active=false
+
+function initCanvas(){
+  cvs.width=swEl.offsetWidth||584;cvs.height=swEl.offsetHeight||218
+  drawSilver()
+}
+
+function drawSilver(){
+  const w=cvs.width,h=cvs.height
+  // Base gradient
+  const g=ctx.createLinearGradient(0,0,w*0.8,h)
+  g.addColorStop(0,'#B4B4B4');g.addColorStop(0.15,'#D8D8D8')
+  g.addColorStop(0.3,'#EDEDED');g.addColorStop(0.45,'#F6F6F6')
+  g.addColorStop(0.55,'#F0F0F0');g.addColorStop(0.7,'#D2D2D2')
+  g.addColorStop(0.85,'#BEBEBE');g.addColorStop(1,'#A8A8A8')
+  ctx.fillStyle=g;ctx.fillRect(0,0,w,h)
+  // Horizontal metallic grain
+  ctx.globalAlpha=0.07
+  for(let y=0;y<h;y+=2){
+    const v=145+Math.random()*55
+    ctx.fillStyle='rgb('+v+','+v+','+v+')'
+    ctx.fillRect(0,y,w,1)
+  }
+  ctx.globalAlpha=1
+  // Pixel noise for texture
+  const img=ctx.getImageData(0,0,w,h),d=img.data
+  for(let i=0;i<d.length;i+=4){
+    const n=(Math.random()-0.5)*22
+    d[i]=Math.max(100,Math.min(255,d[i]+n))
+    d[i+1]=Math.max(100,Math.min(255,d[i+1]+n))
+    d[i+2]=Math.max(100,Math.min(255,d[i+2]+n))
+  }
+  ctx.putImageData(img,0,0)
+  // Bright sheen stripes
+  ctx.globalAlpha=0.22
+  const sg=ctx.createLinearGradient(0,0,w,0)
+  sg.addColorStop(0,'transparent');sg.addColorStop(0.2,'rgba(255,255,255,0.9)')
+  sg.addColorStop(0.45,'rgba(255,255,255,0.5)');sg.addColorStop(0.7,'rgba(255,255,255,0.8)')
+  sg.addColorStop(1,'transparent')
+  ctx.fillStyle=sg
+  for(let y=0;y<h;y+=22){ctx.fillRect(0,y,w,7+Math.random()*4)}
+  ctx.globalAlpha=1
+}
+
+function genStrokes(w,h){
+  const rows=14,rowH=h/rows,strokes=[]
+  for(let r=0;r<rows;r++){
+    const baseY=rowH*r+rowH*0.35+Math.random()*rowH*0.3
+    const ltr=r%2===0,pts=[]
+    let x=ltr?-24:w+24
+    while(ltr?x<w+24:x>-24){
+      pts.push({x:x+(Math.random()*10-5),y:baseY+(Math.random()*rowH*0.5-rowH*0.25)})
+      x+=ltr?(8+Math.random()*5):-(8+Math.random()*5)
+    }
+    strokes.push(pts)
+  }
+  return strokes
+}
+
+function animateScratch(strokes,totalMs,onDone){
+  const totalPts=strokes.reduce((s,st)=>s+st.length,0)
+  const msPerPt=totalMs/totalPts
+  ctx.globalCompositeOperation='destination-out'
+  let si=0,pi=0,lastT=null,accT=0,r0=22
+  function step(t){
+    if(lastT!==null)accT+=t-lastT;lastT=t
+    const want=Math.ceil(accT/msPerPt)
+    let drew=0
+    while(si<strokes.length&&drew<want){
+      const p=strokes[si][pi]
+      ctx.beginPath();ctx.arc(p.x,p.y,r0+(Math.random()*5-2.5),0,Math.PI*2);ctx.fill()
+      pi++;drew++
+      if(pi>=strokes[si].length){si++;pi=0}
+    }
+    accT-=drew*msPerPt
+    if(si<strokes.length){requestAnimationFrame(step)}
+    else{
+      // Ensure full clear
+      ctx.fillRect(0,0,cvs.width,cvs.height)
+      ctx.globalCompositeOperation='source-over'
+      onDone()
+    }
+  }
+  requestAnimationFrame(step)
+}
+
+function showLottery(prize,color,detail,by,scratchMs){
+  if(active)return;active=true
+  pmEl.textContent=prize;pmEl.style.color=color;pmEl.className=''
+  pdEl.textContent=detail;pbEl.textContent=by?by+'님의 복권':''
+  initCanvas();wrap.classList.add('show')
+  setTimeout(()=>{
+    const strokes=genStrokes(cvs.width,cvs.height)
+    animateScratch(strokes,scratchMs,()=>{
+      pmEl.classList.add('popin')
+      setTimeout(hide,5000)
+    })
+  },800)
+}
+
+function hide(){
+  wrap.classList.remove('show')
+  setTimeout(()=>{
+    active=false;pmEl.classList.remove('popin')
+    ctx.globalCompositeOperation='source-over';ctx.clearRect(0,0,cvs.width,cvs.height)
+  },600)
+}
+
+function connect(){
+  const ws=new WebSocket('ws://localhost:${port}/__overlay_ws__')
+  ws.onmessage=e=>{
+    try{
+      const msg=JSON.parse(e.data)
+      if(msg.type==='game:state'&&msg.data?.id==='lottery'&&msg.data?.status==='running'){
+        const ls=msg.data.lottery
+        if(ls)showLottery(ls.prize,ls.color,ls.detail,ls.triggeredBy,ls.scratchMs??3000)
       }
       if(msg.type==='ping')ws.send(JSON.stringify({type:'pong'}))
     }catch{}
@@ -1917,6 +2160,7 @@ export class OverlayServer {
       else if (gameId === 'slot')      html = SLOT_OVERLAY_HTML(port)
       else if (gameId === 'boss')      html = BOSS_OVERLAY_HTML(port)
       else if (gameId === 'number')    html = NUMBER_OVERLAY_HTML(port)
+      else if (gameId === 'lottery')   html = LOTTERY_OVERLAY_HTML(port)
       else if (gameId === 'pickboard') html = PICKBOARD_OVERLAY_HTML(port)
       else html = OVERLAY_HTML(gameId, 'purple', port)
       res.end(html)
