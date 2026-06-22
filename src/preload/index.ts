@@ -38,10 +38,11 @@ contextBridge.exposeInMainWorld('electron', {
   statsGet: () => ipcRenderer.invoke('stats:get'),
 
   // Auth
-  authVerify:  (id: string) => ipcRenderer.invoke('auth:verify', id),
-  authGetUser: ()           => ipcRenderer.invoke('auth:getUser'),
-  authLogout:  ()           => ipcRenderer.invoke('auth:logout'),
-  authRecheck: ()           => ipcRenderer.invoke('auth:recheck'),
+  authVerify:    (id: string) => ipcRenderer.invoke('auth:verify', id),
+  authGetUser:   ()           => ipcRenderer.invoke('auth:getUser'),
+  authLogout:    ()           => ipcRenderer.invoke('auth:logout'),
+  authRecheck:   ()           => ipcRenderer.invoke('auth:recheck'),
+  authSoopLogin: ()           => ipcRenderer.invoke('auth:soopLogin'),
 
   // Quiz
   quizStartManual: (opts: { question: string; answer: string; timeLimit: number }) =>

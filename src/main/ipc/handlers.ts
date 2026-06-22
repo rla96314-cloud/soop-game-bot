@@ -4,6 +4,7 @@ import { soopClient }              from '../soop/client'
 import { overlayServer }           from '../overlay/server'
 import { loadSettings, patchSettings, saveSettings } from '../store/settings'
 import { verifyUser, fetchAllowlist }               from '../auth/allowlist'
+import { openSoopLoginWindow }                      from '../auth/soopLogin'
 import { fetchTodaySchedule }                       from '../schedule/fetcher'
 import { weflabWatcher }                            from '../weflab/watcher'
 
@@ -114,6 +115,17 @@ export function registerIpcHandlers(win: BrowserWindow) {
     const s = loadSettings()
     if (!s.user?.id) return { ok: false, error: '저장된 사용자 없음' }
     return verifyUser(s.user.id)
+  })
+  // SOOP OAuth login window
+  ipcMain.handle('auth:soopLogin', async () => {
+    const identity = await openSoopLoginWindow(win)
+    if (!identity) return { ok: false, error: '로그인 취소됨' }
+    const result = await verifyUser(identity.id)
+    if (result.ok && result.user) {
+      patchSettings({ user: result.user })
+      return { ok: true, user: result.user }
+    }
+    return { ok: false, error: `허용되지 않은 계정입니다 (${identity.id}). 방장에게 추가를 요청하세요.` }
   })
 
   // Quiz manual start
