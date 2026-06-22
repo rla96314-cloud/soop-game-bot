@@ -782,9 +782,12 @@ function spinText(items, winner, spinMs) {
 }
 
 // ── Handlers ──────────────────────────────────────────────────────────────────
+const tSlotOuter = document.querySelector('.t-slot-outer')
+
 function startSpin(data) {
   if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }
   wRes.style.display = 'none'; textRes.style.display = 'none'
+  if (tSlotOuter) tSlotOuter.style.display = 'block'
   setMode(data.animType ?? 'wheel'); show()
   if (data.animType === 'text') spinText(data.items, data.winner, data.spinMs)
   else spinWheel(data.items, data.winnerIdx, data.spinMs)
@@ -793,6 +796,7 @@ function startSpin(data) {
 function showResult(result, animType) {
   const txt = result.result
   if (animType === 'text') {
+    if (tSlotOuter) tSlotOuter.style.display = 'none'
     textRes.innerHTML = '<span class="t-res-inner"><span class="t-bar2"></span><span class="t-bar"></span>&nbsp;' + txt + '&nbsp;<span class="t-bar"></span><span class="t-bar2"></span></span>'
     textRes.style.display = 'block'
   } else {
