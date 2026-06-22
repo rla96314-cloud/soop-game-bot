@@ -2,6 +2,1183 @@ import { createServer, IncomingMessage, ServerResponse } from 'http'
 import { WebSocketServer, WebSocket } from 'ws'
 import type { GameResult, GameState } from '../games/engine'
 
+// ── Quiz overlay ──────────────────────────────────────────────────────────────
+
+const QUIZ_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: transparent; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
+
+  .quiz-box {
+    position: fixed;
+    bottom: 80px; left: 50%;
+    transform: translateX(-50%) translateY(140px);
+    width: 720px;
+    background: rgba(12, 8, 35, 0.93);
+    border: 2px solid rgba(139, 92, 246, 0.7);
+    border-radius: 22px;
+    padding: 28px 36px;
+    backdrop-filter: blur(18px);
+    box-shadow: 0 12px 48px rgba(109,40,217,0.45);
+    opacity: 0;
+    transition: transform 0.5s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
+  }
+  .quiz-box.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+  .quiz-tag {
+    font-size: 11px; font-weight: 800; letter-spacing: 0.15em;
+    text-transform: uppercase; color: #A78BFA; margin-bottom: 12px;
+  }
+  .quiz-q {
+    font-size: 26px; font-weight: 800; color: #fff;
+    line-height: 1.3; margin-bottom: 20px; letter-spacing: -0.02em;
+  }
+  .timer-row { display: flex; align-items: center; gap: 12px; }
+  .timer-bar {
+    flex: 1; height: 8px; background: rgba(255,255,255,0.12);
+    border-radius: 4px; overflow: hidden;
+  }
+  .timer-fill {
+    height: 100%; border-radius: 4px;
+    background: #10B981;
+    transition: width 0.9s linear, background 0.5s;
+  }
+  .timer-num {
+    font-family: 'Inter', monospace; font-size: 18px;
+    font-weight: 800; color: rgba(255,255,255,0.85);
+    width: 36px; text-align: right;
+  }
+  .result-row {
+    margin-top: 16px; padding-top: 16px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    font-size: 22px; font-weight: 800; color: #fff;
+    display: none; align-items: center; gap: 10px;
+  }
+  .result-row.visible { display: flex; }
+  .result-win  { color: #10B981; }
+  .result-fail { color: rgba(255,255,255,0.6); font-size: 16px; }
+
+  @keyframes pop {
+    0%   { transform: scale(0.7); opacity: 0; }
+    60%  { transform: scale(1.08); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .result-row.visible { animation: pop 0.4s ease; }
+</style>
+</head>
+<body>
+<div class="quiz-box" id="box">
+  <div class="quiz-tag">❓ 퀴즈 도전!</div>
+  <div class="quiz-q" id="q-text">문제를 불러오는 중...</div>
+  <div class="timer-row" id="timer-row">
+    <div class="timer-bar"><div class="timer-fill" id="t-fill" style="width:100%"></div></div>
+    <div class="timer-num" id="t-num">--</div>
+  </div>
+  <div class="result-row" id="result-row">
+    <span id="result-icon"></span>
+    <span id="result-text"></span>
+  </div>
+</div>
+<script>
+  const box      = document.getElementById('box')
+  const qText    = document.getElementById('q-text')
+  const tFill    = document.getElementById('t-fill')
+  const tNum     = document.getElementById('t-num')
+  const timerRow = document.getElementById('timer-row')
+  const resultRow= document.getElementById('result-row')
+  const resIcon  = document.getElementById('result-icon')
+  const resText  = document.getElementById('result-text')
+
+  let ticker = null
+  let deadline = 0
+  let totalSec = 30
+  let hideTimer = null
+
+  function show() { box.classList.add('show') }
+  function hide() { box.classList.remove('show') }
+
+  function startTimer(dl, limit) {
+    deadline = dl; totalSec = limit
+    if (ticker) clearInterval(ticker)
+    timerRow.style.display = ''
+    resultRow.classList.remove('visible')
+
+    const tick = () => {
+      const left = Math.max(0, (deadline - Date.now()) / 1000)
+      tNum.textContent = Math.ceil(left)
+      tFill.style.width = (left / totalSec * 100) + '%'
+      tFill.style.background = left > totalSec * 0.35 ? '#10B981' : '#EF4444'
+      if (left <= 0) { clearInterval(ticker); ticker = null }
+    }
+    tick()
+    ticker = setInterval(tick, 200)
+  }
+
+  function showResult(text, isWin) {
+    if (ticker) { clearInterval(ticker); ticker = null }
+    timerRow.style.display = 'none'
+    resIcon.textContent  = isWin ? '🎉' : '⏰'
+    resText.textContent  = text
+    resText.className    = isWin ? 'result-win' : 'result-fail'
+    resultRow.classList.add('visible')
+    if (hideTimer) clearTimeout(hideTimer)
+    hideTimer = setTimeout(hide, 7000)
+  }
+
+  function connect() {
+    const ws = new WebSocket('ws://localhost:${port}/__overlay_ws__')
+    ws.onmessage = e => {
+      try {
+        const msg = JSON.parse(e.data)
+
+        if (msg.type === 'game:state' && msg.data?.id === 'quiz') {
+          const s = msg.data
+          if (s.status === 'collecting' && s.quiz) {
+            qText.textContent = s.quiz.question
+            const limitSec = Math.max(1, Math.round((s.quiz.deadline - Date.now()) / 1000))
+            startTimer(s.quiz.deadline, limitSec)
+            show()
+          } else if (s.status === 'showing_result' && s.result) {
+            const isWin = !s.result.result.includes('시간 초과')
+            showResult(s.result.result, isWin)
+          } else if (s.status === 'idle') {
+            if (!resultRow.classList.contains('visible')) hide()
+          }
+        }
+
+        if (msg.type === 'ping') ws.send(JSON.stringify({type:'pong'}))
+      } catch {}
+    }
+    ws.onclose = () => setTimeout(connect, 2000)
+  }
+  connect()
+<\/script>
+</body>
+</html>`
+
+// ── Ladder overlay ────────────────────────────────────────────────────────────
+
+const LADDER_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: transparent; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
+
+  #box {
+    position: fixed; bottom: 40px; left: 50%;
+    transform: translateX(-50%) translateY(120px);
+    width: 680px; max-width: 95vw;
+    background: rgba(10,6,28,0.92);
+    border: 2px solid rgba(59,130,246,0.5);
+    border-radius: 20px;
+    overflow: hidden;
+    backdrop-filter: blur(18px);
+    box-shadow: 0 12px 48px rgba(37,99,235,0.3);
+    opacity: 0;
+    transition: transform 0.5s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
+  }
+  #box.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+  .hdr {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 18px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .hdr-title { font-size: 13px; font-weight: 800; color: #93C5FD; flex: 1; }
+  .hdr-count { font-size: 12px; color: rgba(255,255,255,0.5); }
+  .timer-bar { height: 4px; background: rgba(255,255,255,0.1); }
+  .timer-fill { height: 100%; background: #3B82F6; transition: width 0.9s linear; }
+
+  #chips {
+    display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    min-height: 38px;
+  }
+  .chip {
+    padding: 3px 10px; border-radius: 20px;
+    border: 1px solid; font-size: 11px; font-weight: 700;
+  }
+
+  #svg-wrap {
+    background: rgba(0,0,0,0.35);
+    padding: 4px 0;
+    display: none;
+  }
+  #svg-wrap.visible { display: block; }
+  svg { width: 100%; display: block; }
+
+  #results {
+    padding: 10px 16px; display: none;
+    flex-direction: column; gap: 5px;
+  }
+  #results.visible { display: flex; }
+  .res-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; border-radius: 7px;
+    background: rgba(255,255,255,0.05);
+    border-left: 3px solid;
+    font-size: 12px; color: rgba(255,255,255,0.85);
+  }
+  .res-user  { font-weight: 700; }
+  .res-arrow { color: rgba(255,255,255,0.3); }
+  .res-prize { color: #fff; font-weight: 600; }
+</style>
+</head>
+<body>
+<div id="box">
+  <div class="hdr">
+    <span class="hdr-title">🪜 사다리타기</span>
+    <span class="hdr-count" id="count"></span>
+  </div>
+  <div class="timer-bar"><div class="timer-fill" id="tfill" style="width:100%"></div></div>
+  <div id="chips"></div>
+  <div id="svg-wrap"><svg id="lsvg" viewBox="0 0 600 240"></svg></div>
+  <div id="results"></div>
+</div>
+<script>
+const COLORS = ['#8B5CF6','#EC4899','#3B82F6','#10B981','#F59E0B','#EF4444','#14B8A6','#6366F1']
+const box    = document.getElementById('box')
+const countEl= document.getElementById('count')
+const tfill  = document.getElementById('tfill')
+const chips  = document.getElementById('chips')
+const svgWrap= document.getElementById('svg-wrap')
+const svgEl  = document.getElementById('lsvg')
+const resDiv = document.getElementById('results')
+let hideTimer= null
+
+function show() { box.classList.add('show') }
+function hide() { box.classList.remove('show') }
+
+function renderCollecting(ladder) {
+  svgWrap.classList.remove('visible')
+  resDiv.classList.remove('visible')
+  chips.style.display = ''
+
+  countEl.textContent = ladder.participants.length + '/' + ladder.maxSlots + '명'
+  const elapsed = (ladder.deadline - Date.now()) / 1000
+  const total   = (ladder.deadline - Date.now() + elapsed * 1000) / 1000
+  tfill.style.width = Math.max(0, Math.min(100, (elapsed / 30) * 100)) + '%'
+
+  chips.innerHTML = ''
+  ladder.participants.forEach((p, i) => {
+    const c = document.createElement('span')
+    c.className = 'chip'
+    c.textContent = p
+    c.style.color = COLORS[i % COLORS.length]
+    c.style.borderColor = COLORS[i % COLORS.length] + '88'
+    c.style.background  = COLORS[i % COLORS.length] + '22'
+    chips.appendChild(c)
+  })
+  show()
+}
+
+function renderResult(ld) {
+  chips.style.display = 'none'
+  tfill.style.width = '0%'
+
+  // Draw SVG ladder
+  const COL_W = 72, ROW_H = 22, PAD_X = 36, PAD_T = 36, PAD_B = 36
+  const cols = ld.cols, rows = ld.rows
+  const W = PAD_X * 2 + (cols - 1) * COL_W
+  const H = PAD_T + rows * ROW_H + PAD_B
+  svgEl.setAttribute('viewBox', '0 0 ' + W + ' ' + H)
+  svgEl.style.height = H + 'px'
+  svgEl.innerHTML = ''
+  svgWrap.classList.add('visible')
+
+  const x = c => PAD_X + c * COL_W
+  const svg = (tag, attrs) => {
+    const el = document.createElementNS('http://www.w3.org/2000/svg', tag)
+    Object.entries(attrs).forEach(([k,v]) => el.setAttribute(k, v))
+    return el
+  }
+
+  // Rails
+  for (let c = 0; c < cols; c++) {
+    svgEl.appendChild(svg('line', {
+      x1: x(c), y1: PAD_T, x2: x(c), y2: PAD_T + rows * ROW_H,
+      stroke: 'rgba(255,255,255,0.18)', 'stroke-width': 2
+    }))
+  }
+  // Rungs
+  ld.rungs.forEach(rg => {
+    svgEl.appendChild(svg('line', {
+      x1: x(rg.leftCol), y1: PAD_T + rg.row * ROW_H,
+      x2: x(rg.leftCol + 1), y2: PAD_T + rg.row * ROW_H,
+      stroke: 'rgba(255,255,255,0.3)', 'stroke-width': 2
+    }))
+  })
+  // Names top
+  ld.order.forEach((name, c) => {
+    const t = svg('text', { x: x(c), y: PAD_T - 8, 'text-anchor':'middle',
+      'font-size': 10, 'font-weight': 700, fill: COLORS[c % COLORS.length] })
+    t.textContent = name.length > 6 ? name.slice(0,5) + '…' : name
+    svgEl.appendChild(t)
+  })
+  // Prizes bottom
+  ld.prizes.forEach((prize, c) => {
+    const t = svg('text', { x: x(c), y: PAD_T + rows * ROW_H + 18, 'text-anchor':'middle',
+      'font-size': 9, fill: 'rgba(255,255,255,0.55)' })
+    t.textContent = prize.length > 6 ? prize.slice(0,5)+'…' : prize
+    svgEl.appendChild(t)
+  })
+
+  // Animate paths
+  let step = 0
+  const lines = ld.paths.map((path, pi) => {
+    const pl = svg('polyline', { fill:'none', stroke: COLORS[pi % COLORS.length],
+      'stroke-width': 2, 'stroke-opacity': 0.85, points: x(path.cols[0]) + ',' + PAD_T })
+    svgEl.appendChild(pl)
+    return pl
+  })
+  const dots = ld.paths.map((path, pi) => {
+    const c = svg('circle', { r:4, fill: COLORS[pi % COLORS.length],
+      cx: x(path.cols[0]), cy: PAD_T })
+    svgEl.appendChild(c)
+    return c
+  })
+
+  const tick = setInterval(() => {
+    step++
+    ld.paths.forEach((path, pi) => {
+      const pts = path.cols.slice(0, step + 1).map((c, r) => x(c) + ',' + (PAD_T + r * ROW_H)).join(' ')
+      lines[pi].setAttribute('points', pts)
+      const cr = Math.min(step, rows)
+      dots[pi].setAttribute('cx', x(path.cols[cr]))
+      dots[pi].setAttribute('cy', PAD_T + cr * ROW_H)
+    })
+    if (step >= rows) {
+      clearInterval(tick)
+      // Show result list
+      resDiv.innerHTML = ''
+      ld.results.forEach(r => {
+        const row = document.createElement('div')
+        row.className = 'res-row'
+        row.style.borderLeftColor = COLORS[r.startCol % COLORS.length]
+        row.innerHTML =
+          '<span class="res-user" style="color:' + COLORS[r.startCol % COLORS.length] + '">' + r.user + '</span>' +
+          '<span class="res-arrow">→</span><span class="res-prize">' + r.prize + '</span>'
+        resDiv.appendChild(row)
+      })
+      resDiv.classList.add('visible')
+      if (hideTimer) clearTimeout(hideTimer)
+      hideTimer = setTimeout(hide, 10000)
+    }
+  }, 55)
+}
+
+function connect() {
+  const ws = new WebSocket('ws://localhost:${port}/__overlay_ws__')
+  ws.onmessage = e => {
+    try {
+      const msg = JSON.parse(e.data)
+      if (msg.type === 'game:state' && msg.data?.id === 'ladder') {
+        const s = msg.data
+        if (s.status === 'collecting' && s.ladder) renderCollecting(s.ladder)
+        else if (s.status === 'showing_result' && s.ladder?.ladderData) renderResult(s.ladder.ladderData)
+        else if (s.status === 'idle') hide()
+      }
+      if (msg.type === 'ping') ws.send(JSON.stringify({type:'pong'}))
+    } catch {}
+  }
+  ws.onclose = () => setTimeout(connect, 2000)
+}
+connect()
+<\/script>
+</body>
+</html>`
+
+// ── Roulette overlay (wheel + text slot) ─────────────────────────────────────
+
+const ROULETTE_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: transparent; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
+
+  /* ── Shared wrapper ── */
+  #rbox {
+    position: fixed; bottom: 60px; left: 50%;
+    transform: translateX(-50%) translateY(140px);
+    opacity: 0;
+    transition: transform 0.5s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
+  }
+  #rbox.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+  /* ── Wheel mode ── */
+  #wheel-wrap {
+    display: none;
+    flex-direction: column; align-items: center; gap: 12px;
+  }
+  #wheel-wrap.active { display: flex; }
+  .wheel-pointer {
+    width: 0; height: 0;
+    border-left: 14px solid transparent;
+    border-right: 14px solid transparent;
+    border-top: 28px solid #fff;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
+    z-index: 10;
+    margin-bottom: -10px;
+  }
+  canvas#wcanvas { border-radius: 50%; box-shadow: 0 0 40px rgba(139,92,246,0.6); }
+  #wheel-result {
+    display: none; padding: 14px 32px; border-radius: 16px;
+    background: rgba(10,6,28,0.92); border: 2px solid rgba(139,92,246,0.6);
+    font-size: 22px; font-weight: 900; color: #fff; text-align: center;
+    backdrop-filter: blur(12px);
+    animation: wPop 0.4s ease;
+  }
+  @keyframes wPop { 0%{transform:scale(0.7);opacity:0} 60%{transform:scale(1.08)} 100%{transform:scale(1);opacity:1} }
+
+  /* ── Text slot mode ── */
+  #text-wrap {
+    display: none;
+    width: 420px;
+    background: rgba(10,6,28,0.92);
+    border: 2px solid rgba(139,92,246,0.6);
+    border-radius: 20px;
+    overflow: hidden;
+    backdrop-filter: blur(16px);
+    box-shadow: 0 12px 48px rgba(109,40,217,0.45);
+  }
+  #text-wrap.active { display: block; }
+  .text-header {
+    padding: 12px 20px;
+    font-size: 11px; font-weight: 800; letter-spacing: 0.15em;
+    color: #A78BFA; border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .text-slot-outer {
+    height: 72px; overflow: hidden; position: relative;
+  }
+  .text-slot-outer::before, .text-slot-outer::after {
+    content: ''; position: absolute; left: 0; right: 0; height: 20px; z-index: 2; pointer-events: none;
+  }
+  .text-slot-outer::before { top: 0; background: linear-gradient(to bottom, rgba(10,6,28,0.9), transparent); }
+  .text-slot-outer::after  { bottom: 0; background: linear-gradient(to top,   rgba(10,6,28,0.9), transparent); }
+  .text-slot-inner {
+    display: flex; flex-direction: column; align-items: center;
+    transition: transform 0s;
+  }
+  .text-slot-item {
+    height: 72px; display: flex; align-items: center; justify-content: center;
+    font-size: 26px; font-weight: 900; color: #fff; letter-spacing: -0.02em;
+    flex-shrink: 0; width: 100%; padding: 0 24px; text-align: center;
+  }
+  .text-highlight-line {
+    position: absolute; top: 50%; left: 12px; right: 12px;
+    height: 2px; background: rgba(139,92,246,0.5); transform: translateY(-50%); z-index: 1;
+  }
+  #text-result {
+    display: none; padding: 12px 20px; border-top: 1px solid rgba(255,255,255,0.08);
+    font-size: 18px; font-weight: 800; color: #fff; text-align: center;
+  }
+</style>
+</head>
+<body>
+<div id="rbox">
+  <!-- Wheel mode -->
+  <div id="wheel-wrap">
+    <div class="wheel-pointer"></div>
+    <canvas id="wcanvas" width="340" height="340"></canvas>
+    <div id="wheel-result"></div>
+  </div>
+
+  <!-- Text slot mode -->
+  <div id="text-wrap">
+    <div class="text-header">🎡 룰렛 돌아가는 중...</div>
+    <div class="text-slot-outer">
+      <div class="text-highlight-line"></div>
+      <div class="text-slot-inner" id="slot-inner"></div>
+    </div>
+    <div id="text-result"></div>
+  </div>
+</div>
+
+<script>
+const COLORS = [
+  '#8B5CF6','#EC4899','#3B82F6','#10B981',
+  '#F59E0B','#EF4444','#14B8A6','#6366F1',
+  '#F97316','#06B6D4','#84CC16','#A855F7',
+]
+
+const rbox        = document.getElementById('rbox')
+const wheelWrap   = document.getElementById('wheel-wrap')
+const textWrap    = document.getElementById('text-wrap')
+const wcanvas     = document.getElementById('wcanvas')
+const ctx         = wcanvas.getContext('2d')
+const wheelResult = document.getElementById('wheel-result')
+const slotInner   = document.getElementById('slot-inner')
+const textResult  = document.getElementById('text-result')
+
+let hideTimer = null
+
+function show() { rbox.classList.add('show') }
+function hide() { rbox.classList.remove('show') }
+function setMode(mode) {
+  wheelWrap.classList.toggle('active', mode === 'wheel')
+  textWrap.classList.toggle('active', mode === 'text')
+}
+
+// ── Wheel helpers ──────────────────────────────────────────────────────────────
+
+function drawWheel(items, angle) {
+  const cx = 170, cy = 170, r = 160
+  const total = items.reduce((s, i) => s + i.probability, 0)
+  ctx.clearRect(0, 0, 340, 340)
+  let start = angle
+
+  items.forEach((item, i) => {
+    const sweep = (item.probability / total) * Math.PI * 2
+    const color = COLORS[i % COLORS.length]
+
+    ctx.beginPath()
+    ctx.moveTo(cx, cy)
+    ctx.arc(cx, cy, r, start, start + sweep)
+    ctx.closePath()
+    ctx.fillStyle = color
+    ctx.fill()
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)'
+    ctx.lineWidth = 1.5
+    ctx.stroke()
+
+    // Label
+    const mid  = start + sweep / 2
+    const lx   = cx + Math.cos(mid) * r * 0.65
+    const ly   = cy + Math.sin(mid) * r * 0.65
+    const maxW = r * sweep * 0.8
+
+    ctx.save()
+    ctx.translate(lx, ly)
+    ctx.rotate(mid + Math.PI / 2)
+    ctx.fillStyle = '#fff'
+    ctx.font = 'bold 12px "Noto Sans KR", sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+
+    const label = item.name.length > 8 ? item.name.slice(0, 7) + '…' : item.name
+    ctx.fillText(label, 0, 0)
+    ctx.restore()
+
+    start += sweep
+  })
+
+  // Center circle
+  ctx.beginPath()
+  ctx.arc(cx, cy, 22, 0, Math.PI * 2)
+  ctx.fillStyle = 'rgba(10,6,28,0.8)'
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)'
+  ctx.lineWidth = 2
+  ctx.stroke()
+}
+
+function spinWheel(items, winnerIdx, spinMs) {
+  const total   = items.reduce((s, i) => s + i.probability, 0)
+  let cumAngle  = -Math.PI / 2  // start at top
+  let winStart  = 0
+
+  items.forEach((item, i) => {
+    const sweep = (item.probability / total) * Math.PI * 2
+    if (i === winnerIdx) winStart = cumAngle + sweep / 2
+    cumAngle += sweep
+  })
+
+  // We want winner at top (-π/2). targetAngle = -(winStart - (-π/2)) = -winStart - π/2
+  // Add extra full rotations for drama
+  const extraRots  = 5
+  const finalAngle = -Math.PI / 2 - winStart + extraRots * Math.PI * 2
+
+  const startTime  = performance.now()
+  const startAngle = 0
+
+  function ease(t) {
+    // Ease out cubic
+    return 1 - Math.pow(1 - t, 3)
+  }
+
+  function tick(now) {
+    const t = Math.min(1, (now - startTime) / spinMs)
+    const currentAngle = startAngle + ease(t) * finalAngle
+    drawWheel(items, currentAngle)
+    if (t < 1) requestAnimationFrame(tick)
+  }
+
+  requestAnimationFrame(tick)
+}
+
+// ── Text slot helpers ──────────────────────────────────────────────────────────
+
+function spinText(items, winner, spinMs) {
+  slotInner.innerHTML = ''
+  const nameList = items.map(i => i.name)
+  // Repeat list multiple times + end with winner
+  const repeats    = 4
+  const full       = []
+  for (let r = 0; r < repeats; r++) {
+    const shuffled = [...nameList].sort(() => Math.random() - 0.5)
+    full.push(...shuffled)
+  }
+  full.push(winner)
+
+  // Build DOM
+  full.forEach(name => {
+    const el = document.createElement('div')
+    el.className = 'text-slot-item'
+    el.textContent = name
+    slotInner.appendChild(el)
+  })
+
+  const ITEM_H = 72
+  const totalH = full.length * ITEM_H
+  // Start at top, scroll to winner (last item at center = offset of (full.length - 1) * ITEM_H)
+  const targetY = -(full.length - 1) * ITEM_H
+
+  slotInner.style.transition = 'none'
+  slotInner.style.transform  = 'translateY(0)'
+
+  requestAnimationFrame(() => {
+    slotInner.style.transition = 'transform ' + spinMs + 'ms cubic-bezier(0.2,0,0.1,1)'
+    slotInner.style.transform  = 'translateY(' + targetY + 'px)'
+  })
+}
+
+// ── Main spin handler ──────────────────────────────────────────────────────────
+
+function startSpin(data) {
+  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }
+  wheelResult.style.display = 'none'
+  textResult.style.display  = 'none'
+
+  setMode(data.animType ?? 'wheel')
+  show()
+
+  if (data.animType === 'text') {
+    spinText(data.items, data.winner, data.spinMs)
+  } else {
+    spinWheel(data.items, data.winnerIdx, data.spinMs)
+  }
+}
+
+function showResult(result, animType) {
+  if (animType === 'text') {
+    textResult.textContent = '🎉 ' + result.result
+    textResult.style.display = 'block'
+  } else {
+    wheelResult.textContent = '🎉 ' + result.result
+    wheelResult.style.display = 'block'
+  }
+  if (hideTimer) clearTimeout(hideTimer)
+  hideTimer = setTimeout(hide, 7000)
+}
+
+let lastAnimType = 'wheel'
+
+function connect() {
+  const ws = new WebSocket('ws://localhost:${port}/__overlay_ws__')
+  ws.onmessage = e => {
+    try {
+      const msg = JSON.parse(e.data)
+      if (msg.type === 'game:state' && msg.data?.id === 'roulette') {
+        const s = msg.data
+        if (s.status === 'running' && s.roulette) {
+          lastAnimType = s.roulette.animType ?? 'wheel'
+          startSpin(s.roulette)
+        } else if (s.status === 'idle') {
+          hide()
+        }
+      }
+      if (msg.type === 'game:result' && msg.data?.gameId === 'roulette') {
+        showResult(msg.data, lastAnimType)
+      }
+      if (msg.type === 'ping') ws.send(JSON.stringify({type:'pong'}))
+    } catch {}
+  }
+  ws.onclose = () => setTimeout(connect, 2000)
+}
+connect()
+<\/script>
+</body>
+</html>`
+
+const NUMBER_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: transparent; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
+  #num-wrap {
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0.7);
+    opacity: 0; text-align: center;
+    transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+    pointer-events: none;
+  }
+  #num-wrap.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  .num-bg {
+    background: rgba(10,6,28,0.93);
+    border: 3px solid rgba(139,92,246,0.7);
+    border-radius: 32px; padding: 32px 56px 28px;
+    box-shadow: 0 16px 60px rgba(109,40,217,0.5);
+    backdrop-filter: blur(24px);
+    min-width: 320px;
+  }
+  .num-label { font-size: 11px; font-weight: 800; letter-spacing: 0.25em; color: #A78BFA; margin-bottom: 16px; text-transform: uppercase; }
+  .num-display {
+    font-size: 120px; font-weight: 900; color: #fff;
+    letter-spacing: -0.04em; line-height: 1;
+    min-width: 240px; display: inline-block; text-align: center;
+    transition: color 0.3s;
+  }
+  .num-display.rolling { color: rgba(167,139,250,0.6); }
+  .num-display.landed  { color: #fff; animation: landPop 0.4s cubic-bezier(0.34,1.56,0.64,1); }
+  @keyframes landPop { 0%{transform:scale(0.8)} 60%{transform:scale(1.08)} 100%{transform:scale(1)} }
+  .num-range { font-size: 14px; color: rgba(255,255,255,0.4); margin-top: 10px; font-weight: 600; }
+  .num-chips { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+  .num-chip {
+    padding: 6px 16px; border-radius: 20px;
+    background: rgba(139,92,246,0.2); border: 2px solid rgba(139,92,246,0.5);
+    font-size: 24px; font-weight: 900; color: #fff;
+    animation: chipIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes chipIn { from{transform:scale(0);opacity:0} to{transform:scale(1);opacity:1} }
+  .num-by { font-size: 13px; color: rgba(255,255,255,0.4); margin-top: 12px; font-weight: 600; }
+</style>
+</head>
+<body>
+<div id="num-wrap">
+  <div class="num-bg">
+    <div class="num-label">🔢 숫자 추첨</div>
+    <div class="num-display rolling" id="num-display">?</div>
+    <div class="num-chips" id="num-chips" style="display:none"></div>
+    <div class="num-range" id="num-range"></div>
+    <div class="num-by" id="num-by"></div>
+  </div>
+</div>
+<script>
+const wrap=document.getElementById('num-wrap'),display=document.getElementById('num-display'),chips=document.getElementById('num-chips'),range=document.getElementById('num-range'),byEl=document.getElementById('num-by')
+let rolling=false
+function rollAnimation(min,max,targets,spinMs,triggeredBy){
+  if(rolling)return
+  rolling=true
+  wrap.classList.add('show')
+  chips.style.display='none'; chips.innerHTML=''
+  byEl.textContent=triggeredBy+'님 추첨'
+  range.textContent=min+' ~ '+max
+  display.className='num-display rolling'; display.textContent='?'
+  if(targets.length>1){
+    display.style.display='none'; chips.style.display='flex'
+    let idx=0
+    function landNext(){
+      if(idx>=targets.length){setTimeout(hide,4000);rolling=false;return}
+      const chip=document.createElement('div'); chip.className='num-chip'; chip.textContent='?'; chips.appendChild(chip)
+      let f=0; const iv=setInterval(()=>{ chip.textContent=Math.floor(Math.random()*(max-min+1))+min; if(++f>=18){clearInterval(iv);chip.textContent=targets[idx];idx++;setTimeout(landNext,500)} },60)
+    }
+    landNext()
+  } else {
+    display.style.display='inline-block'
+    const end=Date.now()+spinMs-400; let interval=40
+    function tick(){
+      const now=Date.now(),progress=1-Math.max(0,(end-now)/(spinMs-400)); interval=40+progress*200
+      display.textContent=Math.floor(Math.random()*(max-min+1))+min
+      if(now<end){ setTimeout(tick,interval) } else { display.textContent=targets[0]; display.className='num-display landed'; setTimeout(hide,4000); rolling=false }
+    }
+    tick()
+  }
+}
+function hide(){ wrap.classList.remove('show'); display.style.display='inline-block'; chips.innerHTML='' }
+function connect(){
+  const ws=new WebSocket('ws://localhost:${port}/__overlay_ws__')
+  ws.onmessage=e=>{
+    try{
+      const msg=JSON.parse(e.data)
+      if(msg.type==='game:state'&&msg.data?.id==='number'&&msg.data?.status==='running'){
+        const ns=msg.data.number
+        if(ns?.result) rollAnimation(ns.min,ns.max,ns.result,3000,msg.data?.number?.triggeredBy??'')
+      }
+      if(msg.type==='ping') ws.send(JSON.stringify({type:'pong'}))
+    }catch{}
+  }
+  ws.onclose=()=>setTimeout(connect,2000)
+}
+connect()
+<\/script>
+</body>
+</html>`
+
+const SLOT_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: transparent; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
+  #slot-wrap {
+    position: fixed; bottom: 60px; left: 50%;
+    transform: translateX(-50%) translateY(180px); opacity: 0;
+    transition: transform 0.5s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
+  }
+  #slot-wrap.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  .slot-machine {
+    background: rgba(10,6,28,0.95); border: 3px solid rgba(139,92,246,0.7);
+    border-radius: 24px; padding: 18px 22px 16px;
+    box-shadow: 0 8px 40px rgba(109,40,217,0.5); backdrop-filter: blur(20px);
+  }
+  .slot-label { text-align: center; font-size: 11px; font-weight: 800; letter-spacing: 0.2em; color: #A78BFA; margin-bottom: 12px; }
+  .reels-row  { display: flex; gap: 10px; margin-bottom: 14px; }
+  .reel {
+    width: 100px; height: 100px; background: rgba(0,0,0,0.4);
+    border-radius: 16px; border: 2px solid rgba(255,255,255,0.08); overflow: hidden; position: relative;
+  }
+  .reel.lit { border-color: #F59E0B; box-shadow: 0 0 20px rgba(245,158,11,0.5); }
+  .reel-inner { display: flex; flex-direction: column; align-items: center; transition: transform 0s; }
+  .reel-cell  { width: 100px; height: 100px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 46px; }
+  .reel::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(to bottom, rgba(10,6,28,0.9) 0%, transparent 30%, transparent 70%, rgba(10,6,28,0.9) 100%);
+    z-index: 2; pointer-events: none;
+  }
+  .reel::after {
+    content: ''; position: absolute; top: 50%; left: 4px; right: 4px;
+    height: 2px; background: rgba(139,92,246,0.4); transform: translateY(-50%); z-index: 3;
+  }
+  .result-bar {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    height: 36px; font-size: 16px; font-weight: 800; color: #fff; opacity: 0; transition: opacity 0.4s;
+  }
+  .result-bar.show    { opacity: 1; }
+  .result-bar.jackpot { color: #F59E0B; animation: jackpotPulse 0.6s ease infinite alternate; }
+  .result-bar.twoKind { color: #A78BFA; }
+  @keyframes jackpotPulse { from { text-shadow: 0 0 20px #F59E0B; } to { text-shadow: 0 0 60px #F59E0B, 0 0 100px #EF4444; } }
+  @keyframes confettiFall { to { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
+  .confetti-piece { position: fixed; top: -20px; width: 8px; height: 12px; border-radius: 2px; animation: confettiFall 2.5s ease-in forwards; }
+</style>
+</head>
+<body>
+<div id="slot-wrap">
+  <div class="slot-machine">
+    <div class="slot-label">🎰 SLOT MACHINE</div>
+    <div class="reels-row">
+      <div class="reel" id="reel0"><div class="reel-inner" id="inner0"></div></div>
+      <div class="reel" id="reel1"><div class="reel-inner" id="inner1"></div></div>
+      <div class="reel" id="reel2"><div class="reel-inner" id="inner2"></div></div>
+    </div>
+    <div class="result-bar" id="result-bar"></div>
+  </div>
+</div>
+<script>
+const wrap = document.getElementById('slot-wrap')
+const resultBar = document.getElementById('result-bar')
+let spinning = false
+
+function rand(arr) { return arr[Math.floor(Math.random() * arr.length)] }
+
+function buildReel(innerEl, target, symbols, rows) {
+  innerEl.innerHTML = ''
+  for (let i = 0; i < rows - 1; i++) {
+    const c = document.createElement('div'); c.className = 'reel-cell'
+    c.textContent = rand(symbols); innerEl.appendChild(c)
+  }
+  const last = document.createElement('div'); last.className = 'reel-cell'
+  last.textContent = target; innerEl.appendChild(last)
+}
+
+function spinReel(reelEl, innerEl, target, symbols, stopMs) {
+  const rows = 32, cellH = 100
+  buildReel(innerEl, target, symbols, rows)
+  innerEl.style.transition = 'none'
+  innerEl.style.transform  = 'translateY(0)'
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    innerEl.style.transition = 'transform ' + (stopMs * 0.75 / 1000).toFixed(2) + 's cubic-bezier(0.2,0,0.5,1)'
+    innerEl.style.transform  = 'translateY(-' + ((rows - 5) * cellH) + 'px)'
+    setTimeout(() => {
+      innerEl.style.transition = 'transform 0.5s cubic-bezier(0,0,0.15,1)'
+      innerEl.style.transform  = 'translateY(-' + ((rows - 1) * cellH) + 'px)'
+      reelEl.classList.add('lit')
+    }, stopMs * 0.75)
+  }))
+}
+
+function showConfetti() {
+  const colors = ['#8B5CF6','#F59E0B','#EF4444','#10B981','#3B82F6','#EC4899']
+  for (let i = 0; i < 60; i++) {
+    const el = document.createElement('div'); el.className = 'confetti-piece'
+    el.style.left = Math.random() * 100 + 'vw'
+    el.style.background = colors[Math.floor(Math.random() * colors.length)]
+    el.style.animationDelay = Math.random() * 0.8 + 's'
+    el.style.animationDuration = (2 + Math.random()) + 's'
+    document.body.appendChild(el)
+    el.addEventListener('animationend', () => el.remove())
+  }
+}
+
+function startSpin(slot) {
+  if (spinning) return; spinning = true
+  const symbols = slot.symbols.length >= 3 ? slot.symbols : ['🍒','🍋','🍊','⭐','🎰','💎']
+  const targets = slot.symbols, stops = [1100, 1700, 2300]
+  resultBar.className = 'result-bar'; resultBar.textContent = ''
+  ;[0,1,2].forEach(i => document.getElementById('reel' + i).classList.remove('lit'))
+  wrap.classList.add('show')
+  ;[0,1,2].forEach(i => spinReel(
+    document.getElementById('reel' + i), document.getElementById('inner' + i),
+    targets[i], symbols, stops[i]
+  ))
+  setTimeout(() => {
+    resultBar.classList.add('show')
+    if (slot.jackpot) { resultBar.className = 'result-bar show jackpot'; resultBar.textContent = '🎉 JACKPOT! 🎉'; showConfetti() }
+    else if (slot.twoKind) { resultBar.className = 'result-bar show twoKind'; resultBar.textContent = '✨ 2개 일치!' }
+    else { resultBar.className = 'result-bar show'; resultBar.textContent = '꽝 😢' }
+  }, stops[2] + 600)
+  setTimeout(() => { wrap.classList.remove('show'); spinning = false; [0,1,2].forEach(i => document.getElementById('reel'+i).classList.remove('lit')) }, 6500)
+}
+
+function connect() {
+  const ws = new WebSocket('ws://localhost:${port}/__overlay_ws__')
+  ws.onmessage = e => {
+    try {
+      const msg = JSON.parse(e.data)
+      if (msg.type === 'game:state' && msg.data?.id === 'slot' && msg.data?.status === 'running' && msg.data.slot?.symbols)
+        startSpin(msg.data.slot)
+      if (msg.type === 'ping') ws.send(JSON.stringify({type:'pong'}))
+    } catch {}
+  }
+  ws.onclose = () => setTimeout(connect, 2000)
+}
+connect()
+<\/script>
+</body>
+</html>`
+
+const BOSS_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: transparent; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
+
+  #boss-hud {
+    position: fixed; top: 40px; left: 40px; width: 520px;
+    background: rgba(10,6,28,0.88); border: 2px solid rgba(239,68,68,0.55);
+    border-radius: 20px; padding: 18px 22px; backdrop-filter: blur(16px);
+    box-shadow: 0 8px 32px rgba(239,68,68,0.25);
+    opacity: 0; transform: translateX(-60px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  #boss-hud.show { opacity: 1; transform: translateX(0); }
+
+  .boss-name-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .boss-skull    { font-size: 22px; }
+  .boss-name     { font-size: 18px; font-weight: 900; color: #fff; letter-spacing: -0.02em; }
+  .hp-label      { margin-left: auto; font-size: 11px; font-weight: 800; color: rgba(239,68,68,0.8); letter-spacing: 0.1em; }
+  .hp-numbers    { font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.6); margin-bottom: 7px; text-align: right; }
+  .hp-bar-bg     { height: 16px; background: rgba(255,255,255,0.08); border-radius: 8px; overflow: hidden; }
+  .hp-bar-fill   {
+    height: 100%; border-radius: 8px;
+    background: linear-gradient(90deg, #EF4444, #F97316);
+    box-shadow: 0 0 12px rgba(239,68,68,0.5);
+    transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
+  }
+  .participants  { margin-top: 14px; display: flex; flex-direction: column; gap: 4px; }
+  .participant-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: rgba(255,255,255,0.65); }
+  .p-name { font-weight: 700; color: #fff; min-width: 80px; }
+  .p-dmg  { margin-left: auto; font-weight: 800; color: #F97316; }
+  .p-crit { font-size: 10px; color: #FBBF24; }
+
+  #dice-popup {
+    position: fixed; bottom: 60px; left: 50%;
+    transform: translateX(-50%) translateY(100px); opacity: 0;
+    transition: opacity 0.3s ease, transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+    text-align: center; pointer-events: none;
+  }
+  #dice-popup.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .dice-face {
+    width: 90px; height: 90px; margin: 0 auto 10px;
+    background: rgba(10,6,28,0.95); border: 3px solid rgba(239,68,68,0.7);
+    border-radius: 18px; display: flex; align-items: center; justify-content: center;
+    font-size: 42px; font-weight: 900; color: #fff;
+    box-shadow: 0 8px 30px rgba(239,68,68,0.35);
+  }
+  .dice-face.spin { animation: diceSpin 0.9s cubic-bezier(0.25,0.46,0.45,0.94) forwards; }
+  @keyframes diceSpin {
+    0%   { transform: rotateX(0deg)   rotateY(0deg);   }
+    50%  { transform: rotateX(540deg) rotateY(270deg); }
+    100% { transform: rotateX(720deg) rotateY(360deg); }
+  }
+  .dice-user   { font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.7); margin-bottom: 6px; }
+  .damage-tag  {
+    display: inline-block; padding: 6px 20px; border-radius: 20px;
+    font-size: 22px; font-weight: 900; color: #fff;
+    background: rgba(239,68,68,0.85); box-shadow: 0 4px 16px rgba(239,68,68,0.4);
+    letter-spacing: -0.02em;
+  }
+  .damage-tag.critical {
+    background: linear-gradient(135deg, #F59E0B, #EF4444);
+    animation: critPulse 0.3s ease;
+  }
+  @keyframes critPulse {
+    0%,100% { transform: scale(1); }
+    50%     { transform: scale(1.15); }
+  }
+  .critical-badge { display: block; font-size: 11px; font-weight: 800; letter-spacing: 0.15em; color: #FBBF24; margin-top: 4px; }
+
+  .float-dmg {
+    position: fixed; font-size: 28px; font-weight: 900; color: #F97316;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.5); pointer-events: none;
+    animation: floatUp 1.8s ease-out forwards;
+  }
+  .float-dmg.crit { color: #FBBF24; font-size: 38px; }
+  @keyframes floatUp {
+    0%   { opacity: 1; transform: translateY(0) scale(1); }
+    60%  { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-120px) scale(0.7); }
+  }
+
+  #defeat-screen {
+    position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.75); opacity: 0; pointer-events: none;
+    transition: opacity 0.6s ease;
+  }
+  #defeat-screen.show { opacity: 1; }
+  .defeat-title {
+    font-size: 72px; font-weight: 900; color: #fff;
+    text-shadow: 0 0 40px #F59E0B; letter-spacing: -0.04em;
+    animation: defeatBounce 0.6s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes defeatBounce { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .defeat-sub { font-size: 20px; color: rgba(255,255,255,0.7); margin-top: 12px; font-weight: 700; }
+</style>
+</head>
+<body>
+<div id="boss-hud">
+  <div class="boss-name-row">
+    <span class="boss-skull">💀</span>
+    <span class="boss-name" id="boss-name">보스</span>
+    <span class="hp-label">BOSS HP</span>
+  </div>
+  <div class="hp-numbers" id="hp-numbers">100,000 / 100,000</div>
+  <div class="hp-bar-bg"><div class="hp-bar-fill" id="hp-fill" style="width:100%"></div></div>
+  <div class="participants" id="participants"></div>
+</div>
+
+<div id="dice-popup">
+  <div class="dice-user" id="dice-user"></div>
+  <div class="dice-face" id="dice-face">?</div>
+  <div class="damage-tag" id="damage-tag">0</div>
+  <span class="critical-badge" id="crit-badge" style="display:none">🎯 CRITICAL HIT!</span>
+</div>
+
+<div id="defeat-screen">
+  <div class="defeat-title">👑 BOSS DEFEATED!</div>
+  <div class="defeat-sub" id="defeat-sub"></div>
+</div>
+
+<script>
+let lastRollTs = 0, bossAlive = false, diceTimer = null
+const hud      = document.getElementById('boss-hud')
+const bossName = document.getElementById('boss-name')
+const hpNums   = document.getElementById('hp-numbers')
+const hpFill   = document.getElementById('hp-fill')
+const partList = document.getElementById('participants')
+const dicePopup= document.getElementById('dice-popup')
+const diceUser = document.getElementById('dice-user')
+const diceFace = document.getElementById('dice-face')
+const dmgTag   = document.getElementById('damage-tag')
+const critBadge= document.getElementById('crit-badge')
+const defeatScr= document.getElementById('defeat-screen')
+const defeatSub= document.getElementById('defeat-sub')
+
+function updateHud(boss) {
+  bossName.textContent = boss.bossName ?? '보스'
+  const pct = Math.max(0, (boss.currentHp / boss.maxHp) * 100)
+  hpFill.style.width   = pct + '%'
+  hpNums.textContent   = boss.currentHp.toLocaleString() + ' / ' + boss.maxHp.toLocaleString()
+  const entries = Object.entries(boss.participants ?? {})
+    .sort((a, b) => b[1].totalDamage - a[1].totalDamage).slice(0, 5)
+  partList.innerHTML = entries.map(([u, p]) => {
+    const cp = p.attackCount ? Math.round(p.critCount / p.attackCount * 100) : 0
+    return '<div class="participant-row"><span class="p-name">' + u + '</span>' +
+      (cp > 0 ? '<span class="p-crit">⚡' + cp + '%</span>' : '') +
+      '<span class="p-dmg">' + p.totalDamage.toLocaleString() + '</span></div>'
+  }).join('')
+}
+
+function showRoll(roll) {
+  if (roll.ts === lastRollTs) return
+  lastRollTs = roll.ts
+  diceUser.textContent = roll.user + '님'
+  diceFace.textContent = '?'
+  diceFace.classList.remove('spin')
+  void diceFace.offsetWidth
+  diceFace.classList.add('spin')
+  let f = 0
+  const iv = setInterval(() => {
+    diceFace.textContent = Math.floor(Math.random() * 12) + 1
+    if (++f >= 16) { clearInterval(iv); diceFace.textContent = roll.roll }
+  }, 55)
+  setTimeout(() => {
+    dmgTag.textContent  = (roll.isCritical ? '💥 ' : '') + roll.damage.toLocaleString() + ' DMG'
+    dmgTag.className    = 'damage-tag' + (roll.isCritical ? ' critical' : '')
+    critBadge.style.display = roll.isCritical ? 'block' : 'none'
+  }, 950)
+  dicePopup.classList.add('show')
+  clearTimeout(diceTimer)
+  diceTimer = setTimeout(() => dicePopup.classList.remove('show'), 4000)
+  const el = document.createElement('div')
+  el.className = 'float-dmg' + (roll.isCritical ? ' crit' : '')
+  el.textContent = (roll.isCritical ? '💥' : '−') + roll.damage.toLocaleString()
+  el.style.left  = (25 + Math.random() * 50) + '%'
+  el.style.top   = '55%'
+  document.body.appendChild(el)
+  el.addEventListener('animationend', () => el.remove())
+}
+
+function connect() {
+  const ws = new WebSocket('ws://localhost:${port}/__overlay_ws__')
+  ws.onmessage = e => {
+    try {
+      const msg = JSON.parse(e.data)
+      if (msg.type === 'game:state' && msg.data?.id === 'boss') {
+        const s    = msg.data
+        const boss = s.boss
+        if (!boss) return
+        if (s.status === 'running' || s.status === 'showing_result') hud.classList.add('show')
+        if (s.status === 'idle') { hud.classList.remove('show'); defeatScr.classList.remove('show') }
+        updateHud(boss)
+        if (boss.lastRoll) showRoll(boss.lastRoll)
+        if (s.status === 'showing_result' && bossAlive) {
+          const total = Object.values(boss.participants ?? {}).reduce((x, p) => x + p.totalDamage, 0)
+          defeatSub.textContent = '총 데미지: ' + total.toLocaleString() + ' | 참여자: ' + Object.keys(boss.participants ?? {}).length + '명'
+          defeatScr.classList.add('show')
+          setTimeout(() => defeatScr.classList.remove('show'), 7000)
+        }
+        bossAlive = boss.alive
+      }
+      if (msg.type === 'ping') ws.send(JSON.stringify({type:'pong'}))
+    } catch {}
+  }
+  ws.onclose = () => setTimeout(connect, 2000)
+}
+connect()
+<\/script>
+</body>
+</html>`
+
 const OVERLAY_HTML = (gameId: string, theme: string) => `<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -144,11 +1321,19 @@ export class OverlayServer {
     this.port = port
 
     this.httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
-      const url = req.url ?? '/'
+      const url    = req.url ?? '/'
       const gameId = url.replace('/overlay/', '').split('?')[0] || 'roulette'
 
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-      res.end(OVERLAY_HTML(gameId, 'purple'))
+      let html: string
+      if      (gameId === 'quiz')     html = QUIZ_OVERLAY_HTML(port)
+      else if (gameId === 'ladder')   html = LADDER_OVERLAY_HTML(port)
+      else if (gameId === 'roulette') html = ROULETTE_OVERLAY_HTML(port)
+      else if (gameId === 'slot')     html = SLOT_OVERLAY_HTML(port)
+      else if (gameId === 'boss')     html = BOSS_OVERLAY_HTML(port)
+      else if (gameId === 'number')   html = NUMBER_OVERLAY_HTML(port)
+      else html = OVERLAY_HTML(gameId, 'purple')
+      res.end(html)
     })
 
     this.wss = new WebSocketServer({ server: this.httpServer, path: '/__overlay_ws__' })

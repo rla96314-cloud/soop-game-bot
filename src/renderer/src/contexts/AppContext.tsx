@@ -76,6 +76,7 @@ const GAME_META: Record<string, { name: string; icon: string }> = {
   rps:      { name: '가위바위보', icon: '✊' },
   fish:     { name: '낚시',     icon: '🎣' },
   lottery:  { name: '복권',     icon: '🎟️' },
+  number:   { name: '숫자 추첨', icon: '🔢' },
 }
 
 const MAX_CHAT    = 100

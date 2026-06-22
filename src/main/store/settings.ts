@@ -6,14 +6,17 @@ export interface RouletteItem { name: string; probability: number }
 export interface GachaGrade  { name: string; probability: number; color: string }
 export interface QuizQuestion { question: string; answer: string }
 export interface Prize        { name: string; description: string }
+export interface PickItem     { name: string; description: string; color: string; count: number }
+export interface BossLootItem { name: string; description: string }
 
 export interface GameConfig {
   enabled:          boolean
   balloonThreshold: number
   chatCommand:      string
   // roulette
-  items?:      RouletteItem[]
+  items?:        RouletteItem[]
   spinDuration?: number
+  animType?:     'wheel' | 'text'
   // ladder
   maxParticipants?: number
   joinDuration?:   number
@@ -25,12 +28,18 @@ export interface GameConfig {
   damagePerChat?:     number
   // gacha
   grades?: GachaGrade[]
+  // pickboard
+  pickRows?: number
+  pickCols?: number
+  pickItems?: PickItem[]
   // quiz
   timeLimit?: number
   questions?: QuizQuestion[]
   // slot / race / rps / fish / lottery
   [key: string]: unknown
 }
+
+export interface WeflabTrigger { keyword: string }
 
 export interface Settings {
   user?: { id: string; name: string } | null
@@ -44,6 +53,11 @@ export interface Settings {
   }
   games:   Record<string, GameConfig>
   overlay: { port: number; theme: string }
+  weflab: {
+    enabled:  boolean
+    url:      string
+    triggers: WeflabTrigger[]
+  }
 }
 
 const DEFAULTS: Settings = {
@@ -78,9 +92,18 @@ const DEFAULTS: Settings = {
       ],
     },
     boss: {
-      enabled: true, balloonThreshold: 0, chatCommand: '!공격',
-      maxHp: 10000, currentHp: 10000,
-      damagePerBalloon: 10, damagePerChat: 1,
+      enabled: true, balloonThreshold: 100, chatCommand: '',
+      bossName:        '보스',
+      maxHp:           100000,
+      damagePerDot:    100,
+      critChance:      0.15,
+      critEnabled:     true,
+      critMultiplier:  2,
+      lootItems: [
+        { name: '1등 상품', description: '치킨 쿠폰'  },
+        { name: '2등 상품', description: '음료 쿠폰'  },
+        { name: '3등 상품', description: '간식 쿠폰'  },
+      ] as BossLootItem[],
     },
     gacha: {
       enabled: true, balloonThreshold: 30, chatCommand: '!뽑기',
@@ -91,6 +114,16 @@ const DEFAULTS: Settings = {
         { name: '일반',   probability: 74, color: '#6B7280' },
       ],
     },
+    pickboard: {
+      enabled: true, balloonThreshold: 0, chatCommand: '',
+      pickRows: 4, pickCols: 5,
+      pickItems: [
+        { name: '1등 상품', description: '치킨 쿠폰',  color: '#F59E0B', count: 1 },
+        { name: '2등 상품', description: '음료 쿠폰',  color: '#8B5CF6', count: 2 },
+        { name: '3등 상품', description: '간식 쿠폰',  color: '#3B82F6', count: 3 },
+        { name: '꽝',       description: '',            color: '#6B7280', count: 14 },
+      ],
+    },
     quiz: {
       enabled: false, balloonThreshold: 0, chatCommand: '!퀴즈',
       timeLimit: 30,
@@ -99,13 +132,24 @@ const DEFAULTS: Settings = {
         { question: '별풍선 최소 후원 단위는?', answer: '1개' },
       ],
     },
-    slot:    { enabled: false, balloonThreshold: 100, chatCommand: '!슬롯'    },
+    slot: {
+      enabled: false, balloonThreshold: 100, chatCommand: '!슬롯',
+      spinDuration: 3000,
+      symbols: ['🍒', '🍋', '🍊', '⭐', '🎰', '💎', '7️⃣', '🔔'],
+    },
     race:    { enabled: false, balloonThreshold:   0, chatCommand: '!경주'    },
     rps:     { enabled: false, balloonThreshold:   0, chatCommand: '!묵찌빠'  },
     fish:    { enabled: false, balloonThreshold:   0, chatCommand: '!낚시'    },
     lottery: { enabled: false, balloonThreshold:   0, chatCommand: '!복권'    },
+    number:  {
+      enabled: false, balloonThreshold: 0, chatCommand: '!추첨',
+      minNumber: 1, maxNumber: 100, count: 1,
+      spinDuration: 3000,
+      excludeList: [] as number[],
+    },
   },
   overlay: { port: 3939, theme: 'purple' },
+  weflab:  { enabled: false, url: '', triggers: [] },
 }
 
 function getPath() {
@@ -134,6 +178,7 @@ export function patchSettings(patch: Partial<Settings>): Settings {
     ...patch,
     soop:    { ...current.soop,    ...(patch.soop    ?? {}) },
     overlay: { ...current.overlay, ...(patch.overlay ?? {}) },
+    weflab:  { ...current.weflab,  ...(patch.weflab  ?? {}) },
     games:   {
       ...current.games,
       ...(patch.games

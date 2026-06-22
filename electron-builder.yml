@@ -14,6 +14,14 @@ win:
     - target: nsis
       arch: [x64]
   icon: resources/icon.ico
+  artifactName: "soop-game-bot-setup-${version}.exe"
+
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  icon: resources/icon.png
+  artifactName: "soop-game-bot-${version}-${arch}.dmg"
 
 nsis:
   oneClick: false
@@ -25,7 +33,8 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: SOOP Game Bot
+  license: null
 
 publish:
-  provider: github
-  releaseType: release
+  provider: generic
+  url: https://github.com/your-repo/soop-game-bot/releases/latest/download

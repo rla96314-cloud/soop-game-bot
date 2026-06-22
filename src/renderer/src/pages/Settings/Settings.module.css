@@ -103,6 +103,7 @@
   font-size: 12px;
   color: var(--text-2);
   margin-top: 10px;
+  line-height: 1.5;
 }
 .hint code {
   background: var(--bg);
@@ -110,4 +111,59 @@
   border-radius: 4px;
   font-family: monospace;
   color: var(--p600);
+}
+
+/* Reconnect button */
+.reconnectBtn {
+  margin-left: auto;
+  padding: 4px 12px;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all 0.12s;
+  font-family: inherit;
+}
+.reconnectBtn:hover:not(:disabled) {
+  border-color: var(--p400);
+  color: var(--p600);
+  background: var(--p50);
+}
+.reconnectBtn:disabled { opacity: 0.5; cursor: default; }
+
+/* Overlay URL list */
+.overlayUrls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.overlayRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.overlayName {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--p600);
+  text-transform: uppercase;
+  min-width: 72px;
+}
+
+.overlayCode {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--text-2);
+  background: var(--bg);
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  flex: 1;
+  user-select: all;
 }

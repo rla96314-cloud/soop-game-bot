@@ -1,8 +1,47 @@
+import { useEffect, useRef, useState } from 'react'
 import { useApp } from '../../contexts/AppContext'
 import styles from './StatsHeader.module.css'
 
+const GAMES = [
+  { id: 'roulette', icon: '🎡', name: '룰렛'     },
+  { id: 'ladder',   icon: '🪜', name: '사다리타기' },
+  { id: 'boss',     icon: '👾', name: '보스전'    },
+  { id: 'gacha',    icon: '🎁', name: '뽑기'      },
+  { id: 'quiz',     icon: '❓', name: '퀴즈'      },
+  { id: 'slot',     icon: '🎰', name: '슬롯머신'  },
+  { id: 'race',     icon: '🏁', name: '경주'      },
+  { id: 'rps',      icon: '✊', name: '가위바위보' },
+]
+
 export default function StatsHeader() {
-  const { connected, simulation, stats } = useApp()
+  const { connected, simulation, stats, triggerGame, gameStates } = useApp()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const btnRef  = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const handler = (e: MouseEvent) => {
+      if (
+        !menuRef.current?.contains(e.target as Node) &&
+        !btnRef.current?.contains(e.target as Node)
+      ) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [menuOpen])
+
+  const isBusy = (id: string) => {
+    const s = gameStates[id]?.status
+    return s === 'running' || s === 'collecting'
+  }
+
+  const handleTrigger = (id: string) => {
+    if (!isBusy(id)) triggerGame(id)
+    setMenuOpen(false)
+  }
 
   return (
     <header className={styles.header}>
@@ -33,9 +72,33 @@ export default function StatsHeader() {
       <StatCard label="누적 실행 횟수"  value={stats.todayRuns.toLocaleString()}       delta={undefined} icon={<CrownIcon />} />
 
       <div className={styles.actions}>
-        <button className={styles.runBtn} onClick={() => {}}>
-          ▶ 수동 실행
-        </button>
+        <div className={styles.runWrap}>
+          <button
+            ref={btnRef}
+            className={styles.runBtn}
+            onClick={() => setMenuOpen(o => !o)}
+          >
+            ▶ 수동 실행
+          </button>
+          {menuOpen && (
+            <div ref={menuRef} className={styles.gameMenu}>
+              {GAMES.map(g => {
+                const busy = isBusy(g.id)
+                return (
+                  <button
+                    key={g.id}
+                    className={`${styles.gameMenuItem} ${busy ? styles.gameMenuBusy : ''}`}
+                    onClick={() => handleTrigger(g.id)}
+                  >
+                    <span className={styles.gameMenuIcon}>{g.icon}</span>
+                    <span className={styles.gameMenuName}>{g.name}</span>
+                    {busy && <span className={styles.busyBadge}>진행중</span>}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </header>
   )

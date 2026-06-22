@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../../contexts/AppContext'
 import styles from './Games.module.css'
 
@@ -8,6 +8,31 @@ interface RouletteItem { name: string; probability: number }
 interface GachaGrade   { name: string; probability: number; color: string }
 interface QuizQuestion { question: string; answer: string }
 interface Prize        { name: string; description: string }
+interface PickItem     { name: string; description: string; color: string; count: number }
+interface BossLootItem { name: string; description: string }
+
+interface BossParticipant { totalDamage: number; attackCount: number; critCount: number; pendingBalloons: number }
+interface BossRollResult  { user: string; roll: number; damage: number; isCritical: boolean; ts: number }
+interface BossLootResult  { user: string; item: BossLootItem; contributionRate: number }
+interface BossStateData   {
+  alive: boolean; maxHp: number; currentHp: number
+  bossName: string; damagePerDot: number; critChance: number; critEnabled: boolean; critMultiplier: number
+  balloonThreshold: number; participants: Record<string, BossParticipant>
+  lastRoll?: BossRollResult; lootResults?: BossLootResult[]
+}
+
+interface LadderRung { row: number; leftCol: number }
+interface LadderPath { cols: number[] }
+interface LadderData {
+  rows: number; cols: number
+  rungs: LadderRung[]; paths: LadderPath[]
+  order: string[]; prizes: string[]
+  results: Array<{ user: string; prize: string; startCol: number; endCol: number }>
+}
+interface LadderState {
+  participants: string[]; maxSlots: number; deadline: number
+  prizes: string[]; ladderData?: LadderData
+}
 
 // ── Game list ─────────────────────────────────────────────────────────────────
 
@@ -15,13 +40,15 @@ const GAMES = [
   { id: 'roulette', icon: '🎡', name: '룰렛',     color: '#8B5CF6', settingKey: 'roulette' },
   { id: 'ladder',   icon: '🪜', name: '사다리타기', color: '#3B82F6', settingKey: 'ladder'   },
   { id: 'boss',     icon: '👾', name: '보스전',    color: '#EF4444', settingKey: 'boss'     },
-  { id: 'gacha',    icon: '🎁', name: '뽑기',     color: '#F59E0B', settingKey: 'gacha'    },
-  { id: 'quiz',     icon: '❓', name: '퀴즈',     color: '#10B981', settingKey: 'quiz'     },
+  { id: 'gacha',     icon: '🎁', name: '뽑기(확률)',  color: '#F59E0B', settingKey: 'gacha'     },
+  { id: 'pickboard', icon: '🎴', name: '뽑기판',    color: '#EC4899', settingKey: 'pickboard' },
+  { id: 'quiz',      icon: '❓', name: '퀴즈',      color: '#10B981', settingKey: 'quiz'      },
   { id: 'slot',     icon: '🎰', name: '슬롯머신',  color: '#8B5CF6', settingKey: 'slot'     },
   { id: 'race',     icon: '🏁', name: '경주',     color: '#6366F1', settingKey: 'race'     },
   { id: 'rps',      icon: '✊', name: '가위바위보', color: '#EC4899', settingKey: 'rps'      },
   { id: 'fish',     icon: '🎣', name: '낚시',     color: '#14B8A6', settingKey: 'fish'     },
   { id: 'lottery',  icon: '🎟️', name: '복권',     color: '#F97316', settingKey: 'lottery'  },
+  { id: 'number',   icon: '🔢', name: '숫자 추첨', color: '#06B6D4', settingKey: 'number'   },
 ]
 
 // ── List editors ──────────────────────────────────────────────────────────────
@@ -268,7 +295,1391 @@ function QuizEditor({ questions: init, onSave }: { questions: QuizQuestion[]; on
   )
 }
 
+// ── Roulette panel ────────────────────────────────────────────────────────────
+
+interface RouletteSpinState {
+  winner: string; winnerIdx: number
+  items: Array<{ name: string; probability: number }>
+  spinMs: number; animType: 'wheel' | 'text'
+}
+
+interface WeflabTrigger { keyword: string }
+
+function RouletteWheelPreview({ items }: { items: Array<{ name: string; probability: number }> }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const COLORS = ['#8B5CF6','#EC4899','#3B82F6','#10B981','#F59E0B','#EF4444','#14B8A6','#6366F1']
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas || !items.length) return
+    const ctx = canvas.getContext('2d')!
+    const cx = 80, cy = 80, r = 74
+    const total = items.reduce((s, i) => s + i.probability, 0)
+    let start = -Math.PI / 2
+    ctx.clearRect(0, 0, 160, 160)
+    items.forEach((item, i) => {
+      const sweep = (item.probability / total) * Math.PI * 2
+      ctx.beginPath(); ctx.moveTo(cx, cy)
+      ctx.arc(cx, cy, r, start, start + sweep); ctx.closePath()
+      ctx.fillStyle = COLORS[i % COLORS.length]; ctx.fill()
+      ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 1; ctx.stroke()
+      const mid = start + sweep / 2
+      ctx.save(); ctx.translate(cx + Math.cos(mid) * r * 0.65, cy + Math.sin(mid) * r * 0.65)
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'
+      const label = item.name.length > 5 ? item.name.slice(0,4)+'…' : item.name
+      ctx.fillText(label, 0, 0); ctx.restore()
+      start += sweep
+    })
+    ctx.beginPath(); ctx.arc(cx, cy, 14, 0, Math.PI * 2)
+    ctx.fillStyle = '#0a0623'; ctx.fill()
+  }, [items])
+
+  return <canvas ref={canvasRef} width={160} height={160} className={styles.rwPreviewCanvas} />
+}
+
+function RoulettePanel({ gSettings, gameStates, saveSetting }: {
+  gSettings:   Record<string, unknown>
+  gameStates:  Record<string, { status: string; [k: string]: unknown }>
+  saveSetting: (key: string, value: unknown) => void
+}) {
+  const el = (window as unknown as Record<string, unknown>).electron as
+    Record<string, (...args: unknown[]) => unknown>
+
+  const [weflabUrl,     setWeflabUrl]     = useState((gSettings.weflabUrl as string) ?? '')
+  const [triggers,      setTriggers]      = useState<WeflabTrigger[]>(
+    (gSettings.weflabTriggers as WeflabTrigger[]) ?? []
+  )
+  const [weflabRunning, setWeflabRunning] = useState(false)
+  const [lastResult,    setLastResult]    = useState('')
+  const [weflabLog,     setWeflabLog]     = useState<string[]>([])
+
+  const animType  = (gSettings.animType as 'wheel' | 'text') ?? 'wheel'
+  const items     = (gSettings.items as Array<{ name: string; probability: number }>) ?? []
+  const spinState = (gameStates['roulette']?.roulette) as RouletteSpinState | undefined
+  const status    = gameStates['roulette']?.status as string ?? 'idle'
+  const isSpinning= status === 'running'
+  const isResult  = status === 'showing_result'
+
+  // Subscribe to weflab events
+  useEffect(() => {
+    const offResult = (el.onWeflabResult as (cb: (t: string) => void) => () => void)(
+      (text) => {
+        setLastResult(text)
+        setWeflabLog(l => [`[${new Date().toLocaleTimeString()}] ${text}`, ...l].slice(0, 20))
+      }
+    )
+    const offLoaded = (el.onWeflabLoaded as (cb: () => void) => () => void)(
+      () => setWeflabLog(l => [`[${new Date().toLocaleTimeString()}] 페이지 로드 완료`, ...l].slice(0,20))
+    )
+    const offError  = (el.onWeflabError  as (cb: (e: string) => void) => () => void)(
+      (e) => setWeflabLog(l => [`[오류] ${e}`, ...l].slice(0, 20))
+    )
+    return () => { offResult(); offLoaded(); offError() }
+  }, [])
+
+  // Check initial weflab status
+  useEffect(() => {
+    (el.weflabStatus as () => Promise<{ running: boolean }>)().then(s => setWeflabRunning(s.running))
+  }, [])
+
+  const toggleWeflab = async () => {
+    if (weflabRunning) {
+      await (el.weflabStop as () => Promise<unknown>)()
+      setWeflabRunning(false)
+    } else {
+      if (!weflabUrl.trim()) return
+      await (el.weflabStart as (url: string) => Promise<unknown>)(weflabUrl.trim())
+      setWeflabRunning(true)
+    }
+  }
+
+  const saveTriggers = (next: WeflabTrigger[]) => {
+    setTriggers(next)
+    saveSetting('weflabTriggers', next)
+  }
+
+  return (
+    <div className={styles.rwPanel}>
+
+      {/* ── Live status ── */}
+      {(isSpinning || isResult) && (
+        <div className={`${styles.rwStatus} ${isResult ? styles.rwStatusResult : ''}`}>
+          {isSpinning && spinState && (
+            <>
+              <div className={styles.rwStatusLabel}>🎡 돌아가는 중...</div>
+              <div className={styles.rwStatusWinner}>
+                결과: <strong>{spinState.winner}</strong>
+              </div>
+            </>
+          )}
+          {isResult && (
+            <div className={styles.rwStatusLabel}>
+              🎉 결과: <strong>{(gameStates['roulette']?.result as { result: string } | null)?.result}</strong>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Animation type ── */}
+      <div className={styles.rwSection}>
+        <div className={styles.rwSectionTitle}>애니메이션 타입</div>
+        <div className={styles.rwAnimRow}>
+          {(['wheel','text'] as const).map(t => (
+            <button key={t}
+              className={`${styles.rwAnimBtn} ${animType === t ? styles.rwAnimBtnActive : ''}`}
+              onClick={() => saveSetting('animType', t)}
+            >
+              {t === 'wheel' ? '🎡 원형 룰렛' : '📃 텍스트 슬롯'}
+            </button>
+          ))}
+        </div>
+
+        {/* Wheel preview */}
+        {animType === 'wheel' && items.length > 0 && (
+          <div className={styles.rwPreviewWrap}>
+            <div className={styles.rwPreviewPointer}>▼</div>
+            <RouletteWheelPreview items={items} />
+          </div>
+        )}
+
+        {/* Text slot preview */}
+        {animType === 'text' && items.length > 0 && (
+          <div className={styles.rwTextPreview}>
+            {items.slice(0, 4).map((item, i) => (
+              <div key={i} className={styles.rwTextItem}>{item.name}</div>
+            ))}
+            {items.length > 4 && <div className={styles.rwTextMore}>+{items.length - 4}개</div>}
+          </div>
+        )}
+      </div>
+
+      {/* ── weflab 연동 ── */}
+      <div className={styles.rwSection}>
+        <div className={styles.rwSectionTitle}>
+          weflab 연동
+          <span className={`${styles.rwBadge} ${weflabRunning ? styles.rwBadgeOn : ''}`}>
+            {weflabRunning ? 'ON' : 'OFF'}
+          </span>
+        </div>
+
+        <div className={styles.rwField}>
+          <label>weflab 페이지 URL</label>
+          <div className={styles.rwRow}>
+            <input className={styles.rwInput}
+              placeholder="https://weflab.io/your-channel"
+              value={weflabUrl}
+              onChange={e => { setWeflabUrl(e.target.value); saveSetting('weflabUrl', e.target.value) }}
+            />
+            <button
+              className={`${styles.rwToggleBtn} ${weflabRunning ? styles.rwToggleBtnOn : ''}`}
+              onClick={toggleWeflab}
+              disabled={!weflabUrl.trim() && !weflabRunning}
+            >
+              {weflabRunning ? '■ 중지' : '▶ 시작'}
+            </button>
+          </div>
+        </div>
+
+        <div className={styles.rwField}>
+          <label>트리거 키워드 (룰렛 결과에 포함 시 자체 룰렛 발동)</label>
+          <div className={styles.rwTriggerList}>
+            {triggers.map((t, i) => (
+              <div key={i} className={styles.rwTriggerRow}>
+                <input className={styles.rwInput}
+                  placeholder="키워드"
+                  value={t.keyword}
+                  onChange={e => saveTriggers(triggers.map((x, j) => j === i ? { keyword: e.target.value } : x))}
+                />
+                <button className={styles.rwDelBtn}
+                  onClick={() => saveTriggers(triggers.filter((_, j) => j !== i))}>✕</button>
+              </div>
+            ))}
+            <button className={styles.rwAddTriggerBtn}
+              onClick={() => saveTriggers([...triggers, { keyword: '' }])}>+ 키워드 추가</button>
+          </div>
+        </div>
+
+        {/* Log */}
+        {weflabRunning && (
+          <div className={styles.rwLog}>
+            <div className={styles.rwLogTitle}>수신 로그</div>
+            {weflabLog.length === 0
+              ? <div className={styles.rwLogEmpty}>결과 대기 중...</div>
+              : weflabLog.map((line, i) => (
+                  <div key={i} className={styles.rwLogLine}>{line}</div>
+                ))
+            }
+            {lastResult && (
+              <div className={styles.rwLogLast}>마지막 결과: <strong>{lastResult}</strong></div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── PickBoard editor ──────────────────────────────────────────────────────────
+
+function PickBoardEditor({
+  items: init, rows: initRows, cols: initCols,
+  onSave, onSaveSize,
+}: {
+  items: PickItem[]
+  rows: number
+  cols: number
+  onSave: (v: PickItem[]) => void
+  onSaveSize: (rows: number, cols: number) => void
+}) {
+  const [items, setItems] = useState<PickItem[]>(init)
+  const [rows, setRows]   = useState(initRows)
+  const [cols, setCols]   = useState(initCols)
+
+  const total = items.reduce((s, i) => s + i.count, 0)
+  const cells = rows * cols
+
+  const save = (next: PickItem[]) => { setItems(next); onSave(next) }
+
+  return (
+    <div className={styles.listEditor}>
+      <div className={styles.listHeader}>
+        <span className={styles.listTitle}>뽑기판 설정</span>
+        <div className={styles.pbSizeRow}>
+          <label>크기</label>
+          <input className={styles.pbSizeInput} type="number" min={1} max={10}
+            value={rows}
+            onChange={e => { const v = Number(e.target.value); setRows(v); onSaveSize(v, cols) }}
+          />
+          <span>×</span>
+          <input className={styles.pbSizeInput} type="number" min={1} max={10}
+            value={cols}
+            onChange={e => { const v = Number(e.target.value); setCols(v); onSaveSize(rows, v) }}
+          />
+          <span className={`${styles.totalBadge} ${total !== cells ? styles.totalWarn : ''}`}>
+            {total}/{cells}칸
+          </span>
+        </div>
+      </div>
+
+      <div className={styles.listHead4}>
+        <span>색상</span><span>이름</span><span>설명</span><span>수량</span>
+      </div>
+
+      {items.map((item, i) => (
+        <div key={i} className={styles.listRow}>
+          <input
+            type="color"
+            className={styles.colorInput}
+            value={item.color}
+            onChange={e => {
+              const next = items.map((x, j) => j === i ? { ...x, color: e.target.value } : x)
+              save(next)
+            }}
+          />
+          <input
+            className={styles.listInput}
+            value={item.name}
+            placeholder="상품명"
+            onChange={e => setItems(items.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
+            onBlur={() => onSave(items)}
+          />
+          <input
+            className={styles.listInput}
+            value={item.description}
+            placeholder="설명"
+            onChange={e => setItems(items.map((x, j) => j === i ? { ...x, description: e.target.value } : x))}
+            onBlur={() => onSave(items)}
+          />
+          <input
+            type="number" min={0} style={{ width: 50 }}
+            className={styles.listInput}
+            value={item.count}
+            onChange={e => {
+              const next = items.map((x, j) => j === i ? { ...x, count: Number(e.target.value) } : x)
+              save(next)
+            }}
+          />
+          <button className={styles.delBtn} onClick={() => save(items.filter((_, j) => j !== i))}>✕</button>
+        </div>
+      ))}
+
+      <button className={styles.addBtn} onClick={() => save([...items, { name: '새 상품', description: '', color: '#6B7280', count: 1 }])}>
+        + 상품 추가
+      </button>
+    </div>
+  )
+}
+
+// ── PickBoard panel ───────────────────────────────────────────────────────────
+
+interface Cell { prize: PickItem; revealed: boolean }
+
+function buildCells(rows: number, cols: number, items: PickItem[]): Cell[] {
+  const total = rows * cols
+  const prizes: PickItem[] = []
+  for (const item of items) {
+    for (let k = 0; k < item.count && prizes.length < total; k++) prizes.push(item)
+  }
+  while (prizes.length < total) {
+    prizes.push({ name: '꽝', description: '', color: '#6B7280', count: 1 })
+  }
+  // Fisher-Yates shuffle
+  for (let i = prizes.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[prizes[i], prizes[j]] = [prizes[j], prizes[i]]
+  }
+  return prizes.slice(0, total).map(prize => ({ prize, revealed: false }))
+}
+
+function PickBoardPanel({ rows, cols, items }: { rows: number; cols: number; items: PickItem[] }) {
+  const [cells, setCells] = useState<Cell[]>(() => buildCells(rows, cols, items))
+  const [lastResult, setLastResult] = useState<PickItem | null>(null)
+
+  // Rebuild when size/items change
+  useEffect(() => {
+    setCells(buildCells(rows, cols, items))
+    setLastResult(null)
+  }, [rows, cols, JSON.stringify(items)])
+
+  const reveal = (idx: number) => {
+    if (cells[idx].revealed) return
+    const next = cells.map((c, i) => i === idx ? { ...c, revealed: true } : c)
+    setCells(next)
+    setLastResult(cells[idx].prize)
+  }
+
+  const reset = () => {
+    setCells(buildCells(rows, cols, items))
+    setLastResult(null)
+  }
+
+  const revealedCount = cells.filter(c => c.revealed).length
+
+  return (
+    <div className={styles.pbPanel}>
+      <div className={styles.pbHeader}>
+        <span className={styles.pbTitle}>뽑기판</span>
+        <span className={styles.pbCount}>{revealedCount}/{rows * cols} 오픈</span>
+        <button className={styles.pbResetBtn} onClick={reset}>🔄 초기화</button>
+      </div>
+
+      {lastResult && (
+        <div className={styles.pbResult} style={{ borderColor: lastResult.color + '80' }}>
+          <span className={styles.pbResultIcon} style={{ background: lastResult.color }}>!</span>
+          <div>
+            <div className={styles.pbResultName} style={{ color: lastResult.color }}>{lastResult.name}</div>
+            {lastResult.description && <div className={styles.pbResultDesc}>{lastResult.description}</div>}
+          </div>
+        </div>
+      )}
+
+      <div
+        className={styles.pbGrid}
+        style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
+      >
+        {cells.map((cell, i) => (
+          <button
+            key={i}
+            className={`${styles.pbCell} ${cell.revealed ? styles.pbCellRevealed : ''}`}
+            style={cell.revealed ? { borderColor: cell.prize.color, background: cell.prize.color + '22' } : {}}
+            onClick={() => reveal(i)}
+          >
+            {cell.revealed ? (
+              <div className={styles.pbCellFront}>
+                <div className={styles.pbCellName} style={{ color: cell.prize.color }}>{cell.prize.name}</div>
+                {cell.prize.description && <div className={styles.pbCellDesc}>{cell.prize.description}</div>}
+              </div>
+            ) : (
+              <span className={styles.pbCellNum}>{i + 1}</span>
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Ladder panel ─────────────────────────────────────────────────────────────
+
+const PLAYER_COLORS = [
+  '#8B5CF6','#EC4899','#3B82F6','#10B981',
+  '#F59E0B','#EF4444','#14B8A6','#6366F1',
+]
+
+function LadderSVG({ data, animate }: { data: LadderData; animate: boolean }) {
+  const COL_W  = 72
+  const ROW_H  = 28
+  const PAD_X  = 36
+  const PAD_TOP = 40
+  const PAD_BOT = 40
+  const W = PAD_X * 2 + (data.cols - 1) * COL_W
+  const H = PAD_TOP + data.rows * ROW_H + PAD_BOT
+
+  const x = (c: number) => PAD_X + c * COL_W
+
+  // Animate: draw dot moving along each path, with delay per participant
+  const [step, setStep] = useState(animate ? 0 : data.rows + 1)
+  useEffect(() => {
+    if (!animate) { setStep(data.rows + 1); return }
+    setStep(0)
+    const id = setInterval(() => setStep(s => {
+      if (s >= data.rows) { clearInterval(id); return s + 1 }
+      return s + 1
+    }), 60)
+    return () => clearInterval(id)
+  }, [animate, data])
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className={styles.ladderSvg}>
+      {/* Vertical rails */}
+      {data.order.map((_, c) => (
+        <line key={c}
+          x1={x(c)} y1={PAD_TOP}
+          x2={x(c)} y2={PAD_TOP + data.rows * ROW_H}
+          stroke="rgba(255,255,255,0.15)" strokeWidth={2}
+        />
+      ))}
+
+      {/* Rungs */}
+      {data.rungs.map((rg, i) => (
+        <line key={i}
+          x1={x(rg.leftCol)} y1={PAD_TOP + rg.row * ROW_H}
+          x2={x(rg.leftCol + 1)} y2={PAD_TOP + rg.row * ROW_H}
+          stroke="rgba(255,255,255,0.35)" strokeWidth={2.5}
+        />
+      ))}
+
+      {/* Animated paths */}
+      {data.paths.map((path, pi) => {
+        const color = PLAYER_COLORS[pi % PLAYER_COLORS.length]
+        const maxRow = Math.min(step, data.rows)
+        const points = path.cols.slice(0, maxRow + 1).map((c, r) =>
+          `${x(c)},${PAD_TOP + r * ROW_H}`
+        ).join(' ')
+        return (
+          <polyline key={pi}
+            points={points}
+            fill="none"
+            stroke={color}
+            strokeWidth={2}
+            strokeOpacity={0.85}
+          />
+        )
+      })}
+
+      {/* Moving dots */}
+      {step <= data.rows && data.paths.map((path, pi) => {
+        const r     = Math.min(step, data.rows)
+        const color = PLAYER_COLORS[pi % PLAYER_COLORS.length]
+        return (
+          <circle key={pi}
+            cx={x(path.cols[r])} cy={PAD_TOP + r * ROW_H}
+            r={5} fill={color}
+          />
+        )
+      })}
+
+      {/* Participant names (top) */}
+      {data.order.map((name, c) => (
+        <text key={c}
+          x={x(c)} y={PAD_TOP - 8}
+          textAnchor="middle"
+          fontSize={11} fontWeight={700}
+          fill={PLAYER_COLORS[c % PLAYER_COLORS.length]}
+        >
+          {name.length > 6 ? name.slice(0, 5) + '…' : name}
+        </text>
+      ))}
+
+      {/* Prize names (bottom) */}
+      {data.prizes.map((prize, c) => (
+        <text key={c}
+          x={x(c)} y={PAD_TOP + data.rows * ROW_H + 20}
+          textAnchor="middle"
+          fontSize={10} fontWeight={600}
+          fill="rgba(255,255,255,0.6)"
+        >
+          {prize.length > 6 ? prize.slice(0, 5) + '…' : prize}
+        </text>
+      ))}
+
+      {/* End dots (bottom of each column) */}
+      {data.prizes.map((_, c) => (
+        <circle key={c}
+          cx={x(c)} cy={PAD_TOP + data.rows * ROW_H}
+          r={4} fill="rgba(255,255,255,0.2)"
+          stroke="rgba(255,255,255,0.4)" strokeWidth={1}
+        />
+      ))}
+    </svg>
+  )
+}
+
+function LadderPanel({ gSettings, gameStates }: {
+  gSettings: Record<string, unknown>
+  gameStates: Record<string, { status: string; [k: string]: unknown }>
+}) {
+  const ladderGameState = gameStates['ladder']
+  const status      = ladderGameState?.status as string ?? 'idle'
+  const ladderState = ladderGameState?.ladder as LadderState | undefined
+  const ladderData  = ladderState?.ladderData
+
+  const isCollecting = status === 'collecting'
+  const isResult     = status === 'showing_result'
+  const prizes       = (gSettings.prizes as Prize[]) ?? []
+
+  const [animating, setAnimating] = useState(false)
+  useEffect(() => {
+    if (isResult && ladderData) {
+      setAnimating(true)
+      const id = setTimeout(() => setAnimating(false), (ladderData.rows + 2) * 60 + 500)
+      return () => clearTimeout(id)
+    }
+  }, [isResult, ladderData])
+
+  const timeLeft = ladderState
+    ? Math.max(0, Math.ceil((ladderState.deadline - Date.now()) / 1000))
+    : 0
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    if (!isCollecting) return
+    const id = setInterval(() => setTick(t => t + 1), 1000)
+    return () => clearInterval(id)
+  }, [isCollecting])
+  void tick
+
+  const participants = ladderState?.participants ?? []
+  const maxSlots     = ladderState?.maxSlots ?? (gSettings.maxParticipants as number ?? 8)
+  const deadline     = ladderState?.deadline ?? 0
+  const pct          = deadline
+    ? Math.max(0, Math.min(100, ((deadline - Date.now()) / ((gSettings.joinDuration as number ?? 30) * 1000)) * 100))
+    : 0
+
+  return (
+    <div className={styles.ladderPanel}>
+      {/* ── Collecting phase ── */}
+      {isCollecting && (
+        <div className={styles.ladderCollect}>
+          <div className={styles.ladderCollectHeader}>
+            <span className={styles.ladderCollectTitle}>참가자 모집 중</span>
+            <span className={styles.ladderCollectCount}>{participants.length}/{maxSlots}명</span>
+            <span className={styles.ladderCollectTime}>{Math.max(0, Math.ceil((deadline - Date.now()) / 1000))}초</span>
+          </div>
+          <div className={styles.ladderTimerBar}>
+            <div className={styles.ladderTimerFill} style={{ width: `${pct}%` }} />
+          </div>
+          <div className={styles.ladderParticipants}>
+            {participants.map((p, i) => (
+              <span key={i} className={styles.ladderChip}
+                style={{ background: PLAYER_COLORS[i % PLAYER_COLORS.length] + '33',
+                         borderColor: PLAYER_COLORS[i % PLAYER_COLORS.length] + '88',
+                         color: PLAYER_COLORS[i % PLAYER_COLORS.length] }}>
+                {p}
+              </span>
+            ))}
+            {participants.length === 0 && (
+              <span className={styles.ladderEmptyHint}>
+                채팅 명령어로 참가 대기 중...
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Result + SVG ── */}
+      {isResult && ladderData && (
+        <div className={styles.ladderResult}>
+          <div className={styles.ladderSvgWrap}>
+            <LadderSVG data={ladderData} animate={animating} />
+          </div>
+          <div className={styles.ladderResultList}>
+            {ladderData.results.map((r, i) => (
+              <div key={i} className={styles.ladderResultRow}
+                style={{ borderLeftColor: PLAYER_COLORS[r.startCol % PLAYER_COLORS.length] }}>
+                <span className={styles.ladderResultUser}
+                  style={{ color: PLAYER_COLORS[r.startCol % PLAYER_COLORS.length] }}>
+                  {r.user}
+                </span>
+                <span className={styles.ladderResultArrow}>→</span>
+                <span className={styles.ladderResultPrize}>{r.prize}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Idle hint ── */}
+      {!isCollecting && !isResult && (
+        <div className={styles.ladderIdle}>
+          <div className={styles.ladderIdleIcon}>🪜</div>
+          <div>
+            <div className={styles.ladderIdleText}>사다리타기 대기 중</div>
+            <div className={styles.ladderIdleHint}>
+              상단 ▶ 수동 실행으로 참가자 모집을 시작하거나,<br/>
+              별풍선 / 채팅 트리거로 자동 시작됩니다.<br/>
+              등록된 상품: {prizes.length > 0 ? prizes.map(p => p.name).join(', ') : '없음'}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Quiz panel ────────────────────────────────────────────────────────────────
+
+type QuizMode = 'manual' | 'list' | 'auto'
+
+interface QuizStateData {
+  question: string; answer: string; deadline: number; winner: string | null
+}
+
+function QuizPanel({
+  gSettings, gameStates, saveSetting,
+}: {
+  gSettings:  Record<string, unknown>
+  gameStates: Record<string, { status: string; [k: string]: unknown }>
+  saveSetting: (key: string, value: unknown) => void
+}) {
+  const [mode, setMode]       = useState<QuizMode>('manual')
+  const [manualQ, setManualQ] = useState('')
+  const [manualA, setManualA] = useState('')
+  const [manualSec, setManualSec] = useState(30)
+  const [timeLeft, setTimeLeft]   = useState(0)
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const el = (window as unknown as Record<string, unknown>).electron as
+    Record<string, (...args: unknown[]) => unknown>
+
+  const quizGameState = gameStates['quiz']
+  const isRunning     = quizGameState?.status === 'collecting'
+  const isResult      = quizGameState?.status === 'showing_result'
+  const quizData      = quizGameState?.quiz as QuizStateData | undefined
+  const resultData    = quizGameState?.result as { result: string; detail: string } | undefined
+
+  const questions     = (gSettings.questions as Array<{ question: string; answer: string }>) ?? []
+  const autoThreshold = (gSettings.balloonThreshold as number) ?? 0
+
+  // Countdown ticker
+  useEffect(() => {
+    if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null }
+    if (isRunning && quizData?.deadline) {
+      const update = () => {
+        const left = Math.max(0, Math.ceil((quizData.deadline - Date.now()) / 1000))
+        setTimeLeft(left)
+        if (left === 0 && tickRef.current) { clearInterval(tickRef.current); tickRef.current = null }
+      }
+      update()
+      tickRef.current = setInterval(update, 500)
+    }
+    return () => { if (tickRef.current) clearInterval(tickRef.current) }
+  }, [isRunning, quizData?.deadline])
+
+  const startManual = async (q: string, a: string, sec: number) => {
+    if (!q.trim() || !a.trim()) return
+    await (el.quizStartManual as (o: { question: string; answer: string; timeLimit: number }) => Promise<unknown>)(
+      { question: q.trim(), answer: a.trim(), timeLimit: sec }
+    )
+  }
+
+  const pct = quizData
+    ? Math.max(0, Math.min(100, (timeLeft / Math.max(1, Math.ceil((quizData.deadline - Date.now() + timeLeft * 1000) / 1000))) * 100))
+    : 0
+  const timerColor = timeLeft > 10 ? '#10B981' : '#EF4444'
+
+  return (
+    <div className={styles.qpPanel}>
+
+      {/* ── Live status ── */}
+      {(isRunning || isResult) && (
+        <div className={`${styles.qpStatus} ${isResult ? styles.qpStatusResult : ''}`}>
+          {isRunning && quizData && (<>
+            <div className={styles.qpStatusLabel}>진행 중</div>
+            <div className={styles.qpStatusQ}>{quizData.question}</div>
+            <div className={styles.qpTimerRow}>
+              <div className={styles.qpTimerBar}>
+                <div className={styles.qpTimerFill} style={{ width: `${pct}%`, background: timerColor }} />
+              </div>
+              <span className={styles.qpTimerNum} style={{ color: timerColor }}>{timeLeft}초</span>
+            </div>
+            <div className={styles.qpAnswerHint}>정답: <strong>{quizData.answer}</strong></div>
+          </>)}
+          {isResult && resultData && (<>
+            <div className={styles.qpStatusLabel}>결과</div>
+            <div className={`${styles.qpStatusQ} ${resultData.result.includes('시간 초과') ? styles.qpTimeout : styles.qpWin}`}>
+              {resultData.result}
+            </div>
+            <div className={styles.qpAnswerHint}>{resultData.detail}</div>
+          </>)}
+        </div>
+      )}
+
+      {/* ── Mode tabs ── */}
+      <div className={styles.qpTabs}>
+        {(['manual','list','auto'] as QuizMode[]).map(m => (
+          <button
+            key={m}
+            className={`${styles.qpTab} ${mode === m ? styles.qpTabActive : ''}`}
+            onClick={() => setMode(m)}
+          >
+            {{ manual:'✏️ 수동 출제', list:'📋 문항 목록', auto:'⚡ 자동 트리거' }[m]}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Tab: 수동 출제 ── */}
+      {mode === 'manual' && (
+        <div className={styles.qpTabContent}>
+          <div className={styles.qpField}>
+            <label>문제</label>
+            <textarea
+              className={styles.qpTextarea}
+              rows={2}
+              placeholder="문제를 입력하세요"
+              value={manualQ}
+              onChange={e => setManualQ(e.target.value)}
+            />
+          </div>
+          <div className={styles.qpField}>
+            <label>정답</label>
+            <input
+              className={styles.qpInput}
+              placeholder="정답을 입력하세요 (대소문자 무시)"
+              value={manualA}
+              onChange={e => setManualA(e.target.value)}
+            />
+          </div>
+          <div className={styles.qpField}>
+            <label>제한 시간</label>
+            <div className={styles.qpRow}>
+              <input
+                className={styles.qpInput}
+                type="number" min={5} max={300} style={{ width: 80 }}
+                value={manualSec}
+                onChange={e => setManualSec(Number(e.target.value))}
+              />
+              <span className={styles.qpUnit}>초</span>
+            </div>
+          </div>
+          <button
+            className={styles.qpStartBtn}
+            disabled={isRunning || !manualQ.trim() || !manualA.trim()}
+            onClick={() => startManual(manualQ, manualA, manualSec)}
+          >
+            {isRunning ? '퀴즈 진행 중...' : '출제하기'}
+          </button>
+        </div>
+      )}
+
+      {/* ── Tab: 문항 목록 ── */}
+      {mode === 'list' && (
+        <div className={styles.qpTabContent}>
+          {questions.length === 0 ? (
+            <div className={styles.qpEmpty}>
+              등록된 문항이 없습니다.<br/>
+              <span>아래 문항 목록에서 먼저 추가하세요.</span>
+            </div>
+          ) : (
+            <div className={styles.qpQList}>
+              {questions.map((q, i) => (
+                <div key={i} className={styles.qpQRow}>
+                  <div className={styles.qpQContent}>
+                    <span className={styles.qpQNum}>{i + 1}</span>
+                    <div className={styles.qpQTexts}>
+                      <div className={styles.qpQQ}>{q.question}</div>
+                      <div className={styles.qpQA}>정답: {q.answer}</div>
+                    </div>
+                  </div>
+                  <button
+                    className={styles.qpPickBtn}
+                    disabled={isRunning}
+                    onClick={() => startManual(q.question, q.answer, (gSettings.timeLimit as number) ?? 30)}
+                  >
+                    출제
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Tab: 자동 트리거 ── */}
+      {mode === 'auto' && (
+        <div className={styles.qpTabContent}>
+          <div className={styles.qpAutoInfo}>
+            <span className={styles.qpAutoIcon}>⚡</span>
+            <div>
+              <strong>별풍선 자동 트리거</strong>가 활성화되면 아래 조건을 충족하는
+              별풍선 후원 시 등록된 문항 중 랜덤으로 자동 출제됩니다.
+            </div>
+          </div>
+          <div className={styles.qpField}>
+            <label>트리거 별풍선 수 (0=비활성)</label>
+            <div className={styles.qpRow}>
+              <input
+                className={styles.qpInput}
+                type="number" min={0} style={{ width: 100 }}
+                value={autoThreshold}
+                onChange={e => saveSetting('balloonThreshold', Number(e.target.value))}
+              />
+              <span className={styles.qpUnit}>개 이상</span>
+            </div>
+          </div>
+          <div className={styles.qpField}>
+            <label>자동 출제 제한 시간</label>
+            <div className={styles.qpRow}>
+              <input
+                className={styles.qpInput}
+                type="number" min={5} max={300} style={{ width: 80 }}
+                value={(gSettings.timeLimit as number) ?? 30}
+                onChange={e => saveSetting('timeLimit', Number(e.target.value))}
+              />
+              <span className={styles.qpUnit}>초</span>
+            </div>
+          </div>
+          <div className={styles.qpAutoNote}>
+            {questions.length === 0
+              ? '⚠ 등록된 문항이 없습니다. 문항 목록 탭에서 추가하세요.'
+              : `✅ 등록된 문항 ${questions.length}개 중 랜덤 출제`
+            }
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Field wrapper ─────────────────────────────────────────────────────────────
+
+// ── Slot Panel ────────────────────────────────────────────────────────────────
+
+interface SlotSpinState { symbols: string[]; jackpot: boolean; twoKind: boolean; triggeredBy: string }
+
+function SlotPanel({
+  gSettings, gameStates, saveSetting,
+}: {
+  gSettings: Record<string, unknown>
+  gameStates: Record<string, { status: string; [k: string]: unknown }>
+  saveSetting: (key: string, value: unknown) => void
+}) {
+  const state  = gameStates['slot']
+  const status = (state?.status as string) ?? 'idle'
+  const spin   = state?.slot as SlotSpinState | undefined
+
+  const defaultSymbols = ['🍒', '🍋', '🍊', '⭐', '🎰', '💎', '7️⃣', '🔔']
+  const [symbols, setSymbols] = useState<string[]>(
+    (gSettings.symbols as string[]) ?? defaultSymbols
+  )
+  const [newSym, setNewSym]   = useState('')
+
+  useEffect(() => {
+    setSymbols((gSettings.symbols as string[]) ?? defaultSymbols)
+  }, [gSettings.symbols])
+
+  const removeSym = (i: number) => {
+    if (symbols.length <= 3) return
+    const next = symbols.filter((_, idx) => idx !== i)
+    setSymbols(next); saveSetting('symbols', next)
+  }
+  const addSym = () => {
+    const s = newSym.trim()
+    if (!s || symbols.includes(s)) return
+    const next = [...symbols, s]
+    setSymbols(next); saveSetting('symbols', next)
+    setNewSym('')
+  }
+
+  const isRunning = status === 'running'
+  const isResult  = status === 'showing_result'
+
+  return (
+    <div className={styles.slPanel}>
+      {/* 현재 상태 카드 */}
+      {(isRunning || isResult) && spin && (
+        <div className={`${styles.slResultCard} ${spin.jackpot ? styles.slJackpot : spin.twoKind ? styles.slTwoKind : ''}`}>
+          <div className={styles.slReels}>
+            {spin.symbols.map((sym, i) => (
+              <div key={i} className={`${styles.slReel} ${isRunning ? styles.slSpinning : ''}`}>
+                {sym}
+              </div>
+            ))}
+          </div>
+          <div className={styles.slResultLabel}>
+            {isRunning ? '🎰 돌아가는 중...' :
+             spin.jackpot  ? '🎉 JACKPOT!' :
+             spin.twoKind  ? '✨ 2개 일치!' : '😢 꽝'}
+          </div>
+          {isResult && (
+            <div className={styles.slTriggeredBy}>{spin.triggeredBy}님의 결과</div>
+          )}
+        </div>
+      )}
+
+      {!isRunning && !isResult && (
+        <div className={styles.slIdle}>
+          <div className={styles.slIdleReels}>
+            {(symbols.slice(0,3)).map((s, i) => (
+              <div key={i} className={styles.slReel}>{s}</div>
+            ))}
+          </div>
+          <p className={styles.slIdleHint}>별풍선 후원 또는 채팅 명령어로 실행됩니다</p>
+        </div>
+      )}
+
+      {/* 심볼 설정 */}
+      <div className={styles.slSymbolSection}>
+        <div className={styles.slSymbolTitle}>심볼 설정 <span className={styles.slSymbolCount}>({symbols.length}개)</span></div>
+        <div className={styles.slSymbolGrid}>
+          {symbols.map((s, i) => (
+            <div key={i} className={styles.slSymbolItem}>
+              <span className={styles.slSymbolEmoji}>{s}</span>
+              <button
+                className={styles.slSymbolRemove}
+                onClick={() => removeSym(i)}
+                disabled={symbols.length <= 3}
+              >×</button>
+            </div>
+          ))}
+        </div>
+        <div className={styles.slAddRow}>
+          <input
+            className={styles.slAddInput}
+            value={newSym}
+            onChange={e => setNewSym(e.target.value)}
+            placeholder="이모지 입력"
+            maxLength={4}
+            onKeyDown={e => e.key === 'Enter' && addSym()}
+          />
+          <button className={styles.slAddBtn} onClick={addSym}>추가</button>
+        </div>
+        <p className={styles.slSymbolHint}>최소 3개 필요 · 엔터로 추가</p>
+      </div>
+
+      {/* 스핀 시간 */}
+      <div className={styles.slSpinRow}>
+        <label className={styles.slSpinLabel}>스핀 시간</label>
+        <input
+          type="number" className={styles.slSpinInput}
+          value={(gSettings.spinDuration as number) ?? 3000}
+          min={2000} max={6000} step={500}
+          onChange={e => saveSetting('spinDuration', Number(e.target.value))}
+        />
+        <span className={styles.slSpinUnit}>ms</span>
+      </div>
+    </div>
+  )
+}
+
+// ── Number Panel ─────────────────────────────────────────────────────────────
+
+interface NumberPickState { min: number; max: number; count: number; result: number[] }
+
+function NumberPanel({
+  gSettings, gameStates, saveSetting,
+}: {
+  gSettings: Record<string, unknown>
+  gameStates: Record<string, { status: string; [k: string]: unknown }>
+  saveSetting: (key: string, value: unknown) => void
+}) {
+  const state   = gameStates['number']
+  const running = state?.status === 'running'
+  const numData = state?.number as NumberPickState | undefined
+
+  const minNumber   = (gSettings.minNumber   as number)   ?? 1
+  const maxNumber   = (gSettings.maxNumber   as number)   ?? 100
+  const count       = (gSettings.count       as number)   ?? 1
+  const spinDuration= (gSettings.spinDuration as number)  ?? 3000
+  const excludeList = (gSettings.excludeList  as number[]) ?? []
+
+  const [excludeInput, setExcludeInput] = useState('')
+
+  function addExclude() {
+    const n = parseInt(excludeInput.trim(), 10)
+    if (isNaN(n)) return
+    if (excludeList.includes(n)) { setExcludeInput(''); return }
+    saveSetting('excludeList', [...excludeList, n].sort((a,b) => a - b))
+    setExcludeInput('')
+  }
+  function removeExclude(n: number) {
+    saveSetting('excludeList', excludeList.filter(x => x !== n))
+  }
+  function clearExclude() {
+    saveSetting('excludeList', [])
+  }
+
+  return (
+    <div className={styles.nbWrap}>
+      {/* Settings */}
+      <div className={styles.nbSettings}>
+        <div className={styles.nbRow}>
+          <span className={styles.nbLabel}>범위</span>
+          <input type="number" className={styles.nbInput} value={minNumber}
+            onChange={e => saveSetting('minNumber', Number(e.target.value))} style={{ width: 80 }} />
+          <span className={styles.nbSep}>~</span>
+          <input type="number" className={styles.nbInput} value={maxNumber}
+            onChange={e => saveSetting('maxNumber', Number(e.target.value))} style={{ width: 80 }} />
+        </div>
+        <div className={styles.nbRow}>
+          <span className={styles.nbLabel}>추첨 개수</span>
+          <input type="number" min={1} className={styles.nbInput} value={count}
+            onChange={e => saveSetting('count', Number(e.target.value))} style={{ width: 80 }} />
+          <span className={styles.nbLabel} style={{ marginLeft: 24 }}>애니메이션(ms)</span>
+          <input type="number" step={500} className={styles.nbInput} value={spinDuration}
+            onChange={e => saveSetting('spinDuration', Number(e.target.value))} style={{ width: 90 }} />
+        </div>
+      </div>
+
+      {/* Exclude list */}
+      <div className={styles.nbExclude}>
+        <div className={styles.nbExcludeHeader}>
+          <span className={styles.nbLabel}>제외 번호</span>
+          {excludeList.length > 0 && (
+            <button className={styles.nbClearBtn} onClick={clearExclude}>전체 삭제</button>
+          )}
+        </div>
+        <div className={styles.nbExcludeAdd}>
+          <input type="number" className={styles.nbInput} placeholder="제외할 번호"
+            value={excludeInput} onChange={e => setExcludeInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addExclude()} style={{ width: 120 }} />
+          <button className={styles.nbAddBtn} onClick={addExclude}>추가</button>
+        </div>
+        <div className={styles.nbChips}>
+          {excludeList.map(n => (
+            <span key={n} className={styles.nbChip}>
+              {n}
+              <button className={styles.nbChipRemove} onClick={() => removeExclude(n)}>×</button>
+            </span>
+          ))}
+          {excludeList.length === 0 && <span className={styles.nbEmpty}>제외 번호 없음</span>}
+        </div>
+      </div>
+
+      {/* Result */}
+      {(running || numData) && (
+        <div className={styles.nbResult}>
+          <div className={styles.nbResultLabel}>{running ? '추첨 중...' : '추첨 결과'}</div>
+          <div className={styles.nbNumbers}>
+            {running
+              ? <div className={styles.nbNumberRolling}>?</div>
+              : numData?.result.map((n, i) => (
+                  <div key={i} className={styles.nbNumber}>{n}</div>
+                ))
+            }
+          </div>
+          {!running && numData && (
+            <div className={styles.nbResultMeta}>
+              {numData.min} ~ {numData.max} 범위 / {numData.count}개 추첨
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Boss Panel ────────────────────────────────────────────────────────────────
+
+function BossLootEditor({
+  items, onSave,
+}: { items: BossLootItem[]; onSave: (v: BossLootItem[]) => void }) {
+  const [list, setList] = useState<BossLootItem[]>(items)
+
+  const update = (i: number, field: keyof BossLootItem, val: string) => {
+    const next = list.map((x, idx) => idx === i ? { ...x, [field]: val } : x)
+    setList(next); onSave(next)
+  }
+  const add    = () => { const n = [...list, { name: '상품', description: '' }]; setList(n); onSave(n) }
+  const remove = (i: number) => { const n = list.filter((_, idx) => idx !== i); setList(n); onSave(n) }
+
+  return (
+    <div className={styles.brLootEditor}>
+      <div className={styles.brLootHeader}>
+        <span className={styles.brLootTitle}>전리품 목록</span>
+        <button className={styles.brAddBtn} onClick={add}>+ 추가</button>
+      </div>
+      {list.map((item, i) => (
+        <div key={i} className={styles.brLootRow}>
+          <span className={styles.brLootNum}>{i + 1}</span>
+          <input
+            className={styles.brInput}
+            value={item.name}
+            onChange={e => update(i, 'name', e.target.value)}
+            placeholder="상품명"
+            style={{ flex: 1 }}
+          />
+          <input
+            className={styles.brInput}
+            value={item.description}
+            onChange={e => update(i, 'description', e.target.value)}
+            placeholder="설명"
+            style={{ flex: 1.5 }}
+          />
+          <button className={styles.brRemoveBtn} onClick={() => remove(i)}>×</button>
+        </div>
+      ))}
+      {list.length === 0 && <p className={styles.brEmpty}>전리품을 추가하세요.</p>}
+    </div>
+  )
+}
+
+function BossPanel({
+  gSettings, gameStates, saveSetting,
+}: {
+  gSettings: Record<string, unknown>
+  gameStates: Record<string, { status: string; [k: string]: unknown }>
+  saveSetting: (key: string, value: unknown) => void
+}) {
+  const el    = (window as unknown as Record<string, Record<string, unknown>>).electron
+  const state = gameStates['boss']
+  const boss  = state?.boss as BossStateData | undefined
+  const status = (state?.status as string) ?? 'idle'
+
+  // Settings form state (used in idle mode)
+  const [bossName,    setBossName]    = useState((gSettings.bossName        as string)  ?? '보스')
+  const [maxHp,       setMaxHp]       = useState((gSettings.maxHp           as number)  ?? 100000)
+  const [dmgPerDot,   setDmgPerDot]   = useState((gSettings.damagePerDot    as number)  ?? 100)
+  const [threshold,   setThreshold]   = useState((gSettings.balloonThreshold as number) ?? 100)
+  const [critEnabled, setCritEnabled] = useState((gSettings.critEnabled      as boolean) !== false)
+  const [critChance,  setCritChance]  = useState(Math.round(((gSettings.critChance as number) ?? 0.15) * 100))
+  const [critMult,    setCritMult]    = useState((gSettings.critMultiplier   as number)  ?? 2)
+  const [lootItems,   setLootItems]   = useState<BossLootItem[]>((gSettings.lootItems as BossLootItem[]) ?? [])
+
+  // Sync settings form from gSettings when props update
+  useEffect(() => {
+    setBossName(   (gSettings.bossName         as string)  ?? '보스')
+    setMaxHp(      (gSettings.maxHp            as number)  ?? 100000)
+    setDmgPerDot(  (gSettings.damagePerDot     as number)  ?? 100)
+    setThreshold(  (gSettings.balloonThreshold  as number)  ?? 100)
+    setCritEnabled((gSettings.critEnabled       as boolean) !== false)
+    setCritChance( Math.round(((gSettings.critChance as number) ?? 0.15) * 100))
+    setCritMult(   (gSettings.critMultiplier    as number)  ?? 2)
+    setLootItems(  (gSettings.lootItems         as BossLootItem[]) ?? [])
+  }, [gSettings])
+
+  // Last roll animation state
+  const [animRoll, setAnimRoll] = useState<BossRollResult | null>(null)
+  const lastRollRef = useRef<number>(0)
+  useEffect(() => {
+    if (!boss?.lastRoll) return
+    if (boss.lastRoll.ts !== lastRollRef.current) {
+      lastRollRef.current = boss.lastRoll.ts
+      setAnimRoll(boss.lastRoll)
+      const t = setTimeout(() => setAnimRoll(null), 4000)
+      return () => clearTimeout(t)
+    }
+  }, [boss?.lastRoll])
+
+  const saveAll = () => {
+    saveSetting('bossName',         bossName)
+    saveSetting('maxHp',            maxHp)
+    saveSetting('damagePerDot',     dmgPerDot)
+    saveSetting('balloonThreshold', threshold)
+    saveSetting('critEnabled',      critEnabled)
+    saveSetting('critChance',       critChance / 100)
+    saveSetting('critMultiplier',   critMult)
+    saveSetting('lootItems',        lootItems)
+  }
+
+  const start = () => { saveAll(); (el.bossStart as () => void)() }
+  const reset = () => (el.bossReset as () => void)()
+
+  const hpPct = boss ? Math.max(0, (boss.currentHp / boss.maxHp) * 100) : 100
+
+  // ── Showing result (boss defeated) ────────────────────────────────────────
+  if (status === 'showing_result' && boss) {
+    const totalDmg = Object.values(boss.participants).reduce((s, p) => s + p.totalDamage, 0)
+    const sorted   = Object.entries(boss.participants)
+      .sort((a, b) => b[1].totalDamage - a[1].totalDamage)
+
+    return (
+      <div className={styles.brDefeated}>
+        <div className={styles.brDefeatTitle}>👑 보스 처치!</div>
+        <div className={styles.brDefeatStats}>
+          총 데미지: <strong>{totalDmg.toLocaleString()}</strong> &nbsp;|&nbsp;
+          참여자: <strong>{sorted.length}명</strong>
+        </div>
+
+        {boss.lootResults && boss.lootResults.length > 0 && (
+          <div className={styles.brLootResults}>
+            <div className={styles.brLootResultsTitle}>🎁 전리품 분배 결과</div>
+            {boss.lootResults.map((r, i) => (
+              <div key={i} className={styles.brLootResultRow}>
+                <span className={styles.brLootIdx}>{i + 1}</span>
+                <span className={styles.brLootWinner}>{r.user}</span>
+                <span className={styles.brLootItemName}>{r.item.name}</span>
+                {r.item.description && (
+                  <span className={styles.brLootDesc}>{r.item.description}</span>
+                )}
+                <span className={styles.brLootPct}>{r.contributionRate.toFixed(1)}%</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className={styles.brDmgTable}>
+          <div className={styles.brDmgTableTitle}>데미지 시트</div>
+          <div className={styles.brDmgHeader}>
+            <span>참여자</span><span>공격</span><span>크리티컬</span><span>총 데미지</span><span>기여도</span>
+          </div>
+          {sorted.map(([user, p]) => (
+            <div key={user} className={styles.brDmgRow}>
+              <span>{user}</span>
+              <span>{p.attackCount}회</span>
+              <span>{p.critCount}회</span>
+              <span>{p.totalDamage.toLocaleString()}</span>
+              <span>{totalDmg > 0 ? (p.totalDamage / totalDmg * 100).toFixed(1) : 0}%</span>
+            </div>
+          ))}
+        </div>
+
+        <button className={styles.brResetBtn} onClick={reset}>다음 레이드 준비</button>
+      </div>
+    )
+  }
+
+  // ── Running (raid active) ─────────────────────────────────────────────────
+  if (status === 'running' && boss) {
+    const totalDmg = Object.values(boss.participants).reduce((s, p) => s + p.totalDamage, 0)
+    const sorted   = Object.entries(boss.participants)
+      .sort((a, b) => b[1].totalDamage - a[1].totalDamage)
+
+    return (
+      <div className={styles.brRunning}>
+        {/* HP Bar */}
+        <div className={styles.brHpCard}>
+          <div className={styles.brBossNameRow}>
+            <span className={styles.brBossIcon}>💀</span>
+            <span className={styles.brBossName}>{boss.bossName}</span>
+            <span className={styles.brHpBadge}>BOSS HP</span>
+          </div>
+          <div className={styles.brHpNumbers}>
+            <span>{boss.currentHp.toLocaleString()}</span>
+            <span className={styles.brHpSep}>/</span>
+            <span className={styles.brHpMax}>{boss.maxHp.toLocaleString()}</span>
+          </div>
+          <div className={styles.brHpBarBg}>
+            <div
+              className={styles.brHpBarFill}
+              style={{ width: `${hpPct}%`, background: hpPct > 50 ? '#EF4444' : hpPct > 25 ? '#F97316' : '#FBBF24' }}
+            />
+          </div>
+          <div className={styles.brHpPct}>{hpPct.toFixed(1)}% 남음</div>
+        </div>
+
+        {/* Last roll animation */}
+        {animRoll && (
+          <div className={`${styles.brDiceCard} ${styles.brDiceShow}`}>
+            <div className={styles.brDiceUser}>{animRoll.user}님의 공격!</div>
+            <div className={`${styles.brDiceFace} ${styles.brDiceSpin}`}>{animRoll.roll}</div>
+            <div className={`${styles.brDmgPill} ${animRoll.isCritical ? styles.brDmgCrit : ''}`}>
+              {animRoll.isCritical ? '💥 ' : ''}{animRoll.damage.toLocaleString()} DMG
+            </div>
+            {animRoll.isCritical && <div className={styles.brCritBadge}>🎯 CRITICAL HIT!</div>}
+          </div>
+        )}
+
+        {/* Config summary */}
+        <div className={styles.brConfigRow}>
+          <span>별풍선 {boss.balloonThreshold}개 → 주사위 1회</span>
+          <span>1면당 {boss.damagePerDot.toLocaleString()} 데미지</span>
+          {boss.critEnabled && <span>크리티컬 {Math.round(boss.critChance * 100)}% (×{boss.critMultiplier})</span>}
+        </div>
+
+        {/* Damage table */}
+        {sorted.length > 0 ? (
+          <div className={styles.brDmgTable}>
+            <div className={styles.brDmgTableTitle}>
+              데미지 시트 &nbsp;<span className={styles.brDmgTotal}>총 {totalDmg.toLocaleString()}</span>
+            </div>
+            <div className={styles.brDmgHeader}>
+              <span>참여자</span><span>공격</span><span>크리티컬</span><span>총 데미지</span><span>기여도</span>
+            </div>
+            {sorted.map(([user, p]) => (
+              <div key={user} className={styles.brDmgRow}>
+                <span>{user}</span>
+                <span>{p.attackCount}회</span>
+                <span>{p.critCount > 0 ? `${p.critCount}회` : '-'}</span>
+                <span>{p.totalDamage.toLocaleString()}</span>
+                <span>{totalDmg > 0 ? (p.totalDamage / totalDmg * 100).toFixed(1) : 0}%</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className={styles.brWaiting}>
+            ⚔️ 별풍선 {boss.balloonThreshold}개를 후원하면 공격이 시작됩니다!
+          </div>
+        )}
+
+        <button className={styles.brResetBtn} style={{ marginTop: 8 }} onClick={reset}>레이드 초기화</button>
+      </div>
+    )
+  }
+
+  // ── Idle (setup form) ─────────────────────────────────────────────────────
+  return (
+    <div className={styles.brSetup}>
+      <div className={styles.brSection}>
+        <div className={styles.brSectionTitle}>보스 설정</div>
+        <div className={styles.brRow}>
+          <label className={styles.brLabel}>보스 이름</label>
+          <input className={styles.brInput} value={bossName} onChange={e => setBossName(e.target.value)} />
+        </div>
+        <div className={styles.brRow}>
+          <label className={styles.brLabel}>최대 HP</label>
+          <input type="number" className={styles.brInput} value={maxHp} min={100}
+            onChange={e => setMaxHp(Number(e.target.value))} />
+        </div>
+        <div className={styles.brRow}>
+          <label className={styles.brLabel}>1면당 데미지</label>
+          <input type="number" className={styles.brInput} value={dmgPerDot} min={1}
+            onChange={e => setDmgPerDot(Number(e.target.value))} />
+          <span className={styles.brHint}>주사위 6 × {dmgPerDot} = {(6 * dmgPerDot).toLocaleString()} 데미지</span>
+        </div>
+        <div className={styles.brRow}>
+          <label className={styles.brLabel}>트리거 별풍선</label>
+          <input type="number" className={styles.brInput} value={threshold} min={1}
+            onChange={e => setThreshold(Number(e.target.value))} />
+          <span className={styles.brHint}>개 후원 시 주사위 1회</span>
+        </div>
+      </div>
+
+      <div className={styles.brSection}>
+        <div className={styles.brSectionTitle}>크리티컬 설정</div>
+        <div className={styles.brRow}>
+          <label className={styles.brLabel}>
+            <input type="checkbox" checked={critEnabled} onChange={e => setCritEnabled(e.target.checked)}
+              style={{ marginRight: 6 }} />
+            크리티컬 활성화
+          </label>
+        </div>
+        {critEnabled && (<>
+          <div className={styles.brRow}>
+            <label className={styles.brLabel}>크리티컬 확률</label>
+            <input type="number" className={styles.brInput} value={critChance} min={1} max={99}
+              onChange={e => setCritChance(Number(e.target.value))} />
+            <span className={styles.brHint}>%</span>
+          </div>
+          <div className={styles.brRow}>
+            <label className={styles.brLabel}>크리티컬 배율</label>
+            <input type="number" className={styles.brInput} value={critMult} min={1.5} step={0.5}
+              onChange={e => setCritMult(Number(e.target.value))} />
+            <span className={styles.brHint}>× (데미지 {critMult}배)</span>
+          </div>
+        </>)}
+      </div>
+
+      <BossLootEditor
+        items={lootItems}
+        onSave={v => { setLootItems(v); saveSetting('lootItems', v) }}
+      />
+
+      <button className={styles.brStartBtn} onClick={start}>
+        ⚔️ 레이드 시작
+      </button>
+    </div>
+  )
+}
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -327,17 +1738,20 @@ export default function GamesPage() {
         <div className={styles.panelHeader}>
           <span className={styles.panelIcon}>{game.icon}</span>
           <h1 className={styles.panelTitle}>{game.name} 설정</h1>
-          <button
-            className={styles.runBtn}
-            style={{ background: busy ? '#9CA3AF' : game.color }}
-            disabled={busy}
-            onClick={() => triggerGame(game.id)}
-          >
-            {busy ? '진행 중...' : '▶ 수동 실행'}
-          </button>
+          {game.id !== 'pickboard' && game.id !== 'boss' && (
+            <button
+              className={styles.runBtn}
+              style={{ background: busy ? '#9CA3AF' : game.color }}
+              disabled={busy}
+              onClick={() => triggerGame(game.id)}
+            >
+              {busy ? '진행 중...' : '▶ 수동 실행'}
+            </button>
+          )}
         </div>
 
         {/* ── Common fields ── */}
+        {game.id !== 'pickboard' && game.id !== 'boss' && (
         <div className={styles.fields}>
           <Field label="별풍선 트리거 (0=비활성)">
             <input
@@ -354,30 +1768,6 @@ export default function GamesPage() {
             />
           </Field>
 
-          {/* Boss */}
-          {game.id === 'boss' && (<>
-            <Field label="보스 최대 HP">
-              <input
-                type="number" min={100}
-                value={(gSettings.maxHp as number) ?? 10000}
-                onChange={e => saveSetting('maxHp', Number(e.target.value))}
-              />
-            </Field>
-            <Field label="별풍선당 데미지">
-              <input
-                type="number" min={1}
-                value={(gSettings.damagePerBalloon as number) ?? 10}
-                onChange={e => saveSetting('damagePerBalloon', Number(e.target.value))}
-              />
-            </Field>
-            <Field label="채팅당 데미지">
-              <input
-                type="number" min={0}
-                value={(gSettings.damagePerChat as number) ?? 1}
-                onChange={e => saveSetting('damagePerChat', Number(e.target.value))}
-              />
-            </Field>
-          </>)}
 
           {/* Ladder */}
           {game.id === 'ladder' && (<>
@@ -397,17 +1787,6 @@ export default function GamesPage() {
             </Field>
           </>)}
 
-          {/* Quiz */}
-          {game.id === 'quiz' && (
-            <Field label="답변 시간 (초)">
-              <input
-                type="number" min={5}
-                value={(gSettings.timeLimit as number) ?? 30}
-                onChange={e => saveSetting('timeLimit', Number(e.target.value))}
-              />
-            </Field>
-          )}
-
           {/* Roulette */}
           {game.id === 'roulette' && (
             <Field label="회전 시간 (ms)">
@@ -419,8 +1798,18 @@ export default function GamesPage() {
             </Field>
           )}
         </div>
+        )}
 
         {/* ── List editors ── */}
+
+        {game.id === 'roulette' && (
+          <RoulettePanel
+            key={`${selected}-panel`}
+            gSettings={gSettings}
+            gameStates={gameStates}
+            saveSetting={saveSetting}
+          />
+        )}
 
         {game.id === 'roulette' && (
           <RouletteEditor
@@ -439,6 +1828,14 @@ export default function GamesPage() {
         )}
 
         {game.id === 'ladder' && (
+          <LadderPanel
+            key={`${selected}-panel`}
+            gSettings={gSettings}
+            gameStates={gameStates}
+          />
+        )}
+
+        {game.id === 'ladder' && (
           <LadderEditor
             key={selected}
             prizes={(gSettings.prizes as Prize[]) ?? []}
@@ -446,9 +1843,65 @@ export default function GamesPage() {
           />
         )}
 
+        {game.id === 'slot' && (
+          <SlotPanel
+            key={`${selected}-panel`}
+            gSettings={gSettings}
+            gameStates={gameStates}
+            saveSetting={saveSetting}
+          />
+        )}
+
+        {game.id === 'boss' && (
+          <BossPanel
+            key={`${selected}-panel`}
+            gSettings={gSettings}
+            gameStates={gameStates}
+            saveSetting={saveSetting}
+          />
+        )}
+
+        {game.id === 'number' && (
+          <NumberPanel
+            key={`${selected}-panel`}
+            gSettings={gSettings}
+            gameStates={gameStates}
+            saveSetting={saveSetting}
+          />
+        )}
+
+        {game.id === 'pickboard' && (
+          <PickBoardPanel
+            key={selected}
+            rows={(gSettings.pickRows as number) ?? 4}
+            cols={(gSettings.pickCols as number) ?? 5}
+            items={(gSettings.pickItems as PickItem[]) ?? []}
+          />
+        )}
+
+        {game.id === 'quiz' && (
+          <QuizPanel
+            key={selected}
+            gSettings={gSettings}
+            gameStates={gameStates}
+            saveSetting={saveSetting}
+          />
+        )}
+
+        {game.id === 'pickboard' && (
+          <PickBoardEditor
+            key={`${selected}-editor`}
+            items={(gSettings.pickItems as PickItem[]) ?? []}
+            rows={(gSettings.pickRows as number) ?? 4}
+            cols={(gSettings.pickCols as number) ?? 5}
+            onSave={v => saveSetting('pickItems', v)}
+            onSaveSize={(r, c) => { saveSetting('pickRows', r); saveSetting('pickCols', c) }}
+          />
+        )}
+
         {game.id === 'quiz' && (
           <QuizEditor
-            key={selected}
+            key={`${selected}-editor`}
             questions={(gSettings.questions as QuizQuestion[]) ?? []}
             onSave={v => saveSetting('questions', v)}
           />

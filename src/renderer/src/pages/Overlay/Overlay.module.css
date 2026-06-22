@@ -4,7 +4,7 @@
 
 .header { margin-bottom: 20px; }
 .title  { font-size: 22px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
-.sub    { font-size: 14px; color: var(--text-2); }
+.sub    { font-size: 14px; color: var(--text2); }
 
 .infoBox {
   display: flex;
@@ -80,7 +80,11 @@
   padding: 8px 14px;
   font-size: 13px;
   cursor: pointer;
-  color: var(--text-2);
+  color: var(--text2);
   transition: border-color 0.15s, color 0.15s;
 }
 .previewBtn:hover { border-color: var(--p400); color: var(--p500); }
+
+.copyBtnDone { background: #10B981 !important; }
+
+.portNote { color: var(--p400); font-weight: 600; }

@@ -8,8 +8,9 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
-    "build:win": "npm run build && electron-builder --win",
+    "build:win": "npm run build && electron-builder --win --x64",
     "build:mac": "npm run build && electron-builder --mac",
+    "build:all": "npm run build && electron-builder --win --mac",
     "preview": "electron-vite preview"
   },
   "dependencies": {

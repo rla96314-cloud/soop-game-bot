@@ -5,6 +5,7 @@ import { overlayServer }           from '../overlay/server'
 import { loadSettings, patchSettings, saveSettings } from '../store/settings'
 import { verifyUser, fetchAllowlist }               from '../auth/allowlist'
 import { fetchTodaySchedule }                       from '../schedule/fetcher'
+import { weflabWatcher }                            from '../weflab/watcher'
 
 export function registerIpcHandlers(win: BrowserWindow) {
   const send = (ch: string, ...args: unknown[]) => {
@@ -79,6 +80,7 @@ export function registerIpcHandlers(win: BrowserWindow) {
   ipcMain.handle('game:state',   (_, gameId: GameId) => gameEngine.getState(gameId))
   ipcMain.handle('game:all',     ()                   => gameEngine.getAllStates())
   ipcMain.handle('game:history', (_, limit = 50)      => gameEngine.getHistory(limit))
+  ipcMain.handle('boss:start',   ()                   => { gameEngine.startBossRaid(); return { ok: true } })
   ipcMain.handle('boss:reset',   ()                   => { gameEngine.resetBoss(); return { ok: true } })
 
   // Overlay
@@ -113,6 +115,38 @@ export function registerIpcHandlers(win: BrowserWindow) {
     if (!s.user?.id) return { ok: false, error: '저장된 사용자 없음' }
     return verifyUser(s.user.id)
   })
+
+  // Quiz manual start
+  ipcMain.handle('quiz:startManual', (_, opts: { question: string; answer: string; timeLimit: number }) => {
+    const ok = gameEngine.startManualQuiz(opts.question, opts.answer, opts.timeLimit)
+    return { ok }
+  })
+
+  // weflab
+  weflabWatcher.on('result', (text: string) => {
+    send('weflab:result', text)
+    const s = loadSettings()
+    if (!s.weflab.enabled) return
+    const matched = s.weflab.triggers.some(t =>
+      t.keyword && text.toLowerCase().includes(t.keyword.toLowerCase())
+    )
+    if (matched) gameEngine.trigger('roulette', 'weflab', 0)
+  })
+  weflabWatcher.on('loaded', () => send('weflab:loaded'))
+  weflabWatcher.on('error',  (e: string) => send('weflab:error', e))
+
+  ipcMain.handle('weflab:start', (_, url: string) => {
+    weflabWatcher.start(url)
+    return { ok: true }
+  })
+  ipcMain.handle('weflab:stop', () => {
+    weflabWatcher.stop()
+    return { ok: true }
+  })
+  ipcMain.handle('weflab:status', () => ({
+    running: weflabWatcher.isRunning,
+    url:     weflabWatcher.url,
+  }))
 
   // Schedule
   ipcMain.handle('schedule:today', async (_, force: boolean) => {

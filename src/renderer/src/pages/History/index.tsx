@@ -16,13 +16,14 @@ const GAME_FILTERS = [
   { id: 'rps',      icon: '✊', name: '가위바위보' },
   { id: 'fish',     icon: '🎣', name: '낚시'     },
   { id: 'lottery',  icon: '🎟️', name: '복권'     },
+  { id: 'number',   icon: '🔢', name: '숫자 추첨' },
 ]
 
 const GAME_COLORS: Record<string, string> = {
   roulette: '#8B5CF6', ladder: '#3B82F6', boss: '#EF4444',
   gacha:    '#F59E0B', quiz:   '#10B981', slot: '#6366F1',
   race:     '#14B8A6', rps:    '#EC4899', fish: '#22D3EE',
-  lottery:  '#F97316',
+  lottery:  '#F97316', number: '#06B6D4',
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

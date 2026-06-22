@@ -4,7 +4,7 @@ import type { Settings } from '../store/settings'
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type GameId = 'roulette' | 'ladder' | 'boss' | 'gacha' | 'quiz' |
-                     'slot' | 'race' | 'rps' | 'fish' | 'lottery'
+                     'slot' | 'race' | 'rps' | 'fish' | 'lottery' | 'number'
 
 export type GameStatus = 'idle' | 'collecting' | 'running' | 'showing_result'
 
@@ -17,10 +17,58 @@ export interface GameResult {
   ts:        number
 }
 
+export interface BossParticipant {
+  totalDamage:     number
+  attackCount:     number
+  critCount:       number
+  pendingBalloons: number
+}
+
+export interface BossRollResult {
+  user:       string
+  roll:       number      // 1~12
+  damage:     number
+  isCritical: boolean
+  ts:         number
+}
+
+export interface BossLootItem {
+  name:        string
+  description: string
+}
+
+export interface BossLootResult {
+  user:             string
+  item:             BossLootItem
+  contributionRate: number
+}
+
 export interface BossState {
-  maxHp:     number
-  currentHp: number
-  alive:     boolean
+  alive:            boolean
+  maxHp:            number
+  currentHp:        number
+  bossName:         string
+  damagePerDot:     number
+  critChance:       number
+  critEnabled:      boolean
+  critMultiplier:   number
+  balloonThreshold: number
+  participants:     Record<string, BossParticipant>
+  lastRoll?:        BossRollResult
+  lootResults?:     BossLootResult[]
+}
+
+export interface LadderRung  { row: number; leftCol: number }
+export interface LadderPath { cols: number[] }  // cols[row] = column index at that row
+
+export interface LadderData {
+  rows:    number
+  cols:    number
+  rungs:   LadderRung[]
+  paths:   LadderPath[]   // one per participant (left-to-right order)
+  order:   string[]       // participant names left-to-right
+  prizes:  string[]       // prize names left-to-right (bottom)
+  results: Array<{ user: string; prize: string; startCol: number; endCol: number }>
 }
 
 export interface LadderState {
@@ -28,6 +76,7 @@ export interface LadderState {
   maxSlots:     number
   deadline:     number    // timestamp
   prizes:       string[]
+  ladderData?:  LadderData   // populated after game finishes
 }
 
 export interface QuizState {
@@ -37,6 +86,28 @@ export interface QuizState {
   winner:    string | null
 }
 
+export interface RouletteSpinState {
+  winner:    string
+  winnerIdx: number
+  items:     Array<{ name: string; probability: number }>
+  spinMs:    number
+  animType:  'wheel' | 'text'
+}
+
+export interface NumberPickState {
+  min:    number
+  max:    number
+  count:  number
+  result: number[]   // pre-determined results
+}
+
+export interface SlotSpinState {
+  symbols:     string[]   // 3 pre-determined symbols
+  jackpot:     boolean
+  twoKind:     boolean
+  triggeredBy: string
+}
+
 export interface GameState {
   id:       GameId
   status:   GameStatus
@@ -44,6 +115,9 @@ export interface GameState {
   boss?:    BossState
   ladder?:  LadderState
   quiz?:    QuizState
+  roulette?: RouletteSpinState
+  slot?:    SlotSpinState
+  number?:  NumberPickState
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -74,7 +148,7 @@ export class GameEngine extends EventEmitter {
 
   init(settings: Settings) {
     this.settings = settings
-    const ids: GameId[] = ['roulette','ladder','boss','gacha','quiz','slot','race','rps','fish','lottery']
+    const ids: GameId[] = ['roulette','ladder','boss','gacha','quiz','slot','race','rps','fish','lottery','number']
     for (const id of ids) {
       this.states.set(id, this.makeIdleState(id))
     }
@@ -85,13 +159,21 @@ export class GameEngine extends EventEmitter {
   }
 
   private makeIdleState(id: GameId): GameState {
-    const cfg = this.settings?.games[id]
+    const cfg   = this.settings?.games[id]
     const state: GameState = { id, status: 'idle', result: null }
     if (id === 'boss' && cfg) {
+      const maxHp = (cfg.maxHp as number) ?? 100000
       state.boss = {
-        maxHp:     (cfg.maxHp as number)     ?? 10000,
-        currentHp: (cfg.currentHp as number) ?? 10000,
-        alive:     true,
+        alive:            true,
+        maxHp,
+        currentHp:        maxHp,
+        bossName:         (cfg.bossName         as string)  ?? '보스',
+        damagePerDot:     (cfg.damagePerDot     as number)  ?? 100,
+        critChance:       (cfg.critChance        as number)  ?? 0.15,
+        critEnabled:      (cfg.critEnabled       as boolean) !== false,
+        critMultiplier:   (cfg.critMultiplier    as number)  ?? 2,
+        balloonThreshold: (cfg.balloonThreshold  as number)  ?? 100,
+        participants:     {},
       }
     }
     return state
@@ -116,9 +198,17 @@ export class GameEngine extends EventEmitter {
     this.todayViewers.add(username)
     this.emit('stats')
 
+    // Boss raid intercepts all balloons while active
+    const bossState = this.getState('boss')
+    if (bossState.status === 'running' && bossState.boss?.alive) {
+      this.bossAccumulateBalloons(username, amount)
+      return
+    }
+
     if (!this.settings.soop.balloonAutoTrigger) return
 
     for (const [id, cfg] of Object.entries(this.settings.games)) {
+      if (id === 'boss') continue  // boss is started manually
       if (!cfg.enabled) continue
       const threshold = cfg.balloonThreshold || this.settings.soop.globalThreshold
       if (amount >= threshold) {
@@ -162,8 +252,7 @@ export class GameEngine extends EventEmitter {
     switch (gameId) {
       case 'roulette': this.runRoulette(triggeredBy, balloon); break
       case 'ladder':   this.startLadder(triggeredBy, balloon); break
-      case 'boss':     this.bossDamage(triggeredBy, balloon,
-                         (this.settings.games.boss?.damagePerBalloon as number ?? 10) * balloon); break
+      case 'boss':     this.startBossRaid(); break
       case 'gacha':    this.runGacha(triggeredBy, balloon); break
       case 'quiz':     this.startQuiz(triggeredBy, balloon); break
       case 'slot':     this.runSlot(triggeredBy, balloon); break
@@ -171,6 +260,7 @@ export class GameEngine extends EventEmitter {
       case 'rps':      this.runRps(triggeredBy, balloon); break
       case 'fish':     this.runFish(triggeredBy, balloon); break
       case 'lottery':  this.runLottery(triggeredBy, balloon); break
+      case 'number':   this.runNumber(triggeredBy, balloon); break
     }
   }
 
@@ -181,13 +271,17 @@ export class GameEngine extends EventEmitter {
     const items = (cfg?.items ?? []) as Array<{ name: string; probability: number }>
     if (!items.length) return
 
+    const winner    = weightedRandom(items)
+    const winnerIdx = items.indexOf(winner)
+    const spinMs    = (cfg?.spinDuration as number) ?? 3000
+    const animType  = (cfg?.animType as 'wheel' | 'text') ?? 'wheel'
+
     const state = this.getState('roulette')
-    state.status = 'running'
+    state.status   = 'running'
+    state.roulette = { winner: winner.name, winnerIdx, items, spinMs, animType }
     this.emit('game:update', 'roulette', state)
 
-    const spinMs = (cfg?.spinDuration as number) ?? 3000
     setTimeout(() => {
-      const winner = weightedRandom(items)
       const result: GameResult = {
         gameId:      'roulette',
         triggeredBy: by,
@@ -244,64 +338,198 @@ export class GameEngine extends EventEmitter {
       return
     }
 
-    // Shuffle and assign prizes
-    const shuffled = [...participants].sort(() => Math.random() - 0.5)
-    const assignments = shuffled.map((user, i) => ({
-      user,
-      prize: prizes[i] ?? `${i + 1}등`,
-    }))
+    const ladderData = this.buildLadder(participants, prizes)
+    state.ladder.ladderData = ladderData
 
-    const winner = assignments[0]
+    const winner = ladderData.results[0]
     const result: GameResult = {
       gameId:      'ladder',
       triggeredBy: by,
       balloon,
       result:      `${winner.user} (${winner.prize})`,
-      detail:      assignments.map(a => `${a.user} → ${a.prize}`).join(' | '),
+      detail:      ladderData.results.map(r => `${r.user} → ${r.prize}`).join(' | '),
       ts:          Date.now(),
     }
     this.finishGame('ladder', result)
   }
 
-  // ── Boss ──────────────────────────────────────────────────────────────────
+  private buildLadder(participants: string[], prizes: string[]): LadderData {
+    const cols   = participants.length
+    const rows   = Math.max(8, cols * 2)   // more rungs as more people join
+    const rungs: LadderRung[] = []
 
-  private bossDamage(by: string, balloon: number, damage: number) {
-    const state = this.getState('boss')
-    if (!state.boss || !state.boss.alive) return
-    if (state.status === 'idle') {
-      state.status = 'running'
-    }
-
-    state.boss.currentHp = Math.max(0, state.boss.currentHp - damage)
-    this.emit('game:update', 'boss', state)
-
-    // Update settings so HP persists
-    if (this.settings.games.boss) {
-      this.settings.games.boss.currentHp = state.boss.currentHp
-    }
-
-    if (state.boss.currentHp <= 0) {
-      state.boss.alive = false
-      const result: GameResult = {
-        gameId:      'boss',
-        triggeredBy: by,
-        balloon,
-        result:      '보스 클리어!',
-        detail:      `보스가 처치됨! 마지막 공격: ${by}님 (${damage} 데미지)`,
-        ts:          Date.now(),
+    // Generate rungs: for each row, place rungs randomly (no two share a column)
+    for (let r = 0; r < rows; r++) {
+      const used = new Set<number>()
+      for (let c = 0; c < cols - 1; c++) {
+        if (!used.has(c) && !used.has(c + 1) && Math.random() < 0.35) {
+          rungs.push({ row: r, leftCol: c })
+          used.add(c)
+          used.add(c + 1)
+        }
       }
-      this.finishGame('boss', result)
+    }
+
+    // Pad prizes list
+    const paddedPrizes = prizes.slice()
+    while (paddedPrizes.length < cols) paddedPrizes.push(`${paddedPrizes.length + 1}등`)
+
+    // Shuffle prize positions at bottom
+    const prizeOrder = [...paddedPrizes].sort(() => Math.random() - 0.5).slice(0, cols)
+
+    // Compute each participant's path
+    const paths: LadderPath[] = participants.map((_, startCol) => {
+      const colPath: number[] = [startCol]
+      let cur = startCol
+      for (let r = 0; r < rows; r++) {
+        // Check if rung goes right (cur → cur+1)
+        const goRight = rungs.some(rg => rg.row === r && rg.leftCol === cur)
+        // Check if rung goes left (cur-1 → cur)
+        const goLeft  = rungs.some(rg => rg.row === r && rg.leftCol === cur - 1)
+        if (goRight)      cur++
+        else if (goLeft)  cur--
+        colPath.push(cur)
+      }
+      return { cols: colPath }
+    })
+
+    const results = participants.map((user, i) => {
+      const endCol = paths[i].cols[rows]
+      return { user, prize: prizeOrder[endCol] ?? `${endCol + 1}등`, startCol: i, endCol }
+    })
+
+    // Sort results by prize order (first prize = winner)
+    results.sort((a, b) => prizes.indexOf(a.prize) - prizes.indexOf(b.prize))
+
+    return { rows, cols, rungs, paths, order: participants, prizes: prizeOrder, results }
+  }
+
+  // ── Boss Raid ─────────────────────────────────────────────────────────────
+
+  startBossRaid() {
+    const state = this.getState('boss')
+    if (state.status !== 'idle') return   // already running
+
+    const cfg   = this.settings.games.boss
+    const maxHp = (cfg?.maxHp as number) ?? 100000
+    state.status = 'running'
+    state.boss   = {
+      alive:            true,
+      maxHp,
+      currentHp:        maxHp,
+      bossName:         (cfg?.bossName         as string)  ?? '보스',
+      damagePerDot:     (cfg?.damagePerDot     as number)  ?? 100,
+      critChance:       (cfg?.critChance        as number)  ?? 0.15,
+      critEnabled:      (cfg?.critEnabled       as boolean) !== false,
+      critMultiplier:   (cfg?.critMultiplier    as number)  ?? 2,
+      balloonThreshold: (cfg?.balloonThreshold  as number)  ?? 100,
+      participants:     {},
+    }
+    this.emit('game:update', 'boss', state)
+  }
+
+  private bossAccumulateBalloons(user: string, amount: number) {
+    const state = this.getState('boss')
+    if (!state.boss?.alive) return
+
+    const p = state.boss.participants[user] ??= {
+      totalDamage: 0, attackCount: 0, critCount: 0, pendingBalloons: 0,
+    }
+    p.pendingBalloons += amount
+
+    const threshold = state.boss.balloonThreshold
+    while (p.pendingBalloons >= threshold) {
+      p.pendingBalloons -= threshold
+      this.bossRollDice(user, state)
+      if (!state.boss.alive) break   // boss defeated mid-loop
     }
   }
 
+  private bossRollDice(user: string, state: GameState) {
+    if (!state.boss?.alive) return
+
+    const roll         = Math.floor(Math.random() * 12) + 1
+    let   damage       = roll * state.boss.damagePerDot
+    const isCritical   = state.boss.critEnabled && Math.random() < state.boss.critChance
+    if (isCritical) damage = Math.round(damage * state.boss.critMultiplier)
+
+    state.boss.currentHp = Math.max(0, state.boss.currentHp - damage)
+
+    const p = state.boss.participants[user]
+    if (p) {
+      p.totalDamage  += damage
+      p.attackCount  += 1
+      if (isCritical) p.critCount++
+    }
+
+    state.boss.lastRoll = { user, roll, damage, isCritical, ts: Date.now() }
+    this.emit('game:update', 'boss', state)
+
+    if (state.boss.currentHp <= 0) {
+      state.boss.alive = false
+      this.defeatBoss(user, state)
+    }
+  }
+
+  private defeatBoss(lastUser: string, state: GameState) {
+    if (!state.boss) return
+
+    const cfg       = this.settings.games.boss
+    const lootItems = (cfg?.lootItems as BossLootItem[]) ?? []
+    const loot      = this.drawBossLoot(state.boss.participants, lootItems)
+
+    state.boss.lootResults = loot
+
+    const totalDamage = Object.values(state.boss.participants)
+      .reduce((s, p) => s + p.totalDamage, 0)
+
+    const result: GameResult = {
+      gameId:      'boss',
+      triggeredBy: lastUser,
+      balloon:     0,
+      result:      '보스 처치!',
+      detail:      `총 데미지: ${totalDamage.toLocaleString()} | 참여자: ${Object.keys(state.boss.participants).length}명`,
+      ts:          Date.now(),
+    }
+    this.finishGame('boss', result)
+  }
+
+  private drawBossLoot(
+    participants: Record<string, BossParticipant>,
+    lootItems:   BossLootItem[],
+  ): BossLootResult[] {
+    if (!lootItems.length) return []
+
+    const entries = Object.entries(participants)
+      .filter(([, p]) => p.totalDamage > 0)
+      .map(([user, p]) => ({ user, weight: p.totalDamage }))
+
+    if (!entries.length) return []
+
+    const totalWeight = entries.reduce((s, e) => s + e.weight, 0)
+
+    return lootItems.map(item => {
+      let r      = Math.random() * totalWeight
+      let winner = entries[entries.length - 1]
+      for (const e of entries) {
+        r -= e.weight
+        if (r <= 0) { winner = e; break }
+      }
+      return {
+        user:             winner.user,
+        item,
+        contributionRate: (winner.weight / totalWeight) * 100,
+      }
+    })
+  }
+
   resetBoss() {
-    const cfg   = this.settings.games.boss
-    const maxHp = (cfg?.maxHp as number) ?? 10000
-    const state = this.getState('boss')
+    const state  = this.getState('boss')
     state.status = 'idle'
     state.result = null
-    state.boss   = { maxHp, currentHp: maxHp, alive: true }
-    if (this.settings.games.boss) this.settings.games.boss.currentHp = maxHp
+    state.boss   = undefined
+    const idle   = this.makeIdleState('boss')
+    state.boss   = idle.boss
     this.emit('game:update', 'boss', state)
   }
 
@@ -363,6 +591,39 @@ export class GameEngine extends EventEmitter {
     }, timeLim * 1000)
   }
 
+  // 수동 퀴즈 (스트리머가 직접 문제/정답 지정)
+  startManualQuiz(question: string, answer: string, timeLimit: number, by = '스트리머'): boolean {
+    const state = this.getState('quiz')
+    if (state.status !== 'idle') return false
+
+    this.todayRuns++
+    this.emit('stats')
+
+    const quizState: QuizState = {
+      question,
+      answer:   answer.toLowerCase().trim(),
+      deadline: Date.now() + timeLimit * 1000,
+      winner:   null,
+    }
+
+    state.status = 'collecting'
+    state.quiz   = quizState
+    this.emit('game:update', 'quiz', state)
+    this.emit('quiz:question', question)
+
+    this.quizTimer = setTimeout(() => {
+      const result: GameResult = {
+        gameId: 'quiz', triggeredBy: by, balloon: 0,
+        result: '시간 초과 - 정답 없음',
+        detail: `정답: ${answer}`,
+        ts:     Date.now(),
+      }
+      this.finishGame('quiz', result)
+    }, timeLimit * 1000)
+
+    return true
+  }
+
   private quizAnswer(username: string, answer: string) {
     const state = this.getState('quiz')
     if (state.status !== 'collecting' || !state.quiz) return
@@ -387,26 +648,38 @@ export class GameEngine extends EventEmitter {
   // ── Simple games ──────────────────────────────────────────────────────────
 
   private runSlot(by: string, balloon: number) {
-    const SYMBOLS = ['🍒', '🍋', '🍊', '⭐', '🎰', '💎']
-    const delay   = 2500
+    const cfg     = this.settings.games.slot
+    const symbols = ((cfg?.symbols as string[])?.length >= 3 ? cfg.symbols : null) as string[] | null
+                 ?? ['🍒', '🍋', '🍊', '⭐', '🎰', '💎']
+    const spinMs  = (cfg?.spinDuration as number) ?? 3000
+
+    // Pre-determine result so overlay can animate to it
+    const s       = [0,1,2].map(() => symbols[Math.floor(Math.random() * symbols.length)])
+    const jackpot = s[0] === s[1] && s[1] === s[2]
+    const twoKind = !jackpot && (s[0] === s[1] || s[1] === s[2] || s[0] === s[2])
 
     const state  = this.getState('slot')
     state.status = 'running'
+    state.slot   = { symbols: s, jackpot, twoKind, triggeredBy: by }
     this.emit('game:update', 'slot', state)
 
     setTimeout(() => {
-      const s = [0,1,2].map(() => SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)])
-      const jackpot = s[0] === s[1] && s[1] === s[2]
+      let outcome = s.join(' ')
+      if (jackpot)  outcome = `JACKPOT! ${s[0]}${s[1]}${s[2]} 🎉`
+      else if (twoKind) outcome = `${s.join(' ')} ✨`
+
       const result: GameResult = {
         gameId:      'slot',
         triggeredBy: by,
         balloon,
-        result:      jackpot ? 'JACKPOT! 🎉' : s.join(' '),
-        detail:      jackpot ? `${by}님 잭팟!` : `${s.join(' ')} - 꽝`,
+        result:      outcome,
+        detail:      jackpot    ? `${by}님 잭팟!`
+                   : twoKind   ? `${by}님 - ${s.join(' ')} (2개 일치!)`
+                   :             `${by}님 - ${s.join(' ')} 꽝`,
         ts:          Date.now(),
       }
       this.finishGame('slot', result)
-    }, delay)
+    }, spinMs)
   }
 
   private runRace(by: string, balloon: number) {
@@ -500,6 +773,48 @@ export class GameEngine extends EventEmitter {
     }, 3500)
   }
 
+  private runNumber(by: string, balloon: number) {
+    const cfg     = this.settings.games.number
+    const min     = (cfg?.minNumber  as number)   ?? 1
+    const max     = (cfg?.maxNumber  as number)   ?? 100
+    const count   = (cfg?.count      as number)   ?? 1
+    const exclude = (cfg?.excludeList as number[]) ?? []
+    const spinMs  = (cfg?.spinDuration as number)  ?? 3000
+
+    // Build available pool
+    const pool: number[] = []
+    for (let i = min; i <= max; i++) {
+      if (!exclude.includes(i)) pool.push(i)
+    }
+
+    // Fisher-Yates pick
+    const results: number[] = []
+    const bag = [...pool]
+    for (let i = 0; i < Math.min(count, bag.length); i++) {
+      const idx = Math.floor(Math.random() * (bag.length - i))
+      ;[bag[i], bag[idx + i]] = [bag[idx + i], bag[i]]
+      results.push(bag[i])
+    }
+
+    const state  = this.getState('number')
+    state.status = 'running'
+    state.number = { min, max, count, result: results }
+    this.emit('game:update', 'number', state)
+
+    setTimeout(() => {
+      const resultStr = results.join(', ')
+      const result: GameResult = {
+        gameId:      'number',
+        triggeredBy: by,
+        balloon,
+        result:      resultStr,
+        detail:      `${by}님 추첨 결과: ${resultStr}  (범위 ${min}~${max})`,
+        ts:          Date.now(),
+      }
+      this.finishGame('number', result)
+    }, spinMs)
+  }
+
   // ── Finish ────────────────────────────────────────────────────────────────
 
   private finishGame(id: GameId, result: GameResult) {
@@ -519,6 +834,8 @@ export class GameEngine extends EventEmitter {
           s2.result = null
           if (id === 'ladder') s2.ladder = undefined
           if (id === 'quiz')   s2.quiz   = undefined
+          if (id === 'slot')   s2.slot   = undefined
+          if (id === 'number') s2.number = undefined
           this.emit('game:update', id, s2)
         }
       }, 5000)

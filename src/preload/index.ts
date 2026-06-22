@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('electron', {
   gameState:   (gameId: string)        => ipcRenderer.invoke('game:state', gameId),
   gameAll:     ()                      => ipcRenderer.invoke('game:all'),
   gameHistory: (limit?: number)        => ipcRenderer.invoke('game:history', limit),
+  bossStart:   ()                      => ipcRenderer.invoke('boss:start'),
   bossReset:   ()                      => ipcRenderer.invoke('boss:reset'),
 
   // Overlay
@@ -42,6 +43,15 @@ contextBridge.exposeInMainWorld('electron', {
   authLogout:  ()           => ipcRenderer.invoke('auth:logout'),
   authRecheck: ()           => ipcRenderer.invoke('auth:recheck'),
 
+  // Quiz
+  quizStartManual: (opts: { question: string; answer: string; timeLimit: number }) =>
+    ipcRenderer.invoke('quiz:startManual', opts),
+
+  // weflab
+  weflabStart:  (url: string) => ipcRenderer.invoke('weflab:start', url),
+  weflabStop:   ()            => ipcRenderer.invoke('weflab:stop'),
+  weflabStatus: ()            => ipcRenderer.invoke('weflab:status'),
+
   // Schedule
   scheduleToday: (force?: boolean) => ipcRenderer.invoke('schedule:today', force ?? false),
 
@@ -55,6 +65,9 @@ contextBridge.exposeInMainWorld('electron', {
   onGameResult:       (cb: (id: string, r: unknown) => void)  => on('game:result',       cb),
   onQuizQuestion:     (cb: (q: unknown) => void)              => on('quiz:question',      cb),
   onStatsUpdate:      (cb: (s: StatsSnapshot) => void)        => on('stats:update',      cb),
+  onWeflabResult:     (cb: (text: string) => void)            => on('weflab:result',     cb),
+  onWeflabLoaded:     (cb: () => void)                        => on('weflab:loaded',     cb),
+  onWeflabError:      (cb: (e: string) => void)               => on('weflab:error',      cb),
 })
 
 interface SoopBalloonEvent { user: string; amount: number; ts: number }
