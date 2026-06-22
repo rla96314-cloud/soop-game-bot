@@ -220,7 +220,7 @@
   cursor: default;
 }
 
-.gameMenuIcon { font-size: 15px; }
+.gameMenuIcon { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 
 .gameMenuName { flex: 1; font-weight: 600; }
 

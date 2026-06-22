@@ -5,18 +5,18 @@ import styles from './History.module.css'
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const GAME_FILTERS = [
-  { id: 'all',      icon: '🎮', name: '전체'     },
-  { id: 'roulette', icon: '🎡', name: '룰렛'     },
-  { id: 'ladder',   icon: '🪜', name: '사다리타기' },
-  { id: 'boss',     icon: '👾', name: '보스전'    },
-  { id: 'gacha',    icon: '🎁', name: '뽑기'     },
-  { id: 'quiz',     icon: '❓', name: '퀴즈'     },
-  { id: 'slot',     icon: '🎰', name: '슬롯머신'  },
-  { id: 'race',     icon: '🏁', name: '경주'     },
-  { id: 'rps',      icon: '✊', name: '가위바위보' },
-  { id: 'fish',     icon: '🎣', name: '낚시'     },
-  { id: 'lottery',  icon: '🎟️', name: '복권'     },
-  { id: 'number',   icon: '🔢', name: '숫자 추첨' },
+  { id: 'all',      name: '전체'     },
+  { id: 'roulette', name: '룰렛'     },
+  { id: 'ladder',   name: '사다리타기' },
+  { id: 'boss',     name: '보스전'    },
+  { id: 'gacha',    name: '뽑기'     },
+  { id: 'quiz',     name: '퀴즈'     },
+  { id: 'slot',     name: '슬롯머신'  },
+  { id: 'race',     name: '경주'     },
+  { id: 'rps',      name: '가위바위보' },
+  { id: 'fish',     name: '낚시'     },
+  { id: 'lottery',  name: '복권'     },
+  { id: 'number',   name: '숫자 추첨' },
 ]
 
 const GAME_COLORS: Record<string, string> = {
@@ -54,7 +54,7 @@ function DetailModal({ item, onClose }: { item: HistoryItem; onClose: () => void
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.modal} onClick={e => e.stopPropagation()}>
         <div className={styles.modalHeader}>
-          <span className={styles.modalTitle}>{item.gameIcon} {item.gameName}</span>
+          <span className={styles.modalTitle}>{item.gameName}</span>
           <button className={styles.closeBtn} onClick={onClose}>✕</button>
         </div>
         <div className={styles.modalBody}>
@@ -67,7 +67,7 @@ function DetailModal({ item, onClose }: { item: HistoryItem; onClose: () => void
           <Row label="트리거">{item.triggeredBy}</Row>
           {item.balloon > 0 && (
             <Row label="별풍선">
-              <span className={styles.balloonVal}>⭐ {item.balloon.toLocaleString()}개</span>
+              <span className={styles.balloonVal}>{item.balloon.toLocaleString()}개</span>
             </Row>
           )}
           <Row label="시간">{fmtTime(item.ts)}</Row>
@@ -128,7 +128,7 @@ export default function HistoryPage() {
               onChange={e => setFilter(e.target.value)}
             >
               {GAME_FILTERS.map(g => (
-                <option key={g.id} value={g.id}>{g.icon} {g.name}</option>
+                <option key={g.id} value={g.id}>{g.name}</option>
               ))}
             </select>
             <select
@@ -169,7 +169,7 @@ export default function HistoryPage() {
                   >
                     <td>
                       <div className={styles.gameCell}>
-                        <span className={styles.gameIcon}>{h.gameIcon}</span>
+                        <span className={styles.gameIcon} style={{ background: GAME_COLORS[h.gameId] ?? '#9CA3AF' }} />
                         <span>{h.gameName}</span>
                       </div>
                     </td>
@@ -182,7 +182,7 @@ export default function HistoryPage() {
                     <td>
                       {h.balloon > 0 && (
                         <span className={styles.balloon}>
-                          ⭐ {h.balloon.toLocaleString()}
+                          {h.balloon.toLocaleString()}
                         </span>
                       )}
                     </td>
@@ -243,7 +243,7 @@ export default function HistoryPage() {
                     className={`${styles.statRow} ${filter === gameId ? styles.statRowActive : ''}`}
                     onClick={() => setFilter(gameId === filter ? 'all' : gameId)}
                   >
-                    <span className={styles.statIcon}>{meta?.icon ?? '🎮'}</span>
+                    <span className={styles.statIcon} style={{ background: color }} />
                     <div className={styles.statBarWrap}>
                       <div className={styles.statLabel}>{meta?.name ?? gameId}</div>
                       <div className={styles.barTrack}>

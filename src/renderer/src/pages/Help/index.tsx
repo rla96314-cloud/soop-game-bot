@@ -2,7 +2,7 @@ import styles from './Help.module.css'
 
 const SECTIONS = [
   {
-    title: '🎡 룰렛',
+    title: '룰렛',
     desc: '별풍선 후원 시 룰렛을 돌려 결과를 추첨합니다.',
     items: [
       '별풍선 트리거 개수를 설정 (0 = 비활성)',
@@ -13,7 +13,7 @@ const SECTIONS = [
     ],
   },
   {
-    title: '🪜 사다리타기',
+    title: '사다리타기',
     desc: '채팅 참가 → 사다리 → 결과 추첨 게임입니다.',
     items: [
       '참가 명령어를 채팅에 입력하면 자동 등록',
@@ -23,7 +23,7 @@ const SECTIONS = [
     ],
   },
   {
-    title: '👾 보스전',
+    title: '보스전',
     desc: '별풍선 누적 → 12면체 주사위 → 데미지 방식의 레이드 게임입니다.',
     items: [
       '사이드바 "보스전" 메뉴에서 레이드 시작',
@@ -34,7 +34,7 @@ const SECTIONS = [
     ],
   },
   {
-    title: '🎯 뽑기판',
+    title: '뽑기판',
     desc: '격자판에서 랜덤으로 아이템을 선택하는 게임입니다.',
     items: [
       '행/열 개수와 아이템 배치 설정',
@@ -43,7 +43,7 @@ const SECTIONS = [
     ],
   },
   {
-    title: '❓ 퀴즈',
+    title: '퀴즈',
     desc: '채팅 정답 입력 경쟁 게임입니다.',
     items: [
       '문제/정답 목록을 미리 등록',
@@ -53,7 +53,7 @@ const SECTIONS = [
     ],
   },
   {
-    title: '🎰 슬롯머신',
+    title: '슬롯머신',
     desc: '3개 릴이 순차적으로 멈추는 슬롯 게임입니다.',
     items: [
       '심볼 이모지 또는 이미지 URL 자유롭게 설정',
@@ -63,7 +63,7 @@ const SECTIONS = [
     ],
   },
   {
-    title: '🔢 숫자 추첨',
+    title: '숫자 추첨',
     desc: '지정 범위 내 숫자를 랜덤 추첨합니다.',
     items: [
       '추첨 범위(최솟값~최댓값) 설정',
@@ -73,7 +73,7 @@ const SECTIONS = [
     ],
   },
   {
-    title: '📺 OBS 오버레이 연결',
+    title: 'OBS 오버레이 연결',
     desc: 'OBS 브라우저 소스에 각 게임의 URL을 추가하면 실시간으로 결과가 표시됩니다.',
     items: [
       'OBS > 소스 추가 > 브라우저 소스',
@@ -84,7 +84,7 @@ const SECTIONS = [
     ],
   },
   {
-    title: '⚙️ 설정',
+    title: '설정',
     desc: '앱 전체 동작을 제어합니다.',
     items: [
       'SOOP 계정 정보: 채널ID / 사용자ID / 토큰',

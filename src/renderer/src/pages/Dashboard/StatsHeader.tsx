@@ -3,17 +3,17 @@ import { useApp } from '../../contexts/AppContext'
 import styles from './StatsHeader.module.css'
 
 const GAMES = [
-  { id: 'roulette', icon: '🎡', name: '룰렛'     },
-  { id: 'ladder',   icon: '🪜', name: '사다리타기' },
-  { id: 'boss',     icon: '👾', name: '보스전'    },
-  { id: 'gacha',    icon: '🎁', name: '뽑기'      },
-  { id: 'quiz',     icon: '❓', name: '퀴즈'      },
-  { id: 'slot',     icon: '🎰', name: '슬롯머신'  },
-  { id: 'race',     icon: '🏁', name: '경주'      },
-  { id: 'rps',      icon: '✊', name: '가위바위보' },
-  { id: 'fish',     icon: '🎣', name: '낚시'      },
-  { id: 'lottery',  icon: '🎟️', name: '복권'      },
-  { id: 'number',   icon: '🔢', name: '숫자 추첨' },
+  { id: 'roulette', name: '룰렛',     color: '#8B5CF6' },
+  { id: 'ladder',   name: '사다리타기', color: '#3B82F6' },
+  { id: 'boss',     name: '보스전',    color: '#EF4444' },
+  { id: 'gacha',    name: '뽑기',     color: '#F59E0B' },
+  { id: 'quiz',     name: '퀴즈',     color: '#10B981' },
+  { id: 'slot',     name: '슬롯머신',  color: '#6366F1' },
+  { id: 'race',     name: '경주',     color: '#6366F1' },
+  { id: 'rps',      name: '가위바위보', color: '#EC4899' },
+  { id: 'fish',     name: '낚시',     color: '#14B8A6' },
+  { id: 'lottery',  name: '복권',     color: '#F97316' },
+  { id: 'number',   name: '숫자 추첨', color: '#06B6D4' },
 ]
 
 export default function StatsHeader() {
@@ -93,7 +93,7 @@ export default function StatsHeader() {
                     className={`${styles.gameMenuItem} ${busy ? styles.gameMenuBusy : ''}`}
                     onClick={() => handleTrigger(g.id)}
                   >
-                    <span className={styles.gameMenuIcon}>{g.icon}</span>
+                    <span className={styles.gameMenuIcon} style={{ background: g.color }} />
                     <span className={styles.gameMenuName}>{g.name}</span>
                     {busy && <span className={styles.busyBadge}>진행중</span>}
                   </button>

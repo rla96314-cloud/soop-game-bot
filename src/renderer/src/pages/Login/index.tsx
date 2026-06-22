@@ -41,7 +41,15 @@ export default function LoginScreen({ onSuccess }: Props) {
 
       <div className={styles.card}>
         <div className={styles.logo}>
-          <div className={styles.logoIcon}>🎮</div>
+          <div className={styles.logoIcon}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="9" r="4" stroke="#fff" strokeWidth="1.8"/>
+              <circle cx="7" cy="16" r="2.5" stroke="#fff" strokeWidth="1.6"/>
+              <circle cx="17" cy="16" r="2.5" stroke="#fff" strokeWidth="1.6"/>
+              <line x1="9" y1="10.5" x2="7" y2="13.5" stroke="#fff" strokeWidth="1.6" strokeLinecap="round"/>
+              <line x1="15" y1="10.5" x2="17" y2="13.5" stroke="#fff" strokeWidth="1.6" strokeLinecap="round"/>
+            </svg>
+          </div>
           <div className={styles.logoText}>
             <span className={styles.logoTop}>SOOP</span>
             <span className={styles.logoBot}>GAME BOT</span>
@@ -63,7 +71,7 @@ export default function LoginScreen({ onSuccess }: Props) {
             <button
               className={styles.soopBtn}
               onClick={handleSoopLogin}
-              disabled={state === 'waiting'}
+              disabled={false}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="8" r="4"/>
@@ -75,7 +83,7 @@ export default function LoginScreen({ onSuccess }: Props) {
 
           {state === 'error' && (
             <div className={styles.error}>
-              <span>🚫</span> {errMsg}
+              {errMsg}
             </div>
           )}
         </div>

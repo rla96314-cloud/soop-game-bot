@@ -126,7 +126,11 @@
 }
 
 .gameIcon {
-  font-size: 15px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
 }
 
 .userCell {
@@ -239,7 +243,10 @@
 .statRowActive       { background: var(--p100); }
 
 .statIcon {
-  font-size: 13px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
   flex-shrink: 0;
 }
 

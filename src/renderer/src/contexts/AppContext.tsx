@@ -13,7 +13,6 @@ export interface ChatItem {
 export interface HistoryItem {
   gameId: string
   gameName: string
-  gameIcon: string
   triggeredBy: string
   balloon: number
   result: string
@@ -65,18 +64,18 @@ export function useApp() { return useContext(Ctx) }
 
 // ── Provider ─────────────────────────────────────────────────────────────────
 
-const GAME_META: Record<string, { name: string; icon: string }> = {
-  roulette: { name: '룰렛',     icon: '🎡' },
-  ladder:   { name: '사다리타기', icon: '🪜' },
-  boss:     { name: '보스전',    icon: '👾' },
-  gacha:    { name: '뽑기',     icon: '🎁' },
-  quiz:     { name: '퀴즈',     icon: '❓' },
-  slot:     { name: '슬롯머신',  icon: '🎰' },
-  race:     { name: '경주',     icon: '🏁' },
-  rps:      { name: '가위바위보', icon: '✊' },
-  fish:     { name: '낚시',     icon: '🎣' },
-  lottery:  { name: '복권',     icon: '🎟️' },
-  number:   { name: '숫자 추첨', icon: '🔢' },
+const GAME_META: Record<string, { name: string }> = {
+  roulette: { name: '룰렛'     },
+  ladder:   { name: '사다리타기' },
+  boss:     { name: '보스전'    },
+  gacha:    { name: '뽑기'     },
+  quiz:     { name: '퀴즈'     },
+  slot:     { name: '슬롯머신'  },
+  race:     { name: '경주'     },
+  rps:      { name: '가위바위보' },
+  fish:     { name: '낚시'     },
+  lottery:  { name: '복권'     },
+  number:   { name: '숫자 추첨' },
 }
 
 const MAX_CHAT    = 100
@@ -120,7 +119,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const mapped = (items as HistoryItem[]).map(r => ({
           ...r,
           gameName: GAME_META[r.gameId]?.name ?? r.gameId,
-          gameIcon: GAME_META[r.gameId]?.icon ?? '🎮',
         }))
         setHistory(mapped)
       })
@@ -180,7 +178,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ...r,
           gameId:   id,
           gameName: GAME_META[id]?.name ?? id,
-          gameIcon: GAME_META[id]?.icon ?? '🎮',
         }
         setHistory(prev => [item, ...prev].slice(0, MAX_HISTORY))
         setStats(prev => ({ ...prev, todayRuns: prev.todayRuns + 1 }))

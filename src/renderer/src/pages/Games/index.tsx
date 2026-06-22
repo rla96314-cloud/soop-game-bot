@@ -37,16 +37,16 @@ interface LadderState {
 // ── Game list ─────────────────────────────────────────────────────────────────
 
 const GAMES = [
-  { id: 'roulette',  icon: '🎡', name: '룰렛',     color: '#8B5CF6', settingKey: 'roulette'  },
-  { id: 'ladder',    icon: '🪜', name: '사다리타기', color: '#3B82F6', settingKey: 'ladder'    },
-  { id: 'pickboard', icon: '🎯', name: '뽑기판',    color: '#EC4899', settingKey: 'pickboard' },
-  { id: 'quiz',      icon: '❓', name: '퀴즈',      color: '#10B981', settingKey: 'quiz'      },
-  { id: 'slot',      icon: '🎰', name: '슬롯머신',  color: '#8B5CF6', settingKey: 'slot'      },
-  { id: 'race',      icon: '🏁', name: '경주',     color: '#6366F1', settingKey: 'race'      },
-  { id: 'rps',       icon: '✊', name: '가위바위보', color: '#EC4899', settingKey: 'rps'       },
-  { id: 'fish',      icon: '🎣', name: '낚시',     color: '#14B8A6', settingKey: 'fish'      },
-  { id: 'lottery',   icon: '🎟️', name: '복권',     color: '#F97316', settingKey: 'lottery'   },
-  { id: 'number',    icon: '🔢', name: '숫자 추첨', color: '#06B6D4', settingKey: 'number'    },
+  { id: 'roulette',  name: '룰렛',     color: '#8B5CF6', settingKey: 'roulette'  },
+  { id: 'ladder',    name: '사다리타기', color: '#3B82F6', settingKey: 'ladder'    },
+  { id: 'pickboard', name: '뽑기판',    color: '#EC4899', settingKey: 'pickboard' },
+  { id: 'quiz',      name: '퀴즈',     color: '#10B981', settingKey: 'quiz'      },
+  { id: 'slot',      name: '슬롯머신',  color: '#8B5CF6', settingKey: 'slot'      },
+  { id: 'race',      name: '경주',     color: '#6366F1', settingKey: 'race'      },
+  { id: 'rps',       name: '가위바위보', color: '#EC4899', settingKey: 'rps'       },
+  { id: 'fish',      name: '낚시',     color: '#14B8A6', settingKey: 'fish'      },
+  { id: 'lottery',   name: '복권',     color: '#F97316', settingKey: 'lottery'   },
+  { id: 'number',    name: '숫자 추첨', color: '#06B6D4', settingKey: 'number'    },
 ]
 
 const OVERLAY_PORT = 3939  // used for OBS URL copy
@@ -68,7 +68,7 @@ function ObsUrlBtn({ gameId, port }: { gameId: string; port: number }) {
       onClick={copy}
       title={url}
     >
-      {copied ? '✓ 복사됨' : '📋 OBS URL'}
+      {copied ? '복사됨' : 'OBS URL'}
     </button>
   )
 }
@@ -430,7 +430,7 @@ function RoulettePanel({ gSettings, gameStates, saveSetting, weflabSettings, sav
         <div className={`${styles.rwStatus} ${isResult ? styles.rwStatusResult : ''}`}>
           {isSpinning && spinState && (
             <>
-              <div className={styles.rwStatusLabel}>🎡 돌아가는 중...</div>
+              <div className={styles.rwStatusLabel}>돌아가는 중...</div>
               <div className={styles.rwStatusWinner}>
                 결과: <strong>{spinState.winner}</strong>
               </div>
@@ -438,7 +438,7 @@ function RoulettePanel({ gSettings, gameStates, saveSetting, weflabSettings, sav
           )}
           {isResult && (
             <div className={styles.rwStatusLabel}>
-              🎉 결과: <strong>{(gameStates['roulette']?.result as { result: string } | null)?.result}</strong>
+              결과: <strong>{(gameStates['roulette']?.result as { result: string } | null)?.result}</strong>
             </div>
           )}
         </div>
@@ -453,7 +453,7 @@ function RoulettePanel({ gSettings, gameStates, saveSetting, weflabSettings, sav
               className={`${styles.rwAnimBtn} ${animType === t ? styles.rwAnimBtnActive : ''}`}
               onClick={() => saveSetting('animType', t)}
             >
-              {t === 'wheel' ? '🎡 원형 룰렛' : '📃 텍스트 슬롯'}
+              {t === 'wheel' ? '원형 룰렛' : '텍스트 슬롯'}
             </button>
           ))}
         </div>
@@ -699,7 +699,7 @@ function PickBoardPanel({ rows, cols, items }: { rows: number; cols: number; ite
       <div className={styles.pbHeader}>
         <span className={styles.pbTitle}>뽑기판</span>
         <span className={styles.pbCount}>{revealedCount}/{rows * cols} 오픈</span>
-        <button className={styles.pbResetBtn} onClick={reset}>🔄 초기화</button>
+        <button className={styles.pbResetBtn} onClick={reset}>초기화</button>
       </div>
 
       {lastResult && (
@@ -950,7 +950,7 @@ function LadderPanel({ gSettings, gameStates }: {
       {/* ── Idle hint ── */}
       {!isCollecting && !isResult && (
         <div className={styles.ladderIdle}>
-          <div className={styles.ladderIdleIcon}>🪜</div>
+          <div className={styles.ladderIdleIcon} />
           <div>
             <div className={styles.ladderIdleText}>사다리타기 대기 중</div>
             <div className={styles.ladderIdleHint}>
@@ -1061,7 +1061,7 @@ function QuizPanel({
             className={`${styles.qpTab} ${mode === m ? styles.qpTabActive : ''}`}
             onClick={() => setMode(m)}
           >
-            {{ manual:'✏️ 수동 출제', list:'📋 문항 목록', auto:'⚡ 자동 트리거' }[m]}
+            {{ manual:'수동 출제', list:'문항 목록', auto:'자동 트리거' }[m]}
           </button>
         ))}
       </div>
@@ -1147,7 +1147,7 @@ function QuizPanel({
       {mode === 'auto' && (
         <div className={styles.qpTabContent}>
           <div className={styles.qpAutoInfo}>
-            <span className={styles.qpAutoIcon}>⚡</span>
+            <span className={styles.qpAutoIcon}>!</span>
             <div>
               <strong>별풍선 자동 트리거</strong>가 활성화되면 아래 조건을 충족하는
               별풍선 후원 시 등록된 문항 중 랜덤으로 자동 출제됩니다.
@@ -1252,9 +1252,9 @@ function SlotPanel({
             ))}
           </div>
           <div className={styles.slResultLabel}>
-            {isRunning ? '🎰 돌아가는 중...' :
-             spin.jackpot  ? '🎉 JACKPOT!' :
-             spin.twoKind  ? '✨ 2개 일치!' : '😢 꽝'}
+            {isRunning ? '돌아가는 중...' :
+             spin.jackpot  ? 'JACKPOT!' :
+             spin.twoKind  ? '2개 일치!' : '꽝'}
           </div>
           {isResult && (
             <div className={styles.slTriggeredBy}>{spin.triggeredBy}님의 결과</div>
@@ -1551,7 +1551,7 @@ function BossPanel({
 
         {boss.lootResults && boss.lootResults.length > 0 && (
           <div className={styles.brLootResults}>
-            <div className={styles.brLootResultsTitle}>🎁 전리품 분배 결과</div>
+            <div className={styles.brLootResultsTitle}>전리품 분배 결과</div>
             {boss.lootResults.map((r, i) => (
               <div key={i} className={styles.brLootResultRow}>
                 <span className={styles.brLootIdx}>{i + 1}</span>
@@ -1624,7 +1624,7 @@ function BossPanel({
             <div className={`${styles.brDmgPill} ${animRoll.isCritical ? styles.brDmgCrit : ''}`}>
               {animRoll.isCritical ? '💥 ' : ''}{animRoll.damage.toLocaleString()} DMG
             </div>
-            {animRoll.isCritical && <div className={styles.brCritBadge}>🎯 CRITICAL HIT!</div>}
+            {animRoll.isCritical && <div className={styles.brCritBadge}>CRITICAL HIT!</div>}
           </div>
         )}
 
@@ -1656,7 +1656,7 @@ function BossPanel({
           </div>
         ) : (
           <div className={styles.brWaiting}>
-            ⚔️ 별풍선 {boss.balloonThreshold}개를 후원하면 공격이 시작됩니다!
+            별풍선 {boss.balloonThreshold}개를 후원하면 공격이 시작됩니다!
           </div>
         )}
 
@@ -1724,7 +1724,7 @@ function BossPanel({
       />
 
       <button className={styles.brStartBtn} onClick={start}>
-        ⚔️ 레이드 시작
+        레이드 시작
       </button>
     </div>
   )
@@ -1771,7 +1771,7 @@ export default function GamesPage() {
             className={`${styles.gameBtn} ${selected === g.id ? styles.active : ''}`}
             onClick={() => setSelected(g.id)}
           >
-            <span className={styles.gameIcon}>{g.icon}</span>
+            <span className={styles.gameIcon} style={{ background: g.color }} />
             <span className={styles.gameName}>{g.name}</span>
             <span
               className={styles.statusDot}
@@ -1790,7 +1790,7 @@ export default function GamesPage() {
 
         {/* Header */}
         <div className={styles.panelHeader}>
-          <span className={styles.panelIcon}>{game.icon}</span>
+          <span className={styles.panelIcon} style={{ background: game.color }} />
           <h1 className={styles.panelTitle}>{game.name}</h1>
           <div className={styles.panelHeaderRight}>
             {/* Enabled toggle */}

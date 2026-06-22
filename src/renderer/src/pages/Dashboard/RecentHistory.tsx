@@ -52,7 +52,6 @@ export default function RecentHistory() {
             <tr key={i}>
               <td>
                 <div className={styles.gameCell}>
-                  <span className={styles.gameIcon}>{h.gameIcon}</span>
                   {h.gameName}
                 </div>
               </td>
@@ -65,7 +64,6 @@ export default function RecentHistory() {
               <td>
                 {h.balloon > 0 && (
                   <div className={styles.balloonCell}>
-                    <span>⭐</span>
                     <span className={styles.balloonAmt}>{h.balloon.toLocaleString()}</span>
                   </div>
                 )}

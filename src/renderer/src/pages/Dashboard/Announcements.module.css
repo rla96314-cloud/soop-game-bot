@@ -44,7 +44,12 @@
 .row:hover { background: var(--p50); cursor: pointer; }
 .row:last-child { border-bottom: none; }
 
-.icon { font-size: 14px; flex-shrink: 0; }
+.badge {
+  font-size: 9px; font-weight: 800; flex-shrink: 0;
+  padding: 2px 5px; border-radius: 4px;
+  background: var(--p500); color: #fff;
+  letter-spacing: 0.03em;
+}
 
 .text {
   flex: 1;

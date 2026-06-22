@@ -19,7 +19,7 @@
   margin-bottom: 24px;
   line-height: 1.5;
 }
-.infoIcon { font-size: 18px; flex-shrink: 0; }
+
 
 .grid {
   display: grid;
@@ -40,7 +40,7 @@
   gap: 10px;
   margin-bottom: 10px;
 }
-.gameIcon { font-size: 22px; }
+.gameIcon { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 .gameName { font-size: 15px; font-weight: 600; color: var(--text); }
 
 .urlBox {

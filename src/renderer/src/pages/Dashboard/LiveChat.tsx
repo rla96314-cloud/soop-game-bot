@@ -2,8 +2,7 @@ import { useState } from 'react'
 import { useApp } from '../../contexts/AppContext'
 import styles from './LiveChat.module.css'
 
-const AVATARS = ['🐱','⭐','🎮','🍀','🌊','🎲','🍗','💨','🌙','💻','🍉','😊','🧙','✨','🔥']
-const avatarFor = (user: string) => AVATARS[user.charCodeAt(0) % AVATARS.length]
+const avatarFor = (user: string) => user.charAt(0).toUpperCase() || '?'
 
 const PAGE_SIZE = 7
 
@@ -36,7 +35,6 @@ export default function LiveChat() {
             <span className={styles.user}>{item.user}</span>
             {item.isBalloon && (
               <div className={styles.balloon}>
-                <span className={styles.star}>⭐</span>
                 <span className={styles.amount}>{item.amount?.toLocaleString()}</span>
               </div>
             )}

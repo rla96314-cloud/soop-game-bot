@@ -55,7 +55,7 @@ function ObsUrlChip() {
       onClick={() => { navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) }) }}
       title={url}
     >
-      {copied ? '✓ 복사됨' : '📋 OBS URL'}
+      {copied ? '복사됨' : 'OBS URL'}
     </button>
   )
 }
@@ -97,7 +97,6 @@ export default function BossPage() {
     <div className={styles.page}>
       <div className={styles.header}>
         <div className={styles.headerLeft}>
-          <span className={styles.icon}>👾</span>
           <div>
             <h1 className={styles.title}>보스전</h1>
             <p className={styles.sub}>별풍선 누적 → 주사위 → 데미지 → 전리품</p>
@@ -106,7 +105,7 @@ export default function BossPage() {
         <div className={styles.headerRight}>
           <ObsUrlChip />
           {status === 'idle' && (
-            <button className={styles.startBtn} onClick={startRaid}>⚔️ 레이드 시작</button>
+            <button className={styles.startBtn} onClick={startRaid}>레이드 시작</button>
           )}
         </div>
       </div>
@@ -122,9 +121,9 @@ export default function BossPage() {
             {boss.currentHp.toLocaleString()} / {boss.maxHp.toLocaleString()}
           </span>
           <span className={styles.hpStatusPct}>{hpPct.toFixed(0)}%</span>
-          {status === 'running' && <span className={styles.hpStatusBadge}>⚔️ 전투 중</span>}
-          {status === 'collecting' && <span className={styles.hpStatusBadge}>🎲 주사위 대기</span>}
-          {status === 'showing_result' && <span className={styles.hpStatusBadge} style={{ background: 'rgba(245,158,11,0.2)', color: '#F59E0B' }}>🏆 처치!</span>}
+          {status === 'running' && <span className={styles.hpStatusBadge}>전투 중</span>}
+          {status === 'collecting' && <span className={styles.hpStatusBadge}>주사위 대기</span>}
+          {status === 'showing_result' && <span className={styles.hpStatusBadge} style={{ background: 'rgba(245,158,11,0.2)', color: '#F59E0B' }}>처치!</span>}
         </div>
       )}
 
@@ -220,7 +219,6 @@ export default function BossPage() {
       {status === 'showing_result' && boss && (
         <div className={styles.body}>
           <div className={styles.resultBanner}>
-            <span className={styles.resultIcon}>🏆</span>
             <span className={styles.resultTitle}>보스 처치!</span>
           </div>
           {boss.lootResults && boss.lootResults.length > 0 && (
