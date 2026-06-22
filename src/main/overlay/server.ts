@@ -604,7 +604,8 @@ const ROULETTE_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
     flex-shrink: 0; width: 100%; text-align: center; letter-spacing: -0.02em;
   }
   #text-result {
-    display: none; padding: 10px 24px 14px;
+    display: none; height: 78px;
+    align-items: center; justify-content: center;
     font-size: 26px; font-weight: 900; color: #5B30A8;
     text-align: center; letter-spacing: -0.02em;
   }
@@ -798,7 +799,7 @@ function showResult(result, animType) {
   if (animType === 'text') {
     if (tSlotOuter) tSlotOuter.style.display = 'none'
     textRes.textContent = txt
-    textRes.style.display = 'block'
+    textRes.style.display = 'flex'
   } else {
     wRes.textContent = txt; wRes.style.display = 'block'
   }
