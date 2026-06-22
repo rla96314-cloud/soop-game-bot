@@ -37,19 +37,41 @@ interface LadderState {
 // ── Game list ─────────────────────────────────────────────────────────────────
 
 const GAMES = [
-  { id: 'roulette', icon: '🎡', name: '룰렛',     color: '#8B5CF6', settingKey: 'roulette' },
-  { id: 'ladder',   icon: '🪜', name: '사다리타기', color: '#3B82F6', settingKey: 'ladder'   },
-  { id: 'boss',     icon: '👾', name: '보스전',    color: '#EF4444', settingKey: 'boss'     },
-  { id: 'gacha',     icon: '🎁', name: '뽑기(확률)',  color: '#F59E0B', settingKey: 'gacha'     },
-  { id: 'pickboard', icon: '🎴', name: '뽑기판',    color: '#EC4899', settingKey: 'pickboard' },
+  { id: 'roulette',  icon: '🎡', name: '룰렛',     color: '#8B5CF6', settingKey: 'roulette'  },
+  { id: 'ladder',    icon: '🪜', name: '사다리타기', color: '#3B82F6', settingKey: 'ladder'    },
+  { id: 'pickboard', icon: '🎯', name: '뽑기판',    color: '#EC4899', settingKey: 'pickboard' },
   { id: 'quiz',      icon: '❓', name: '퀴즈',      color: '#10B981', settingKey: 'quiz'      },
-  { id: 'slot',     icon: '🎰', name: '슬롯머신',  color: '#8B5CF6', settingKey: 'slot'     },
-  { id: 'race',     icon: '🏁', name: '경주',     color: '#6366F1', settingKey: 'race'     },
-  { id: 'rps',      icon: '✊', name: '가위바위보', color: '#EC4899', settingKey: 'rps'      },
-  { id: 'fish',     icon: '🎣', name: '낚시',     color: '#14B8A6', settingKey: 'fish'     },
-  { id: 'lottery',  icon: '🎟️', name: '복권',     color: '#F97316', settingKey: 'lottery'  },
-  { id: 'number',   icon: '🔢', name: '숫자 추첨', color: '#06B6D4', settingKey: 'number'   },
+  { id: 'slot',      icon: '🎰', name: '슬롯머신',  color: '#8B5CF6', settingKey: 'slot'      },
+  { id: 'race',      icon: '🏁', name: '경주',     color: '#6366F1', settingKey: 'race'      },
+  { id: 'rps',       icon: '✊', name: '가위바위보', color: '#EC4899', settingKey: 'rps'       },
+  { id: 'fish',      icon: '🎣', name: '낚시',     color: '#14B8A6', settingKey: 'fish'      },
+  { id: 'lottery',   icon: '🎟️', name: '복권',     color: '#F97316', settingKey: 'lottery'   },
+  { id: 'number',    icon: '🔢', name: '숫자 추첨', color: '#06B6D4', settingKey: 'number'    },
 ]
+
+const OVERLAY_PORT = 3939  // used for OBS URL copy
+
+// ── OBS URL copy button ───────────────────────────────────────────────────────
+
+function ObsUrlBtn({ gameId, port }: { gameId: string; port: number }) {
+  const [copied, setCopied] = useState(false)
+  const url = `http://localhost:${port}/overlay/${gameId}`
+  const copy = () => {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+  return (
+    <button
+      className={`${styles.obsUrlBtn} ${copied ? styles.obsUrlBtnCopied : ''}`}
+      onClick={copy}
+      title={url}
+    >
+      {copied ? '✓ 복사됨' : '📋 OBS URL'}
+    </button>
+  )
+}
 
 // ── List editors ──────────────────────────────────────────────────────────────
 
@@ -1195,6 +1217,13 @@ function SlotPanel({
   const isRunning = status === 'running'
   const isResult  = status === 'showing_result'
 
+  const isUrl = (s: string) => s.startsWith('http') || s.startsWith('data:')
+
+  const renderSymbol = (s: string, cls?: string) =>
+    isUrl(s)
+      ? <img src={s} alt="심볼" className={cls ?? styles.slSymbolImg} />
+      : <span>{s}</span>
+
   return (
     <div className={styles.slPanel}>
       {/* 현재 상태 카드 */}
@@ -1203,7 +1232,7 @@ function SlotPanel({
           <div className={styles.slReels}>
             {spin.symbols.map((sym, i) => (
               <div key={i} className={`${styles.slReel} ${isRunning ? styles.slSpinning : ''}`}>
-                {sym}
+                {renderSymbol(sym)}
               </div>
             ))}
           </div>
@@ -1222,10 +1251,10 @@ function SlotPanel({
         <div className={styles.slIdle}>
           <div className={styles.slIdleReels}>
             {(symbols.slice(0,3)).map((s, i) => (
-              <div key={i} className={styles.slReel}>{s}</div>
+              <div key={i} className={styles.slReel}>{renderSymbol(s)}</div>
             ))}
           </div>
-          <p className={styles.slIdleHint}>별풍선 후원 또는 채팅 명령어로 실행됩니다</p>
+          <p className={styles.slIdleHint}>별풍선 후원으로 실행됩니다</p>
         </div>
       )}
 
@@ -1235,7 +1264,11 @@ function SlotPanel({
         <div className={styles.slSymbolGrid}>
           {symbols.map((s, i) => (
             <div key={i} className={styles.slSymbolItem}>
-              <span className={styles.slSymbolEmoji}>{s}</span>
+              <span className={styles.slSymbolEmoji}>
+                {isUrl(s)
+                  ? <img src={s} alt="심볼" className={styles.slSymbolImg} />
+                  : s}
+              </span>
               <button
                 className={styles.slSymbolRemove}
                 onClick={() => removeSym(i)}
@@ -1249,13 +1282,12 @@ function SlotPanel({
             className={styles.slAddInput}
             value={newSym}
             onChange={e => setNewSym(e.target.value)}
-            placeholder="이모지 입력"
-            maxLength={4}
+            placeholder="이모지 또는 이미지 URL (http://...)"
             onKeyDown={e => e.key === 'Enter' && addSym()}
           />
           <button className={styles.slAddBtn} onClick={addSym}>추가</button>
         </div>
-        <p className={styles.slSymbolHint}>최소 3개 필요 · 엔터로 추가</p>
+        <p className={styles.slSymbolHint}>최소 3개 필요 · 이모지 또는 이미지 URL 지원</p>
       </div>
 
       {/* 스핀 시간 */}
@@ -1744,34 +1776,49 @@ export default function GamesPage() {
         {/* Header */}
         <div className={styles.panelHeader}>
           <span className={styles.panelIcon}>{game.icon}</span>
-          <h1 className={styles.panelTitle}>{game.name} 설정</h1>
-          {game.id !== 'pickboard' && game.id !== 'boss' && (
-            <button
-              className={styles.runBtn}
-              style={{ background: busy ? '#9CA3AF' : game.color }}
-              disabled={busy}
-              onClick={() => triggerGame(game.id)}
-            >
-              {busy ? '진행 중...' : '▶ 수동 실행'}
-            </button>
-          )}
+          <h1 className={styles.panelTitle}>{game.name}</h1>
+          <div className={styles.panelHeaderRight}>
+            {/* Enabled toggle */}
+            <label className={styles.toggleWrap} title={gSettings.enabled ? '활성화됨' : '비활성화됨'}>
+              <input
+                type="checkbox"
+                className={styles.toggleInput}
+                checked={(gSettings.enabled as boolean) ?? true}
+                onChange={e => saveSetting('enabled', e.target.checked)}
+              />
+              <span className={styles.toggleTrack}>
+                <span className={styles.toggleThumb} />
+              </span>
+              <span className={styles.toggleLabel}>
+                {(gSettings.enabled as boolean) ?? true ? '활성' : '비활성'}
+              </span>
+            </label>
+            {/* OBS URL copy */}
+            {game.id !== 'pickboard' && (
+              <ObsUrlBtn gameId={game.id} port={OVERLAY_PORT} />
+            )}
+            {/* Manual run */}
+            {game.id !== 'pickboard' && (
+              <button
+                className={styles.runBtn}
+                style={{ background: busy ? '#6B7280' : game.color }}
+                disabled={busy}
+                onClick={() => triggerGame(game.id)}
+              >
+                {busy ? '진행 중...' : '▶ 수동 실행'}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* ── Common fields ── */}
-        {game.id !== 'pickboard' && game.id !== 'boss' && (
+        {game.id !== 'pickboard' && (
         <div className={styles.fields}>
           <Field label="별풍선 트리거 (0=비활성)">
             <input
               type="number" min={0}
               value={(gSettings.balloonThreshold as number) ?? 0}
               onChange={e => saveSetting('balloonThreshold', Number(e.target.value))}
-            />
-          </Field>
-          <Field label="채팅 명령어">
-            <input
-              type="text"
-              value={(gSettings.chatCommand as string) ?? ''}
-              onChange={e => saveSetting('chatCommand', e.target.value)}
             />
           </Field>
 

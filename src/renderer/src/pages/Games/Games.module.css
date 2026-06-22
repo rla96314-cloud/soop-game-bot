@@ -56,8 +56,43 @@
   margin-bottom: 28px;
 }
 
-.panelIcon { font-size: 28px; }
+.panelIcon  { font-size: 28px; }
 .panelTitle { font-size: 20px; font-weight: 700; color: var(--text); flex: 1; }
+
+.panelHeaderRight {
+  display: flex; align-items: center; gap: 10px;
+}
+
+/* ── Toggle switch ── */
+.toggleWrap {
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;
+}
+.toggleInput { display: none; }
+.toggleTrack {
+  position: relative; width: 44px; height: 24px;
+  background: var(--border); border-radius: 12px;
+  transition: background 0.2s;
+}
+.toggleInput:checked + .toggleTrack { background: var(--p500); }
+.toggleThumb {
+  position: absolute; top: 3px; left: 3px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; transition: transform 0.2s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+}
+.toggleInput:checked + .toggleTrack .toggleThumb { transform: translateX(20px); }
+.toggleLabel { font-size: 12px; font-weight: 600; color: var(--text3); min-width: 32px; }
+
+/* ── OBS URL button ── */
+.obsUrlBtn {
+  padding: 7px 13px; border-radius: 8px;
+  border: 1.5px solid var(--border); background: transparent;
+  font-size: 12px; font-weight: 600; color: var(--text3);
+  cursor: pointer; transition: border-color 0.15s, color 0.15s; font-family: inherit;
+  white-space: nowrap;
+}
+.obsUrlBtn:hover     { border-color: var(--p400); color: var(--p500); }
+.obsUrlBtnCopied     { border-color: #10B981 !important; color: #10B981 !important; }
 
 .runBtn {
   color: #fff;
@@ -1238,7 +1273,8 @@
   background: var(--bg); border: 1.5px solid var(--border); border-radius: 10px;
   padding: 5px 8px;
 }
-.slSymbolEmoji { font-size: 24px; line-height: 1; }
+.slSymbolEmoji { font-size: 24px; line-height: 1; display: flex; align-items: center; justify-content: center; }
+.slSymbolImg   { width: 32px; height: 32px; object-fit: contain; border-radius: 4px; }
 .slSymbolRemove {
   width: 18px; height: 18px; border-radius: 5px;
   background: none; border: 1px solid var(--border); color: var(--text3);

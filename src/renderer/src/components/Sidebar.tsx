@@ -8,13 +8,13 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { id: 'dashboard', icon: '⊞', label: '대시보드' },
-  { id: 'chat',      icon: '💬', label: '채팅 / 후원' },
-  { id: 'games',     icon: '🎮', label: '게임 관리' },
+  { id: 'dashboard', icon: '⊞',  label: '대시보드'    },
+  { id: 'games',     icon: '🎮', label: '게임 관리'   },
+  { id: 'boss',      icon: '👾', label: '보스전'       },
   { id: 'overlay',   icon: '📺', label: 'OBS 오버레이' },
   { id: 'history',   icon: '📊', label: '기록 / 통계' },
-  { id: 'settings',  icon: '⚙️', label: '설정' },
-  { id: 'help',      icon: '❓', label: '도움말' },
+  { id: 'settings',  icon: '⚙️', label: '설정'        },
+  { id: 'help',      icon: '❓', label: '도움말'       },
 ]
 
 interface Props {

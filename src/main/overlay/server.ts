@@ -11,7 +11,7 @@ const QUIZ_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: transparent; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
+  html, body { background: transparent !important; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
 
   .quiz-box {
     position: fixed;
@@ -169,7 +169,7 @@ const LADDER_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@700;800&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: transparent; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
+  html, body { background: transparent !important; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
 
   #box {
     position: fixed; bottom: 40px; left: 50%;
@@ -404,7 +404,7 @@ const ROULETTE_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: transparent; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
+  html, body { background: transparent !important; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
 
   /* ── Shared wrapper ── */
   #rbox {
@@ -717,7 +717,7 @@ const NUMBER_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: transparent; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
+  html, body { background: transparent !important; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
   #num-wrap {
     position: fixed; top: 50%; left: 50%;
     transform: translate(-50%, -50%) scale(0.7);
@@ -824,7 +824,7 @@ const SLOT_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: transparent; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
+  html, body { background: transparent !important; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
   #slot-wrap {
     position: fixed; bottom: 60px; left: 50%;
     transform: translateX(-50%) translateY(180px); opacity: 0;
@@ -885,14 +885,22 @@ let spinning = false
 
 function rand(arr) { return arr[Math.floor(Math.random() * arr.length)] }
 
+function isUrl(s) { return s && (s.startsWith('http') || s.startsWith('data:')) }
+function makeCell(sym) {
+  const c = document.createElement('div'); c.className = 'reel-cell'
+  if (isUrl(sym)) {
+    const img = document.createElement('img')
+    img.src = sym; img.style.cssText = 'width:64px;height:64px;object-fit:contain;border-radius:8px'
+    c.appendChild(img)
+  } else {
+    c.textContent = sym
+  }
+  return c
+}
 function buildReel(innerEl, target, symbols, rows) {
   innerEl.innerHTML = ''
-  for (let i = 0; i < rows - 1; i++) {
-    const c = document.createElement('div'); c.className = 'reel-cell'
-    c.textContent = rand(symbols); innerEl.appendChild(c)
-  }
-  const last = document.createElement('div'); last.className = 'reel-cell'
-  last.textContent = target; innerEl.appendChild(last)
+  for (let i = 0; i < rows - 1; i++) innerEl.appendChild(makeCell(rand(symbols)))
+  innerEl.appendChild(makeCell(target))
 }
 
 function spinReel(reelEl, innerEl, target, symbols, stopMs) {
@@ -972,7 +980,7 @@ const BOSS_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: transparent; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
+  html, body { background: transparent !important; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
 
   #boss-hud {
     position: fixed; top: 40px; left: 40px; width: 520px;

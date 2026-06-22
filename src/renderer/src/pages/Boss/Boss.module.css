@@ -1,0 +1,108 @@
+/* ── Boss Page ── */
+.page   { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+.header { display: flex; align-items: center; justify-content: space-between; padding: 28px 32px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.headerLeft  { display: flex; align-items: center; gap: 16px; }
+.headerRight { display: flex; align-items: center; gap: 10px; }
+.icon  { font-size: 36px; }
+.title { font-size: 22px; font-weight: 800; color: var(--text); letter-spacing: -0.03em; }
+.sub   { font-size: 13px; color: var(--text3); margin-top: 2px; }
+
+.startBtn {
+  padding: 10px 22px; background: #EF4444; color: #fff;
+  border: none; border-radius: 10px; font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: opacity 0.15s; font-family: inherit;
+}
+.startBtn:hover { opacity: 0.85; }
+
+.obsChip {
+  padding: 8px 14px; border: 1.5px solid var(--border); border-radius: 8px;
+  background: transparent; font-size: 12px; font-weight: 600; color: var(--text3);
+  cursor: pointer; transition: border-color 0.15s, color 0.15s; font-family: inherit;
+}
+.obsChip:hover      { border-color: var(--p400); color: var(--p500); }
+.obsChipCopied      { border-color: #10B981 !important; color: #10B981 !important; }
+
+.body { display: flex; gap: 20px; padding: 24px 32px; flex: 1; overflow-y: auto; }
+.col  { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+
+.section      { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+.sectionTitle { font-size: 11px; font-weight: 800; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px; }
+
+.fieldGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.fieldLabel { font-size: 11px; font-weight: 700; color: var(--text3); }
+.input {
+  padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 8px;
+  font-size: 13px; color: var(--text); background: var(--bg); outline: none; font-family: inherit;
+}
+.input:focus { border-color: var(--p400); }
+.input:disabled { opacity: 0.45; }
+
+/* Toggle */
+.toggleWrap  { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.toggleInput { display: none; }
+.toggleTrack {
+  position: relative; width: 44px; height: 24px;
+  background: var(--border); border-radius: 12px; transition: background 0.2s;
+}
+.toggleInput:checked + .toggleTrack { background: var(--p500); }
+.toggleThumb {
+  position: absolute; top: 3px; left: 3px; width: 18px; height: 18px;
+  border-radius: 50%; background: #fff; transition: transform 0.2s; box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+}
+.toggleInput:checked + .toggleTrack .toggleThumb { transform: translateX(20px); }
+.toggleLabel { font-size: 12px; font-weight: 600; color: var(--text3); }
+
+/* HP bar */
+.bossNameRow { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+.bossNameText { font-size: 18px; font-weight: 800; color: var(--text); }
+.hpText       { font-size: 13px; color: var(--text3); font-weight: 600; }
+.hpTrack { height: 18px; background: var(--border); border-radius: 9px; overflow: hidden; }
+.hpFill  { height: 100%; border-radius: 9px; transition: width 0.4s ease, background 0.4s ease; }
+.hpPctLabel { text-align: right; font-size: 12px; color: var(--text3); margin-top: 4px; }
+
+/* Dice card */
+.diceCard {
+  display: flex; align-items: center; gap: 16px;
+  padding: 16px 20px; background: var(--bg); border: 1.5px solid var(--border); border-radius: 12px;
+}
+.diceCardCrit { border-color: #F59E0B; background: rgba(245,158,11,0.06); }
+.diceVal  { font-size: 48px; font-weight: 900; color: var(--text); line-height: 1; min-width: 56px; text-align: center; }
+.diceInfo { display: flex; flex-direction: column; gap: 4px; }
+.diceUser { font-size: 14px; font-weight: 700; color: var(--text); }
+.diceDmg  { font-size: 16px; font-weight: 800; color: #EF4444; display: flex; align-items: center; gap: 6px; }
+.critBadge{ background: #F59E0B; color: #000; font-size: 10px; font-weight: 900; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.05em; }
+
+/* Damage table */
+.dmgTable { display: flex; flex-direction: column; gap: 6px; }
+.dmgRow { display: flex; align-items: center; gap: 8px; }
+.dmgRank { font-size: 12px; font-weight: 700; color: var(--text3); width: 20px; text-align: center; }
+.dmgUser { font-size: 13px; font-weight: 600; color: var(--text); min-width: 80px; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dmgBarWrap { flex: 1; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.dmgBar { height: 100%; background: #EF4444; border-radius: 4px; transition: width 0.4s; }
+.dmgVal { font-size: 12px; font-weight: 700; color: var(--text2); width: 70px; text-align: right; }
+.dmgCrit{ font-size: 11px; color: #F59E0B; width: 36px; text-align: right; }
+
+/* Loot editor */
+.lootEditor { display: flex; flex-direction: column; gap: 8px; }
+.lootHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.lootTitle  { font-size: 12px; font-weight: 700; color: var(--text3); }
+.addBtn     { padding: 5px 12px; background: var(--p500); color: #fff; border: none; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
+.addBtn:hover { background: var(--p600); }
+.lootRow    { display: flex; align-items: center; gap: 8px; }
+.lootNum    { font-size: 12px; color: var(--text3); width: 20px; text-align: center; }
+.removeBtn  { background: none; border: none; cursor: pointer; color: var(--text3); font-size: 16px; padding: 0 2px; }
+.removeBtn:hover { color: #EF4444; }
+.empty { font-size: 12px; color: var(--text3); text-align: center; padding: 12px 0; }
+
+/* Result */
+.resultBanner { display: flex; align-items: center; gap: 16px; padding: 0 32px 20px; }
+.resultIcon   { font-size: 40px; }
+.resultTitle  { font-size: 28px; font-weight: 900; color: var(--text); }
+.lootGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; padding: 0 32px; }
+.lootCard { background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 4px; }
+.lootCardRank { font-size: 11px; font-weight: 700; color: var(--p400); }
+.lootCardUser { font-size: 15px; font-weight: 800; color: var(--text); }
+.lootCardItem { font-size: 13px; font-weight: 700; color: var(--text2); }
+.lootCardDesc { font-size: 12px; color: var(--text3); }
+.lootCardPct  { font-size: 11px; color: var(--p400); margin-top: 4px; }

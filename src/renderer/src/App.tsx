@@ -8,9 +8,11 @@ import Settings         from './pages/Settings'
 import GamesPage        from './pages/Games'
 import OverlayPage      from './pages/Overlay'
 import HistoryPage      from './pages/History'
+import BossPage         from './pages/Boss'
+import HelpPage         from './pages/Help'
 import styles           from './App.module.css'
 
-export type Page = 'dashboard' | 'chat' | 'games' | 'overlay' | 'history' | 'settings' | 'help'
+export type Page = 'dashboard' | 'games' | 'boss' | 'overlay' | 'history' | 'settings' | 'help'
 
 interface AuthUser { id: string; name: string }
 
@@ -77,15 +79,11 @@ export default function App() {
           <main className={styles.main}>
             {page === 'dashboard' && <Dashboard />}
             {page === 'games'     && <GamesPage />}
+            {page === 'boss'      && <BossPage />}
             {page === 'overlay'   && <OverlayPage />}
             {page === 'settings'  && <Settings />}
             {page === 'history'   && <HistoryPage />}
-            {(page === 'chat' || page === 'help') && (
-              <div className={styles.placeholder}>
-                <span className={styles.placeholderIcon}>🚧</span>
-                <p>준비 중인 페이지입니다</p>
-              </div>
-            )}
+            {page === 'help'      && <HelpPage />}
           </main>
         </div>
       </div>
