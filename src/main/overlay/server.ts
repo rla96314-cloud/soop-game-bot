@@ -940,15 +940,15 @@ const PICKBOARD_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
   /* Prize content */
   .pb-ticket-content {
     display: flex; flex-direction: column; align-items: center;
-    gap: 3px; padding: 6px 8px; text-align: center; z-index: 1;
+    gap: 3px; padding: 6px 8px; text-align: center; z-index: 1; width: 100%;
   }
   .pb-ticket-name {
-    font-size: 13px; font-weight: 800; line-height: 1.2;
-    word-break: keep-all;
+    font-size: 22px; font-weight: 900; line-height: 1.2;
+    word-break: keep-all; width: 100%;
   }
   .pb-ticket-desc {
-    font-size: 10px; color: rgba(0,0,0,0.45); line-height: 1.2;
-    word-break: keep-all;
+    font-size: 13px; color: rgba(0,0,0,0.5); line-height: 1.2;
+    word-break: keep-all; width: 100%;
   }
 
   /* Highlight animation for just-revealed */
@@ -983,6 +983,21 @@ const wrap   = document.getElementById('pb-wrap')
 const grid   = document.getElementById('pb-grid')
 const countEl= document.getElementById('pb-count')
 let currentCells = [], currentRows = 4, currentCols = 5
+
+function fitTicketText(ticket) {
+  const name = ticket.querySelector('.pb-ticket-name')
+  const desc = ticket.querySelector('.pb-ticket-desc')
+  if (!name) return
+  const maxH = ticket.clientHeight - 16
+  let size = 26
+  name.style.fontSize = size + 'px'
+  if (desc) desc.style.fontSize = Math.max(11, Math.round(size * 0.58)) + 'px'
+  while (size > 11 && ticket.querySelector('.pb-ticket-content').scrollHeight > maxH) {
+    size--
+    name.style.fontSize = size + 'px'
+    if (desc) desc.style.fontSize = Math.max(11, Math.round(size * 0.58)) + 'px'
+  }
+}
 
 function buildGrid(cells, rows, cols) {
   grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)'
@@ -1024,6 +1039,9 @@ function buildGrid(cells, rows, cols) {
     ticketWrap.appendChild(ticket)
     grid.appendChild(ticketWrap)
   })
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.pb-ticket.revealed').forEach(fitTicketText)
+  })
 
   const revealed = cells.filter(c => c.revealed).length
   countEl.textContent = revealed + ' / ' + cells.length + ' 오픈'
@@ -1064,6 +1082,7 @@ function updateGrid(cells, rows, cols) {
           content.appendChild(desc)
         }
         ticket.appendChild(content)
+        requestAnimationFrame(() => fitTicketText(ticket))
       }, 200)
     }
   })
