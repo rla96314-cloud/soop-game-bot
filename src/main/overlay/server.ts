@@ -401,11 +401,22 @@ function renderResult(ld) {
     svgEl.appendChild(d); return d
   })
 
+  // Build right-angle path points up to a given step
+  function orthoPts(cols, upTo) {
+    const pts = [xp(cols[0]) + ',' + PAD_T]
+    for (let r = 0; r < Math.min(upTo, rows); r++) {
+      const curY = PAD_T + r * ROW_H
+      const nxtY = PAD_T + (r + 1) * ROW_H
+      if (cols[r + 1] !== cols[r]) pts.push(xp(cols[r + 1]) + ',' + curY) // horizontal rung
+      pts.push(xp(cols[r + 1]) + ',' + nxtY)                               // vertical descent
+    }
+    return pts.join(' ')
+  }
+
   const tick = setInterval(() => {
     step++
     ld.paths.forEach((path, pi) => {
-      const pts = path.cols.slice(0, step+1).map((c,r) => xp(c)+','+(PAD_T+r*ROW_H)).join(' ')
-      lines[pi].setAttribute('points', pts)
+      lines[pi].setAttribute('points', orthoPts(path.cols, step))
       const cr = Math.min(step, rows)
       dots[pi].setAttribute('cx', xp(path.cols[cr]))
       dots[pi].setAttribute('cy', PAD_T + cr * ROW_H)
