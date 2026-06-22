@@ -167,3 +167,51 @@
   flex: 1;
   user-select: all;
 }
+
+/* ── weflab controls (shared with Games panel) ── */
+.rwRow { display: flex; gap: 8px; }
+.rwInput {
+  flex: 1; padding: 7px 10px;
+  border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg2); color: var(--text1); font-size: 13px;
+}
+.rwInput:disabled { opacity: 0.45; }
+.rwToggleBtn {
+  padding: 7px 14px; border-radius: 8px;
+  border: 1px solid var(--p500); background: none;
+  color: var(--p500); font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.rwToggleBtn:hover:not(:disabled) { background: var(--p500); color: #fff; }
+.rwToggleBtnOn { background: rgba(239,68,68,0.1); border-color: #EF4444; color: #EF4444; }
+.rwToggleBtnOn:hover { background: #EF4444 !important; color: #fff !important; }
+.rwToggleBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+.rwTriggerList { display: flex; flex-direction: column; gap: 6px; }
+.rwTriggerRow { display: flex; gap: 6px; }
+.rwDelBtn {
+  padding: 6px 10px; border-radius: 7px;
+  border: 1px solid var(--border); background: none;
+  color: var(--text3); font-size: 12px; cursor: pointer;
+}
+.rwDelBtn:hover { background: rgba(239,68,68,0.1); color: #EF4444; border-color: #EF4444; }
+.rwAddTriggerBtn {
+  padding: 7px 0; border-radius: 8px;
+  border: 1px dashed var(--border); background: none;
+  color: var(--p500); font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.rwAddTriggerBtn:hover:not(:disabled) { background: rgba(139,92,246,0.07); }
+.rwAddTriggerBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+.rwLog {
+  margin-top: 8px; border-radius: 8px;
+  border: 1px solid var(--border); overflow: hidden;
+}
+.rwLogTitle {
+  padding: 6px 10px; font-size: 10px; font-weight: 800;
+  color: var(--text3); background: var(--bg2);
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+.rwLogEmpty { padding: 8px 10px; font-size: 11px; color: var(--text3); }
+.rwLogLine {
+  padding: 4px 10px; font-size: 11px; color: var(--text2);
+  border-bottom: 1px solid var(--border); font-family: monospace;
+}
+.rwLogLine:last-of-type { border-bottom: none; }

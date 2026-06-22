@@ -760,22 +760,25 @@ function spinWheel(items, winnerIdx, spinMs) {
   })(t0)
 }
 
-// ── Text spin ─────────────────────────────────────────────────────────────────
+// ── Text spin (위에서 아래로) ─────────────────────────────────────────────────
 function spinText(items, winner, spinMs) {
   slotInner.innerHTML = ''
   const names = items.map(i => i.name), full = []
-  for (let r = 0; r < 5; r++) full.push(...[...names].sort(() => Math.random() - 0.5))
+  // winner goes first: ends visible at translateY(0)
   full.push(winner)
+  for (let r = 0; r < 5; r++) full.push(...[...names].sort(() => Math.random() - 0.5))
   full.forEach(name => {
     const el = document.createElement('div'); el.className = 't-slot-item'; el.textContent = name
     slotInner.appendChild(el)
   })
-  const targetY = -(full.length - 1) * 78
-  slotInner.style.transition = 'none'; slotInner.style.transform = 'translateY(0)'
-  requestAnimationFrame(() => {
+  const startY = -(full.length - 1) * 78  // start showing last items (bottom of list)
+  slotInner.style.transition = 'none'
+  slotInner.style.transform = 'translateY(' + startY + 'px)'
+  // double rAF ensures browser flushes the reset before starting transition
+  requestAnimationFrame(() => requestAnimationFrame(() => {
     slotInner.style.transition = 'transform ' + spinMs + 'ms cubic-bezier(0.2,0,0.1,1)'
-    slotInner.style.transform  = 'translateY(' + targetY + 'px)'
-  })
+    slotInner.style.transform  = 'translateY(0)'  // scroll DOWN to winner
+  }))
 }
 
 // ── Handlers ──────────────────────────────────────────────────────────────────

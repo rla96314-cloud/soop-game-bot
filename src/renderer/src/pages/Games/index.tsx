@@ -325,7 +325,7 @@ interface RouletteSpinState {
   spinMs: number; animType: 'wheel' | 'text'
 }
 
-interface WeflabTrigger { keyword: string }
+
 
 function RouletteWheelPreview({ items }: { items: Array<{ name: string; probability: number }> }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -359,68 +359,17 @@ function RouletteWheelPreview({ items }: { items: Array<{ name: string; probabil
   return <canvas ref={canvasRef} width={160} height={160} className={styles.rwPreviewCanvas} />
 }
 
-function RoulettePanel({ gSettings, gameStates, saveSetting, weflabSettings, saveWeflabSetting }: {
-  gSettings:          Record<string, unknown>
-  gameStates:         Record<string, { status: string; [k: string]: unknown }>
-  saveSetting:        (key: string, value: unknown) => void
-  weflabSettings:     Record<string, unknown>
-  saveWeflabSetting:  (key: string, value: unknown) => void
+function RoulettePanel({ gSettings, gameStates, saveSetting }: {
+  gSettings:  Record<string, unknown>
+  gameStates: Record<string, { status: string; [k: string]: unknown }>
+  saveSetting:(key: string, value: unknown) => void
 }) {
-  const el = (window as unknown as Record<string, unknown>).electron as
-    Record<string, (...args: unknown[]) => unknown>
-
-  const [weflabUrl,     setWeflabUrl]     = useState((weflabSettings.url as string) ?? '')
-  const [triggers,      setTriggers]      = useState<WeflabTrigger[]>(
-    (weflabSettings.triggers as WeflabTrigger[]) ?? []
-  )
-  const [weflabRunning, setWeflabRunning] = useState(false)
-  const [lastResult,    setLastResult]    = useState('')
-  const [weflabLog,     setWeflabLog]     = useState<string[]>([])
-
   const animType  = (gSettings.animType as 'wheel' | 'text') ?? 'wheel'
   const items     = (gSettings.items as Array<{ name: string; probability: number }>) ?? []
   const spinState = (gameStates['roulette']?.roulette) as RouletteSpinState | undefined
   const status    = gameStates['roulette']?.status as string ?? 'idle'
   const isSpinning= status === 'running'
   const isResult  = status === 'showing_result'
-
-  // Subscribe to weflab events
-  useEffect(() => {
-    const offResult = (el.onWeflabResult as (cb: (t: string) => void) => () => void)(
-      (text) => {
-        setLastResult(text)
-        setWeflabLog(l => [`[${new Date().toLocaleTimeString()}] ${text}`, ...l].slice(0, 20))
-      }
-    )
-    const offLoaded = (el.onWeflabLoaded as (cb: () => void) => () => void)(
-      () => setWeflabLog(l => [`[${new Date().toLocaleTimeString()}] 페이지 로드 완료`, ...l].slice(0,20))
-    )
-    const offError  = (el.onWeflabError  as (cb: (e: string) => void) => () => void)(
-      (e) => setWeflabLog(l => [`[오류] ${e}`, ...l].slice(0, 20))
-    )
-    return () => { offResult(); offLoaded(); offError() }
-  }, [])
-
-  // Check initial weflab status
-  useEffect(() => {
-    (el.weflabStatus as () => Promise<{ running: boolean }>)().then(s => setWeflabRunning(s.running))
-  }, [])
-
-  const toggleWeflab = async () => {
-    if (weflabRunning) {
-      await (el.weflabStop as () => Promise<unknown>)()
-      setWeflabRunning(false)
-    } else {
-      if (!weflabUrl.trim()) return
-      await (el.weflabStart as (url: string) => Promise<unknown>)(weflabUrl.trim())
-      setWeflabRunning(true)
-    }
-  }
-
-  const saveTriggers = (next: WeflabTrigger[]) => {
-    setTriggers(next)
-    saveWeflabSetting('triggers', next)
-  }
 
   return (
     <div className={styles.rwPanel}>
@@ -473,69 +422,6 @@ function RoulettePanel({ gSettings, gameStates, saveSetting, weflabSettings, sav
               <div key={i} className={styles.rwTextItem}>{item.name}</div>
             ))}
             {items.length > 4 && <div className={styles.rwTextMore}>+{items.length - 4}개</div>}
-          </div>
-        )}
-      </div>
-
-      {/* ── weflab 연동 ── */}
-      <div className={styles.rwSection}>
-        <div className={styles.rwSectionTitle}>
-          weflab 연동
-          <span className={`${styles.rwBadge} ${weflabRunning ? styles.rwBadgeOn : ''}`}>
-            {weflabRunning ? 'ON' : 'OFF'}
-          </span>
-        </div>
-
-        <div className={styles.rwField}>
-          <label>weflab 페이지 URL</label>
-          <div className={styles.rwRow}>
-            <input className={styles.rwInput}
-              placeholder="https://weflab.io/your-channel"
-              value={weflabUrl}
-              onChange={e => { setWeflabUrl(e.target.value); saveWeflabSetting('url', e.target.value) }}
-            />
-            <button
-              className={`${styles.rwToggleBtn} ${weflabRunning ? styles.rwToggleBtnOn : ''}`}
-              onClick={toggleWeflab}
-              disabled={!weflabUrl.trim() && !weflabRunning}
-            >
-              {weflabRunning ? '■ 중지' : '▶ 시작'}
-            </button>
-          </div>
-        </div>
-
-        <div className={styles.rwField}>
-          <label>트리거 키워드 (룰렛 결과에 포함 시 자체 룰렛 발동)</label>
-          <div className={styles.rwTriggerList}>
-            {triggers.map((t, i) => (
-              <div key={i} className={styles.rwTriggerRow}>
-                <input className={styles.rwInput}
-                  placeholder="키워드"
-                  value={t.keyword}
-                  onChange={e => saveTriggers(triggers.map((x, j) => j === i ? { keyword: e.target.value } : x))}
-                />
-                <button className={styles.rwDelBtn}
-                  onClick={() => saveTriggers(triggers.filter((_, j) => j !== i))}>✕</button>
-              </div>
-            ))}
-            <button className={styles.rwAddTriggerBtn}
-              onClick={() => saveTriggers([...triggers, { keyword: '' }])}>+ 키워드 추가</button>
-          </div>
-        </div>
-
-        {/* Log */}
-        {weflabRunning && (
-          <div className={styles.rwLog}>
-            <div className={styles.rwLogTitle}>수신 로그</div>
-            {weflabLog.length === 0
-              ? <div className={styles.rwLogEmpty}>결과 대기 중...</div>
-              : weflabLog.map((line, i) => (
-                  <div key={i} className={styles.rwLogLine}>{line}</div>
-                ))
-            }
-            {lastResult && (
-              <div className={styles.rwLogLast}>마지막 결과: <strong>{lastResult}</strong></div>
-            )}
           </div>
         )}
       </div>
@@ -789,16 +675,20 @@ function LadderSVG({ data, animate }: { data: LadderData; animate: boolean }) {
         />
       ))}
 
-      {/* Animated paths */}
+      {/* Animated paths (orthogonal right-angle segments) */}
       {data.paths.map((path, pi) => {
         const color = PLAYER_COLORS[pi % PLAYER_COLORS.length]
         const maxRow = Math.min(step, data.rows)
-        const points = path.cols.slice(0, maxRow + 1).map((c, r) =>
-          `${x(c)},${PAD_TOP + r * ROW_H}`
-        ).join(' ')
+        const pts: string[] = [`${x(path.cols[0])},${PAD_TOP}`]
+        for (let r = 0; r < maxRow; r++) {
+          const curY = PAD_TOP + r * ROW_H
+          const nxtY = PAD_TOP + (r + 1) * ROW_H
+          if (path.cols[r + 1] !== path.cols[r]) pts.push(`${x(path.cols[r + 1])},${curY}`)
+          pts.push(`${x(path.cols[r + 1])},${nxtY}`)
+        }
         return (
           <polyline key={pi}
-            points={points}
+            points={pts.join(' ')}
             fill="none"
             stroke={color}
             strokeWidth={2}
@@ -1921,11 +1811,6 @@ export default function GamesPage() {
     patchSettings({ games: { [game.settingKey]: { [key]: value } } })
   }
 
-  const weflabSettings = (settings?.weflab as Record<string, unknown> | undefined) ?? {}
-  const saveWeflabSetting = (key: string, value: unknown) => {
-    patchSettings({ weflab: { [key]: value } } as Parameters<typeof patchSettings>[0])
-  }
-
   return (
     <div className={styles.layout}>
 
@@ -2042,8 +1927,6 @@ export default function GamesPage() {
             gSettings={gSettings}
             gameStates={gameStates}
             saveSetting={saveSetting}
-            weflabSettings={weflabSettings}
-            saveWeflabSetting={saveWeflabSetting}
           />
         )}
 

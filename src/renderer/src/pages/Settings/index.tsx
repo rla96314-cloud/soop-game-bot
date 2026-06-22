@@ -4,6 +4,8 @@ import styles from './Settings.module.css'
 
 const el = () => (window as unknown as Record<string, Record<string, unknown>>).electron
 
+interface WeflabTrigger { keyword: string }
+
 export default function Settings() {
   const { settings, patchSettings, refreshSettings, connected } = useApp()
 
@@ -21,6 +23,9 @@ export default function Settings() {
   // Weflab
   const [weflabEnabled, setWeflabEnabled] = useState(false)
   const [weflabUrl,     setWeflabUrl]     = useState('')
+  const [triggers,      setTriggers]      = useState<WeflabTrigger[]>([])
+  const [weflabRunning, setWeflabRunning] = useState(false)
+  const [weflabLog,     setWeflabLog]     = useState<string[]>([])
 
   const [saved,        setSaved]        = useState(false)
   const [reconnecting, setReconnecting] = useState(false)
@@ -37,7 +42,30 @@ export default function Settings() {
     setOverlayPort(       (s.overlay?.port             as number)  ?? 3939)
     setWeflabEnabled(     !!(s.weflab?.enabled         as boolean))
     setWeflabUrl(         (s.weflab?.url               as string)  ?? '')
+    setTriggers(          (s.weflab?.triggers          as WeflabTrigger[]) ?? [])
   }, [settings])
+
+  // weflab event listeners
+  useEffect(() => {
+    const e = el()
+    const offResult = (e.onWeflabResult as (cb: (t: string) => void) => () => void)(
+      (text) => setWeflabLog(l => [`[${new Date().toLocaleTimeString()}] ${text}`, ...l].slice(0, 20))
+    )
+    const offLoaded = (e.onWeflabLoaded as (cb: () => void) => () => void)(
+      () => setWeflabLog(l => [`[${new Date().toLocaleTimeString()}] 페이지 로드 완료`, ...l].slice(0, 20))
+    )
+    const offError  = (e.onWeflabError  as (cb: (err: string) => void) => () => void)(
+      (err) => setWeflabLog(l => [`[오류] ${err}`, ...l].slice(0, 20))
+    )
+    return () => { offResult(); offLoaded(); offError() }
+  }, [])
+
+  // Check initial weflab status
+  useEffect(() => {
+    (el().weflabStatus as () => Promise<{ running: boolean }>)()
+      .then(s => setWeflabRunning(s.running))
+      .catch(() => {})
+  }, [])
 
   const save = () => {
     patchSettings({
@@ -50,7 +78,7 @@ export default function Settings() {
         globalThreshold:    Number(globalThreshold),
       },
       overlay: { port: Number(overlayPort) },
-      weflab:  { enabled: weflabEnabled, url: weflabUrl },
+      weflab:  { enabled: weflabEnabled, url: weflabUrl, triggers },
     })
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
@@ -68,6 +96,23 @@ export default function Settings() {
     } finally {
       setReconnecting(false)
     }
+  }
+
+  const toggleWeflab = async () => {
+    const e = el()
+    if (weflabRunning) {
+      await (e.weflabStop as () => Promise<unknown>)()
+      setWeflabRunning(false)
+    } else {
+      if (!weflabUrl.trim()) return
+      await (e.weflabStart as (url: string) => Promise<unknown>)(weflabUrl.trim())
+      setWeflabRunning(true)
+    }
+  }
+
+  const saveTriggers = (next: WeflabTrigger[]) => {
+    setTriggers(next)
+    patchSettings({ weflab: { triggers: next } } as Parameters<typeof patchSettings>[0])
   }
 
   return (
@@ -161,26 +206,70 @@ export default function Settings() {
 
       {/* weflab */}
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>weflab 연동 (룰렛)</h2>
+        <h2 className={styles.sectionTitle}>weflab 연동</h2>
+
         <div className={styles.toggle}>
           <label>
             <input type="checkbox" checked={weflabEnabled} onChange={e => setWeflabEnabled(e.target.checked)} />
             <span>weflab 룰렛 결과 감지 사용</span>
           </label>
         </div>
+
         <div className={styles.field} style={{ marginTop: 12 }}>
           <label>weflab 방송 URL</label>
-          <input
-            value={weflabUrl}
-            onChange={e => setWeflabUrl(e.target.value)}
-            placeholder="https://weflab.com/page/..."
-            disabled={!weflabEnabled}
-          />
+          <div className={styles.rwRow}>
+            <input
+              className={styles.rwInput}
+              value={weflabUrl}
+              onChange={e => setWeflabUrl(e.target.value)}
+              placeholder="https://weflab.com/page/..."
+              disabled={!weflabEnabled}
+            />
+            <button
+              className={`${styles.rwToggleBtn} ${weflabRunning ? styles.rwToggleBtnOn : ''}`}
+              onClick={toggleWeflab}
+              disabled={(!weflabUrl.trim() && !weflabRunning) || !weflabEnabled}
+            >
+              {weflabRunning ? '■ 중지' : '▶ 시작'}
+            </button>
+          </div>
         </div>
-        <p className={styles.hint}>
-          룰렛 결과가 감지되면 트리거 키워드와 일치할 경우 게임이 자동 실행됩니다.
-          트리거 키워드는 게임 설정 → 룰렛에서 관리합니다.
-        </p>
+
+        <div className={styles.field}>
+          <label>트리거 키워드 (결과에 포함 시 게임 자동 발동)</label>
+          <div className={styles.rwTriggerList}>
+            {triggers.map((t, i) => (
+              <div key={i} className={styles.rwTriggerRow}>
+                <input
+                  className={styles.rwInput}
+                  placeholder="키워드"
+                  value={t.keyword}
+                  onChange={e => saveTriggers(triggers.map((x, j) => j === i ? { keyword: e.target.value } : x))}
+                  disabled={!weflabEnabled}
+                />
+                <button className={styles.rwDelBtn}
+                  onClick={() => saveTriggers(triggers.filter((_, j) => j !== i))}>✕</button>
+              </div>
+            ))}
+            <button
+              className={styles.rwAddTriggerBtn}
+              onClick={() => saveTriggers([...triggers, { keyword: '' }])}
+              disabled={!weflabEnabled}
+            >+ 키워드 추가</button>
+          </div>
+        </div>
+
+        {weflabRunning && (
+          <div className={styles.rwLog}>
+            <div className={styles.rwLogTitle}>수신 로그</div>
+            {weflabLog.length === 0
+              ? <div className={styles.rwLogEmpty}>결과 대기 중...</div>
+              : weflabLog.map((line, i) => (
+                  <div key={i} className={styles.rwLogLine}>{line}</div>
+                ))
+            }
+          </div>
+        )}
       </section>
     </div>
   )
