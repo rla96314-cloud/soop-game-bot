@@ -7,6 +7,7 @@ import Dashboard        from './pages/Dashboard'
 import Settings         from './pages/Settings'
 import GamesPage        from './pages/Games'
 import OverlayPage      from './pages/Overlay'
+import HistoryPage      from './pages/History'
 import styles           from './App.module.css'
 
 export type Page = 'dashboard' | 'chat' | 'games' | 'overlay' | 'history' | 'settings' | 'help'
@@ -78,7 +79,8 @@ export default function App() {
             {page === 'games'     && <GamesPage />}
             {page === 'overlay'   && <OverlayPage />}
             {page === 'settings'  && <Settings />}
-            {(page === 'chat' || page === 'history' || page === 'help') && (
+            {page === 'history'   && <HistoryPage />}
+            {(page === 'chat' || page === 'help') && (
               <div className={styles.placeholder}>
                 <span className={styles.placeholderIcon}>🚧</span>
                 <p>준비 중인 페이지입니다</p>
