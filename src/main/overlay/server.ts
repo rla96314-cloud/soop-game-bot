@@ -1143,14 +1143,14 @@ html,body{background:transparent !important;overflow:hidden;font-family:'Noto Sa
 /* Ball orbits (8 balls) */
 .b{position:absolute;top:50%;left:50%;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.6)}
 .b::after{content:'';position:absolute;top:10%;left:18%;width:30%;height:24%;background:rgba(255,255,255,0.55);border-radius:50%;filter:blur(2px)}
-.b1{width:46px;height:46px;font-size:14px;margin:-23px 0 0 -23px;background:radial-gradient(circle at 35% 30%,#EF9A9A,#C62828);animation:ob1 4.2s linear infinite}
-.b2{width:44px;height:44px;font-size:13px;margin:-22px 0 0 -22px;background:radial-gradient(circle at 35% 30%,#90CAF9,#1565C0);animation:ob2 5.1s linear infinite;filter:blur(0.5px)}
-.b3{width:42px;height:42px;font-size:13px;margin:-21px 0 0 -21px;background:radial-gradient(circle at 35% 30%,#A5D6A7,#2E7D32);animation:ob3 3.4s linear infinite}
-.b4{width:46px;height:46px;font-size:14px;margin:-23px 0 0 -23px;background:radial-gradient(circle at 35% 30%,#FFCC80,#E65100);animation:ob4 4.8s linear infinite;filter:blur(0.8px)}
-.b5{width:44px;height:44px;font-size:13px;margin:-22px 0 0 -22px;background:radial-gradient(circle at 35% 30%,#FFE082,#F9A825);color:#3E2000;animation:ob5 3.8s linear infinite}
-.b6{width:42px;height:42px;font-size:13px;margin:-21px 0 0 -21px;background:radial-gradient(circle at 35% 30%,#CE93D8,#6A1B9A);animation:ob6 6.2s linear infinite;filter:blur(1px)}
-.b7{width:40px;height:40px;font-size:12px;margin:-20px 0 0 -20px;background:radial-gradient(circle at 35% 30%,#ffffff,#90A4AE);color:#263238;animation:ob7 2.9s linear infinite}
-.b8{width:44px;height:44px;font-size:13px;margin:-22px 0 0 -22px;background:radial-gradient(circle at 35% 30%,#80DEEA,#006064);animation:ob8 5.5s linear infinite;filter:blur(0.5px)}
+.b1{width:46px;height:46px;font-size:14px;margin:-23px 0 0 -23px;background:radial-gradient(circle at 35% 30%,#EF9A9A,#C62828);animation:ob1 1.4s linear infinite}
+.b2{width:44px;height:44px;font-size:13px;margin:-22px 0 0 -22px;background:radial-gradient(circle at 35% 30%,#90CAF9,#1565C0);animation:ob2 1.7s linear infinite;filter:blur(0.5px)}
+.b3{width:42px;height:42px;font-size:13px;margin:-21px 0 0 -21px;background:radial-gradient(circle at 35% 30%,#A5D6A7,#2E7D32);animation:ob3 1.1s linear infinite}
+.b4{width:46px;height:46px;font-size:14px;margin:-23px 0 0 -23px;background:radial-gradient(circle at 35% 30%,#FFCC80,#E65100);animation:ob4 1.6s linear infinite;filter:blur(0.8px)}
+.b5{width:44px;height:44px;font-size:13px;margin:-22px 0 0 -22px;background:radial-gradient(circle at 35% 30%,#FFE082,#F9A825);color:#3E2000;animation:ob5 1.3s linear infinite}
+.b6{width:42px;height:42px;font-size:13px;margin:-21px 0 0 -21px;background:radial-gradient(circle at 35% 30%,#CE93D8,#6A1B9A);animation:ob6 2.1s linear infinite;filter:blur(1px)}
+.b7{width:40px;height:40px;font-size:12px;margin:-20px 0 0 -20px;background:radial-gradient(circle at 35% 30%,#ffffff,#90A4AE);color:#263238;animation:ob7 1.0s linear infinite}
+.b8{width:44px;height:44px;font-size:13px;margin:-22px 0 0 -22px;background:radial-gradient(circle at 35% 30%,#80DEEA,#006064);animation:ob8 1.8s linear infinite;filter:blur(0.5px)}
 /* Orbital keyframes (8 different paths) */
 @keyframes ob1{0%{transform:translate(0,-105px)}12.5%{transform:translate(74px,-74px)}25%{transform:translate(105px,0)}37.5%{transform:translate(74px,74px)}50%{transform:translate(0,105px)}62.5%{transform:translate(-74px,74px)}75%{transform:translate(-105px,0)}87.5%{transform:translate(-74px,-74px)}100%{transform:translate(0,-105px)}}
 @keyframes ob2{0%{transform:translate(95px,0)}12.5%{transform:translate(67px,67px)}25%{transform:translate(0,95px)}37.5%{transform:translate(-67px,67px)}50%{transform:translate(-95px,0)}62.5%{transform:translate(-67px,-67px)}75%{transform:translate(0,-95px)}87.5%{transform:translate(67px,-67px)}100%{transform:translate(95px,0)}}
@@ -1178,18 +1178,10 @@ html,body{background:transparent !important;overflow:hidden;font-family:'Noto Sa
 .plat2{width:110%;height:22px;background:linear-gradient(180deg,#1565c0 0%,#0d47a1 100%);border-radius:0}
 .plat3{width:120%;height:18px;background:linear-gradient(180deg,#0d47a1 0%,#093380 100%);border-radius:0 0 8px 8px;display:flex;align-items:center;justify-content:space-evenly;padding:0 12px}
 .led{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.9);box-shadow:0 0 7px rgba(255,255,255,0.8)}
-/* Result panel */
-.rp{background:rgba(13,71,161,0.85);border:1.5px solid rgba(100,160,255,0.3);border-radius:16px;padding:14px 28px 12px;text-align:center;width:100%;margin-top:14px;box-shadow:inset 0 2px 8px rgba(0,0,50,0.5),0 4px 16px rgba(0,0,50,0.4);min-height:88px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
-.rp-badge{background:rgba(255,255,255,0.15);color:#fff;font-size:11px;font-weight:800;letter-spacing:0.12em;padding:3px 14px;border-radius:20px;text-transform:uppercase}
-#rbn{font-size:62px;font-weight:900;color:#fff;line-height:1;letter-spacing:-0.04em;text-shadow:0 0 30px rgba(150,220,255,0.8)}
-#rbn.rolling{color:rgba(150,200,255,0.5)}
-#rbn.landed{animation:nLd 0.55s cubic-bezier(0.34,1.56,0.64,1)}
-@keyframes nLd{0%{transform:scale(0.6)}60%{transform:scale(1.1)}100%{transform:scale(1)}}
-.rchips{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
-.rchip{padding:5px 14px;border-radius:14px;background:rgba(255,255,255,0.18);color:#fff;font-size:22px;font-weight:900;box-shadow:0 2px 8px rgba(0,0,50,0.3);animation:chIn 0.4s cubic-bezier(0.34,1.56,0.64,1)}
+/* Multi-draw chips (shown inside bay) */
+.mchips{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;padding:6px}
+.mchip{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#3E2000;background:radial-gradient(circle at 35% 30%,#FFE082,#F9A825);box-shadow:0 0 14px rgba(255,200,50,0.7);animation:chIn 0.4s cubic-bezier(0.34,1.56,0.64,1)}
 @keyframes chIn{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
-.rrange{font-size:11px;color:rgba(200,220,255,0.6);font-weight:600}
-.rby{font-size:11px;color:rgba(200,220,255,0.5);font-weight:600}
 </style>
 </head>
 <body>
@@ -1217,8 +1209,9 @@ html,body{background:transparent !important;overflow:hidden;font-family:'Noto Sa
     <!-- Chute + display bay -->
     <div class="chute-wrap">
       <div class="chute"></div>
-      <div class="bay">
-        <div class="wball" id="wball">?</div>
+      <div class="bay" id="bay">
+        <div class="wball" id="wball"></div>
+        <div class="mchips" id="mchips" style="display:none"></div>
       </div>
     </div>
     <!-- Platform -->
@@ -1226,14 +1219,6 @@ html,body{background:transparent !important;overflow:hidden;font-family:'Noto Sa
       <div class="plat1"></div>
       <div class="plat2"></div>
       <div class="plat3" id="pleds"></div>
-    </div>
-    <!-- Result -->
-    <div class="rp">
-      <div class="rp-badge">당첨 번호</div>
-      <div id="rbn" class="rolling">?</div>
-      <div class="rchips" id="rchips" style="display:none"></div>
-      <div class="rrange" id="rrange"></div>
-      <div class="rby" id="rby"></div>
     </div>
   </div>
 </div>
@@ -1243,41 +1228,36 @@ const pled=document.getElementById('pleds')
 for(let i=0;i<16;i++){const d=document.createElement('div');d.className='led';pled.appendChild(d)}
 // Ball refs
 const BALLS=[...Array(8)].map((_,i)=>document.getElementById('bl'+i))
-const wrap=document.getElementById('nw'),rbn=document.getElementById('rbn'),rchips=document.getElementById('rchips'),rrange=document.getElementById('rrange'),rby=document.getElementById('rby'),wball=document.getElementById('wball')
+const wrap=document.getElementById('nw'),wball=document.getElementById('wball'),mchips=document.getElementById('mchips')
 let rolling=false,rollIv=null
 function rnd(a,b){return Math.floor(Math.random()*(b-a+1))+a}
 function tickBalls(a,b){BALLS.forEach(bl=>{bl.textContent=rnd(a,b)})}
 function rollAnimation(min,max,targets,spinMs,triggeredBy){
   if(rolling)return;rolling=true
   wrap.classList.add('show')
-  rchips.style.display='none';rchips.innerHTML=''
-  rby.textContent=triggeredBy?triggeredBy+'님 추첨':''
-  rrange.textContent=min+' ~ '+max
-  rbn.className='rolling';rbn.style.display='block';rbn.textContent='?'
-  wball.textContent='?';wball.classList.remove('show')
+  wball.textContent='';wball.classList.remove('show')
+  mchips.style.display='none';mchips.innerHTML=''
   tickBalls(min,max)
   if(targets.length>1){
-    rbn.style.display='none';rchips.style.display='flex'
-    rollIv=setInterval(()=>tickBalls(min,max),80)
+    rollIv=setInterval(()=>tickBalls(min,max),25)
+    mchips.style.display='flex'
     let idx=0
     function landNext(){
       if(idx>=targets.length){clearInterval(rollIv);setTimeout(hide,5000);rolling=false;return}
-      const chip=document.createElement('div');chip.className='rchip';chip.textContent='?';rchips.appendChild(chip)
-      let f=0;const iv=setInterval(()=>{chip.textContent=rnd(min,max);if(++f>=20){clearInterval(iv);chip.textContent=targets[idx];idx++;setTimeout(landNext,600)}},60)
+      const chip=document.createElement('div');chip.className='mchip';chip.textContent='?';mchips.appendChild(chip)
+      let f=0;const iv=setInterval(()=>{chip.textContent=rnd(min,max);if(++f>=18){clearInterval(iv);chip.textContent=targets[idx];idx++;setTimeout(landNext,500)}},40)
     }
     landNext()
   } else {
-    rollIv=setInterval(()=>tickBalls(min,max),80)
+    rollIv=setInterval(()=>tickBalls(min,max),25)
     setTimeout(()=>{
       clearInterval(rollIv)
-      // Show winner
       wball.textContent=targets[0];wball.classList.add('show')
-      rbn.textContent=targets[0];rbn.className='landed'
       rolling=false;setTimeout(hide,5000)
     },Math.max(spinMs-800,500))
   }
 }
-function hide(){wrap.classList.remove('show');clearInterval(rollIv);rolling=false;rchips.innerHTML='';setTimeout(()=>{wball.classList.remove('show');rbn.className='rolling';rbn.textContent='?'},600)}
+function hide(){wrap.classList.remove('show');clearInterval(rollIv);rolling=false;setTimeout(()=>{wball.classList.remove('show');mchips.innerHTML='';mchips.style.display='none'},600)}
 function connect(){
   const ws=new WebSocket('ws://localhost:${port}/__overlay_ws__')
   ws.onmessage=e=>{
@@ -1330,11 +1310,14 @@ html,body{background:transparent !important;overflow:hidden;font-family:'Noto Sa
 /* Prize zone (underneath canvas) */
 .pz{position:relative;min-height:218px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 24px 20px;gap:6px;background:linear-gradient(145deg,#f5f5f5 0%,#ebebeb 45%,#f2f2f2 100%)}
 .pz-bg{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 40%,rgba(255,255,255,0.65) 0%,transparent 70%)}
-#pm{font-size:54px;font-weight:900;text-align:center;line-height:1;position:relative;z-index:1;transition:color 0.3s}
-#pd{font-size:18px;font-weight:700;color:#555;text-align:center;position:relative;z-index:1}
-#pb{font-size:13px;color:#999;position:relative;z-index:1;margin-top:4px}
-/* Canvas (silver foil) */
-#sc{position:absolute;inset:0;width:100%;height:100%;display:block}
+#pm{font-size:54px;font-weight:900;text-align:center;line-height:1;transition:color 0.3s}
+#pd{font-size:18px;font-weight:700;color:#555;text-align:center}
+#pb{font-size:13px;color:#999;margin-top:4px}
+/* Canvas (silver foil) — must be above prize text */
+#sc{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:3}
+/* Scratch hint text over canvas */
+.sh{position:absolute;bottom:12px;left:0;right:0;text-align:center;font-size:12px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.6);z-index:4;pointer-events:none;animation:shP 1.1s ease-in-out infinite}
+@keyframes shP{0%,100%{opacity:0.4}50%{opacity:1}}
 /* Scratch particles hint */
 .scratch-hint{position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:12px;font-weight:800;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.5);z-index:20;pointer-events:none;animation:hintP 1s ease-in-out infinite}
 @keyframes hintP{0%,100%{opacity:0.4}50%{opacity:1}}
@@ -1375,6 +1358,7 @@ html,body{background:transparent !important;overflow:hidden;font-family:'Noto Sa
         <div id="pb"></div>
       </div>
       <canvas id="sc"></canvas>
+      <div class="sh" id="sh">← 긁어보세요</div>
     </div>
   </div>
 </div>
@@ -1382,10 +1366,14 @@ html,body{background:transparent !important;overflow:hidden;font-family:'Noto Sa
 const cvs=document.getElementById('sc'),ctx=cvs.getContext('2d')
 const swEl=document.getElementById('sw'),wrap=document.getElementById('lw')
 const pmEl=document.getElementById('pm'),pdEl=document.getElementById('pd'),pbEl=document.getElementById('pb')
-let active=false
+const shEl=document.getElementById('sh')
+let active=false,activeTimer=null
 
 function initCanvas(){
-  cvs.width=swEl.offsetWidth||584;cvs.height=swEl.offsetHeight||218
+  // Force layout dimensions; fall back to known card size
+  const w=swEl.getBoundingClientRect().width||584
+  const h=swEl.getBoundingClientRect().height||218
+  cvs.width=Math.round(w)||584;cvs.height=Math.round(h)||218
   drawSilver()
 }
 
@@ -1470,22 +1458,32 @@ function animateScratch(strokes,totalMs,onDone){
 
 function showLottery(prize,color,detail,by,scratchMs){
   if(active)return;active=true
+  if(activeTimer){clearTimeout(activeTimer);activeTimer=null}
   pmEl.textContent=prize;pmEl.style.color=color;pmEl.className=''
-  pdEl.textContent=detail;pbEl.textContent=by?by+'님의 복권':''
-  initCanvas();wrap.classList.add('show')
-  setTimeout(()=>{
-    const strokes=genStrokes(cvs.width,cvs.height)
-    animateScratch(strokes,scratchMs,()=>{
-      pmEl.classList.add('popin')
-      setTimeout(hide,5000)
-    })
-  },800)
+  pdEl.textContent=detail||'';pbEl.textContent=by?by+'님의 복권':''
+  shEl.style.display='block'
+  // Show first so getBoundingClientRect works correctly
+  wrap.classList.add('show')
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    initCanvas()
+    setTimeout(()=>{
+      const strokes=genStrokes(cvs.width,cvs.height)
+      animateScratch(strokes,scratchMs,()=>{
+        shEl.style.display='none'
+        pmEl.classList.add('popin')
+        if(prize!=='꽝')pmEl.classList.add('shimmer')
+        activeTimer=setTimeout(hide,5000)
+      })
+    },600)
+  }))
 }
 
 function hide(){
   wrap.classList.remove('show')
   setTimeout(()=>{
-    active=false;pmEl.classList.remove('popin')
+    active=false
+    pmEl.classList.remove('popin','shimmer')
+    shEl.style.display='block'
     ctx.globalCompositeOperation='source-over';ctx.clearRect(0,0,cvs.width,cvs.height)
   },600)
 }
