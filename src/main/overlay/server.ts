@@ -1370,10 +1370,8 @@ const shEl=document.getElementById('sh')
 let active=false,activeTimer=null
 
 function initCanvas(){
-  // Force layout dimensions; fall back to known card size
-  const w=swEl.getBoundingClientRect().width||584
-  const h=swEl.getBoundingClientRect().height||218
-  cvs.width=Math.round(w)||584;cvs.height=Math.round(h)||218
+  // offsetWidth/Height ignores CSS transform (scale), so always correct
+  cvs.width=swEl.offsetWidth||584;cvs.height=swEl.offsetHeight||218
   drawSilver()
 }
 
