@@ -2668,17 +2668,20 @@ function _burstPts(rays,outer,inner){
   }
   return s+'Z'
 }
-function _tier(dmg){
-  if(dmg< 200) return {tc:'#FFFDE0',oc:'#FFE566',ic:'rgba(255,255,220,0.85)',glow:'rgba(255,255,180,0.7)', rays:10,or:70, ir:26}
-  if(dmg< 600) return {tc:'#FFD700',oc:'#FFA500',ic:'rgba(255,210,0,0.85)',  glow:'rgba(255,200,0,0.8)',  rays:12,or:82, ir:30}
-  if(dmg<1500) return {tc:'#FFAA44',oc:'#FF5500',ic:'rgba(255,100,0,0.85)',  glow:'rgba(255,90,0,0.82)', rays:14,or:92, ir:34}
-  if(dmg<4000) return {tc:'#FF6633',oc:'#CC1100',ic:'rgba(200,20,0,0.88)',   glow:'rgba(200,10,0,0.85)', rays:16,or:102,ir:37}
-  return              {tc:'#FFFFFF', oc:'#FF0000',ic:'rgba(255,240,220,0.95)',glow:'rgba(255,30,0,0.92)', rays:18,or:114,ir:40}
-}
-function showBurst(dmg,isCrit){
-  const t = isCrit
-    ? {tc:'#FFD700',oc:'#FF2200',ic:'rgba(255,255,200,0.95)',glow:'rgba(255,180,0,0.95)',rays:20,or:120,ir:42}
-    : _tier(dmg)
+// 주사위 눈수 1-6 별 버스트 스타일
+const ROLL_TIERS=[
+  null, // index 0 unused
+  {tc:'#FFFDE0',oc:'#FFE88A',ic:'rgba(255,255,220,0.80)',glow:'rgba(255,255,190,0.65)',rays:10,or:66, ir:24}, // 1
+  {tc:'#FFE033',oc:'#FFC200',ic:'rgba(255,220,0,0.82)',  glow:'rgba(255,210,0,0.72)',  rays:11,or:74, ir:27}, // 2
+  {tc:'#FFB830',oc:'#FF8C00',ic:'rgba(255,160,0,0.84)',  glow:'rgba(255,140,0,0.76)',  rays:12,or:82, ir:30}, // 3
+  {tc:'#FF8C00',oc:'#FF4D00',ic:'rgba(255,90,0,0.86)',   glow:'rgba(255,80,0,0.80)',   rays:14,or:92, ir:33}, // 4
+  {tc:'#FF5522',oc:'#CC1800',ic:'rgba(220,30,0,0.88)',   glow:'rgba(210,20,0,0.84)',   rays:16,or:102,ir:36}, // 5
+  {tc:'#FF2200',oc:'#990000',ic:'rgba(180,0,0,0.92)',    glow:'rgba(200,0,0,0.90)',    rays:18,or:112,ir:39}, // 6
+]
+const CRIT_TIER={tc:'#FFD700',oc:'#FF1A00',ic:'rgba(255,255,200,0.95)',glow:'rgba(255,200,0,0.95)',rays:20,or:124,ir:43}
+
+function showBurst(dmg,rollNum,isCrit){
+  const t = isCrit ? CRIT_TIER : (ROLL_TIERS[Math.max(1,Math.min(6,rollNum))]||ROLL_TIERS[1])
   const R=t.or+20, W=R*2
   const ns=dmg.toLocaleString()
   const fs=isCrit?60:ns.length>=6?40:ns.length>=5?48:ns.length>=4?56:64
@@ -2760,7 +2763,7 @@ function showRoll(roll) {
     diceFace.textContent=Math.floor(Math.random()*12)+1
     if(++f>=16){clearInterval(iv);diceFace.textContent=roll.roll}
   },55)
-  setTimeout(()=>{ showBurst(roll.damage, roll.isCritical) }, 950)
+  setTimeout(()=>{ showBurst(roll.damage, roll.roll, roll.isCritical) }, 950)
   dicePopup.classList.add('show')
   clearTimeout(diceTimer)
   diceTimer=setTimeout(()=>dicePopup.classList.remove('show'),3200)
