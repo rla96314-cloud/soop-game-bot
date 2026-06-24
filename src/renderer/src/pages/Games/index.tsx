@@ -1688,30 +1688,75 @@ function BossPanel({
   // ── Running (raid active) ─────────────────────────────────────────────────
   if (status === 'running' && boss) {
     const totalDmg = Object.values(boss.participants).reduce((s, p) => s + p.totalDamage, 0)
-    const sorted   = Object.entries(boss.participants)
-      .sort((a, b) => b[1].totalDamage - a[1].totalDamage)
+    const sorted   = Object.entries(boss.participants).sort((a, b) => b[1].totalDamage - a[1].totalDamage)
+    const top3     = sorted.slice(0, 3)
+    const phase2Pct = (gSettings.phase2HpPercent as number) ?? 50
+    const phase    = hpPct <= phase2Pct ? 'phase2' : 'phase1'
+    const hpColor  = hpPct > 50 ? '#EF4444' : hpPct > 25 ? '#F97316' : '#FBBF24'
 
     return (
       <div className={styles.brRunning}>
-        {/* HP Bar */}
-        <div className={styles.brHpCard}>
-          <div className={styles.brBossNameRow}>
-            <span className={styles.brBossIcon}>💀</span>
-            <span className={styles.brBossName}>{boss.bossName}</span>
-            <span className={styles.brHpBadge}>BOSS HP</span>
-          </div>
-          <div className={styles.brHpNumbers}>
-            <span>{boss.currentHp.toLocaleString()}</span>
-            <span className={styles.brHpSep}>/</span>
-            <span className={styles.brHpMax}>{boss.maxHp.toLocaleString()}</span>
-          </div>
-          <div className={styles.brHpBarBg}>
-            <div
-              className={styles.brHpBarFill}
-              style={{ width: `${hpPct}%`, background: hpPct > 50 ? '#EF4444' : hpPct > 25 ? '#F97316' : '#FBBF24' }}
+        {/* Main row: image left, HP + top3 right */}
+        <div className={styles.brMainRow}>
+          {/* Phase image */}
+          <div className={styles.brPhaseImgWrap}>
+            <img
+              key={phase}
+              className={styles.brPhaseImg}
+              src={`http://localhost:${OVERLAY_PORT}/api/boss-image/${phase}?t=${Date.now()}`}
+              alt=""
+              onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+              onLoad={e  => { (e.target as HTMLImageElement).style.display = '' }}
             />
+            <div className={styles.brPhaseLabel}>{hpPct <= phase2Pct ? '2 페이즈' : '1 페이즈'}</div>
           </div>
-          <div className={styles.brHpPct}>{hpPct.toFixed(1)}% 남음</div>
+
+          {/* HP bar + top 3 */}
+          <div className={styles.brHpTop3Col}>
+            {/* Boss name */}
+            <div className={styles.brBossNameRow}>
+              <span className={styles.brBossName}>{boss.bossName}</span>
+              <span className={styles.brHpBadge}>RAID</span>
+            </div>
+
+            {/* HP numbers */}
+            <div className={styles.brHpNumbers}>
+              <span style={{ color: hpColor }}>{boss.currentHp.toLocaleString()}</span>
+              <span className={styles.brHpSep}>/</span>
+              <span className={styles.brHpMax}>{boss.maxHp.toLocaleString()}</span>
+            </div>
+
+            {/* Ornate HP bar */}
+            <div className={styles.brOrnateBar}>
+              <div className={styles.brOrnateTrack}>
+                <div className={styles.brOrnateFill} style={{ width: `${hpPct}%`, background: `linear-gradient(180deg, ${hpColor}cc 0%, ${hpColor} 40%, ${hpColor}cc 100%)` }} />
+                <div className={styles.brOrnateShine} style={{ width: `${hpPct}%` }} />
+              </div>
+              <div className={styles.brOrnateTL} />
+              <div className={styles.brOrnateTR} />
+              <div className={styles.brOrnateBL} />
+              <div className={styles.brOrnateBR} />
+              <div className={styles.brOrnateGemT} />
+              <div className={styles.brOrnateGemB} />
+            </div>
+            <div className={styles.brHpPct}>{hpPct.toFixed(1)}% 남음</div>
+
+            {/* Top 3 damage */}
+            <div className={styles.brTop3}>
+              <div className={styles.brTop3Title}>데미지 TOP 3</div>
+              {top3.length === 0
+                ? <div className={styles.brTop3Empty}>별풍선 {boss.balloonThreshold}개를 후원하면 공격 시작!</div>
+                : top3.map(([user, p], i) => (
+                  <div key={user} className={styles.brTop3Row}>
+                    <span className={`${styles.brTop3Rank} ${i === 0 ? styles.brRank1 : i === 1 ? styles.brRank2 : styles.brRank3}`}>{i + 1}</span>
+                    <span className={styles.brTop3User}>{user}</span>
+                    <span className={styles.brTop3Dmg}>{p.totalDamage.toLocaleString()}</span>
+                    <span className={styles.brTop3Pct}>{totalDmg > 0 ? (p.totalDamage / totalDmg * 100).toFixed(1) : 0}%</span>
+                  </div>
+                ))
+              }
+            </div>
+          </div>
         </div>
 
         {/* Last roll animation */}
@@ -1720,7 +1765,7 @@ function BossPanel({
             <div className={styles.brDiceUser}>{animRoll.user}님의 공격!</div>
             <div className={`${styles.brDiceFace} ${styles.brDiceSpin}`}>{animRoll.roll}</div>
             <div className={`${styles.brDmgPill} ${animRoll.isCritical ? styles.brDmgCrit : ''}`}>
-              {animRoll.isCritical ? '💥 ' : ''}{animRoll.damage.toLocaleString()} DMG
+              {animRoll.isCritical ? 'CRIT! ' : ''}{animRoll.damage.toLocaleString()} DMG
             </div>
             {animRoll.isCritical && <div className={styles.brCritBadge}>CRITICAL HIT!</div>}
           </div>
@@ -1733,32 +1778,7 @@ function BossPanel({
           {boss.critEnabled && <span>크리티컬 {Math.round(boss.critChance * 100)}% (×{boss.critMultiplier})</span>}
         </div>
 
-        {/* Damage table */}
-        {sorted.length > 0 ? (
-          <div className={styles.brDmgTable}>
-            <div className={styles.brDmgTableTitle}>
-              데미지 시트 &nbsp;<span className={styles.brDmgTotal}>총 {totalDmg.toLocaleString()}</span>
-            </div>
-            <div className={styles.brDmgHeader}>
-              <span>참여자</span><span>공격</span><span>크리티컬</span><span>총 데미지</span><span>기여도</span>
-            </div>
-            {sorted.map(([user, p]) => (
-              <div key={user} className={styles.brDmgRow}>
-                <span>{user}</span>
-                <span>{p.attackCount}회</span>
-                <span>{p.critCount > 0 ? `${p.critCount}회` : '-'}</span>
-                <span>{p.totalDamage.toLocaleString()}</span>
-                <span>{totalDmg > 0 ? (p.totalDamage / totalDmg * 100).toFixed(1) : 0}%</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className={styles.brWaiting}>
-            별풍선 {boss.balloonThreshold}개를 후원하면 공격이 시작됩니다!
-          </div>
-        )}
-
-        <button className={styles.brResetBtn} style={{ marginTop: 8 }} onClick={reset}>레이드 초기화</button>
+        <button className={styles.brResetBtn} onClick={reset}>레이드 초기화</button>
       </div>
     )
   }
