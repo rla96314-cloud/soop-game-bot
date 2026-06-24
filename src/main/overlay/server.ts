@@ -2598,19 +2598,12 @@ const BOSS_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
   .pname{font-weight:700;color:#fff;min-width:80px}.pdmg{margin-left:auto;font-weight:800;color:#F97316}.pcrit{font-size:10px;color:#FBBF24}
 
   /* Dice popup */
-  #dice-popup{position:fixed;bottom:60px;left:50%;transform:translateX(-50%) translateY(100px);opacity:0;transition:opacity .3s,transform .35s cubic-bezier(0.34,1.56,0.64,1);text-align:center;pointer-events:none}
+  #dice-popup{position:fixed;bottom:70px;left:50%;transform:translateX(-50%) translateY(80px);opacity:0;transition:opacity .3s,transform .35s cubic-bezier(0.34,1.56,0.64,1);text-align:center;pointer-events:none}
   #dice-popup.show{opacity:1;transform:translateX(-50%) translateY(0)}
-  .dice-face{width:90px;height:90px;margin:0 auto 10px;background:rgba(10,6,28,0.95);border:3px solid rgba(239,68,68,0.7);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:42px;font-weight:900;color:#fff;box-shadow:0 8px 30px rgba(239,68,68,0.35)}
+  .dice-face{width:80px;height:80px;margin:0 auto 6px;background:rgba(10,6,28,0.95);border:3px solid rgba(239,68,68,0.7);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:38px;font-weight:900;color:#fff;box-shadow:0 8px 30px rgba(239,68,68,0.35)}
   .dice-face.spin{animation:diceSpin .9s cubic-bezier(0.25,0.46,0.45,0.94) forwards}
   @keyframes diceSpin{0%{transform:rotateX(0) rotateY(0)}50%{transform:rotateX(540deg) rotateY(270deg)}100%{transform:rotateX(720deg) rotateY(360deg)}}
   .dice-user{font-size:13px;font-weight:700;color:rgba(255,255,255,0.7);margin-bottom:6px}
-  .dmg-tag{display:inline-block;padding:6px 20px;border-radius:20px;font-size:22px;font-weight:900;color:#fff;background:rgba(239,68,68,0.85);box-shadow:0 4px 16px rgba(239,68,68,0.4);letter-spacing:-.02em}
-  .dmg-tag.crit{background:linear-gradient(135deg,#F59E0B,#EF4444);animation:critPulse .3s ease}
-  @keyframes critPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
-  .crit-badge{display:block;font-size:11px;font-weight:800;letter-spacing:.15em;color:#FBBF24;margin-top:4px}
-  .float-dmg{position:fixed;font-size:28px;font-weight:900;color:#F97316;text-shadow:0 2px 8px rgba(0,0,0,0.5);pointer-events:none;animation:floatUp 1.8s ease-out forwards}
-  .float-dmg.crit{color:#FBBF24;font-size:38px}
-  @keyframes floatUp{0%{opacity:1;transform:translateY(0) scale(1)}60%{opacity:1}100%{opacity:0;transform:translateY(-120px) scale(0.7)}}
 
   /* Defeat */
   #defeat-screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);opacity:0;pointer-events:none;transition:opacity .6s}
@@ -2643,8 +2636,6 @@ const BOSS_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 <div id="dice-popup">
   <div class="dice-user" id="dice-user"></div>
   <div class="dice-face" id="dice-face">?</div>
-  <div class="dmg-tag" id="dmg-tag">0</div>
-  <span class="crit-badge" id="crit-badge" style="display:none">&#x1F3AF; CRITICAL HIT!</span>
 </div>
 
 <!-- Defeat overlay -->
@@ -2663,12 +2654,74 @@ const parts=document.getElementById('parts')
 const dicePopup=document.getElementById('dice-popup')
 const diceUser=document.getElementById('dice-user')
 const diceFace=document.getElementById('dice-face')
-const dmgTag=document.getElementById('dmg-tag')
-const critBadge=document.getElementById('crit-badge')
 const defeatScr=document.getElementById('defeat-screen')
 const defeatSub=document.getElementById('defeat-sub')
 const bossImgWrap=document.getElementById('boss-img-wrap')
 const bossImg=document.getElementById('boss-img')
+
+/* ── 스타버스트 데미지 이펙트 ── */
+function _burstPts(rays,outer,inner){
+  let s=''
+  for(let i=0;i<rays*2;i++){
+    const a=i*Math.PI/rays-Math.PI/2, r=i%2===0?outer:inner
+    s+=(i?'L':'M')+(r*Math.cos(a)).toFixed(1)+','+(r*Math.sin(a)).toFixed(1)
+  }
+  return s+'Z'
+}
+function _tier(dmg){
+  if(dmg< 200) return {tc:'#FFFDE0',oc:'#FFE566',ic:'rgba(255,255,220,0.85)',glow:'rgba(255,255,180,0.7)', rays:10,or:70, ir:26}
+  if(dmg< 600) return {tc:'#FFD700',oc:'#FFA500',ic:'rgba(255,210,0,0.85)',  glow:'rgba(255,200,0,0.8)',  rays:12,or:82, ir:30}
+  if(dmg<1500) return {tc:'#FFAA44',oc:'#FF5500',ic:'rgba(255,100,0,0.85)',  glow:'rgba(255,90,0,0.82)', rays:14,or:92, ir:34}
+  if(dmg<4000) return {tc:'#FF6633',oc:'#CC1100',ic:'rgba(200,20,0,0.88)',   glow:'rgba(200,10,0,0.85)', rays:16,or:102,ir:37}
+  return              {tc:'#FFFFFF', oc:'#FF0000',ic:'rgba(255,240,220,0.95)',glow:'rgba(255,30,0,0.92)', rays:18,or:114,ir:40}
+}
+function showBurst(dmg,isCrit){
+  const t = isCrit
+    ? {tc:'#FFD700',oc:'#FF2200',ic:'rgba(255,255,200,0.95)',glow:'rgba(255,180,0,0.95)',rays:20,or:120,ir:42}
+    : _tier(dmg)
+  const R=t.or+20, W=R*2
+  const ns=dmg.toLocaleString()
+  const fs=isCrit?60:ns.length>=6?40:ns.length>=5?48:ns.length>=4?56:64
+
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg')
+  svg.setAttribute('viewBox',(-R)+' '+(-R)+' '+W+' '+W)
+  const x=Math.random()*(window.innerWidth-W*0.5)+W*0.25
+  const y=Math.random()*(window.innerHeight*0.5)+window.innerHeight*0.2
+  svg.style.cssText='position:fixed;width:'+W+'px;height:'+W+'px;pointer-events:none;z-index:200;overflow:visible;left:'+(x-R)+'px;top:'+(y-R)+'px'
+
+  const mk=(tag,attrs)=>{const e=document.createElementNS('http://www.w3.org/2000/svg',tag);Object.entries(attrs).forEach(([k,v])=>e.setAttribute(k,String(v)));return e}
+
+  // blur filter
+  const defs=document.createElementNS('http://www.w3.org/2000/svg','defs')
+  const flt=mk('filter',{id:'bg',x:'-60%',y:'-60%',width:'220%',height:'220%'})
+  const fgb=mk('feGaussianBlur',{stdDeviation:'14'})
+  flt.appendChild(fgb); defs.appendChild(flt); svg.appendChild(defs)
+
+  // outer glow
+  svg.appendChild(mk('circle',{r:t.or*0.95,fill:t.glow,filter:'url(#bg)'}))
+  // ray star
+  svg.appendChild(mk('path',{d:_burstPts(t.rays,t.or,t.ir),fill:t.oc}))
+  // inner circle
+  svg.appendChild(mk('circle',{r:t.or*0.44,fill:t.ic}))
+  // CRIT label above
+  if(isCrit){
+    const cl=mk('text',{'text-anchor':'middle','dominant-baseline':'middle','font-size':15,'font-weight':900,fill:'#FFD700',stroke:'#000','stroke-width':3,'paint-order':'stroke','font-family':'Noto Sans KR,sans-serif',y:-(fs/2+18)})
+    cl.textContent='CRITICAL HIT!'; svg.appendChild(cl)
+  }
+  // damage number
+  const tx=mk('text',{'text-anchor':'middle','dominant-baseline':'middle','font-size':fs,'font-weight':900,fill:t.tc,stroke:'#1a0000','stroke-width':7,'paint-order':'stroke','font-family':'Noto Sans KR,sans-serif'})
+  tx.textContent=ns; svg.appendChild(tx)
+
+  svg.animate([
+    {transform:'scale(0.15)',opacity:0},
+    {transform:'scale(1.25)',opacity:1,offset:0.18},
+    {transform:'scale(0.95)',opacity:1,offset:0.30},
+    {transform:'scale(1.0)', opacity:1,offset:0.65},
+    {transform:'scale(1.0) translateY(-70px)',opacity:0}
+  ],{duration:2400,fill:'forwards',easing:'ease-out'}).onfinish=()=>svg.remove()
+
+  document.body.appendChild(svg)
+}
 
 function setPhaseImage(phase) {
   if (phase===currentPhase) return
@@ -2707,21 +2760,10 @@ function showRoll(roll) {
     diceFace.textContent=Math.floor(Math.random()*12)+1
     if(++f>=16){clearInterval(iv);diceFace.textContent=roll.roll}
   },55)
-  setTimeout(()=>{
-    dmgTag.textContent=(roll.isCritical?'&#x1F4A5; ':'')+roll.damage.toLocaleString()+' DMG'
-    dmgTag.className='dmg-tag'+(roll.isCritical?' crit':'')
-    critBadge.style.display=roll.isCritical?'block':'none'
-  },950)
+  setTimeout(()=>{ showBurst(roll.damage, roll.isCritical) }, 950)
   dicePopup.classList.add('show')
   clearTimeout(diceTimer)
-  diceTimer=setTimeout(()=>dicePopup.classList.remove('show'),4000)
-  const el=document.createElement('div')
-  el.className='float-dmg'+(roll.isCritical?' crit':'')
-  el.textContent=(roll.isCritical?'&#x1F4A5;':'&#x2212;')+roll.damage.toLocaleString()
-  el.style.left=(25+Math.random()*50)+'%'
-  el.style.top='55%'
-  document.body.appendChild(el)
-  el.addEventListener('animationend',()=>el.remove())
+  diceTimer=setTimeout(()=>dicePopup.classList.remove('show'),3200)
 }
 
 function connect(){
