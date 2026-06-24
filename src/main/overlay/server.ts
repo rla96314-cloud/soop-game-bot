@@ -1587,7 +1587,27 @@ const BOSS_SETTINGS_HTML = (port: number) => `<!DOCTYPE html>
 <script>
 const g = id => document.getElementById(id)
 
-const APPS_SCRIPT = \`function doPost(e) {
+const APPS_SCRIPT = \`// ── Drive 이미지 저장 헬퍼 ────────────────────────────────────────────────
+function saveBossImageToDrive_(phase, dataUrl) {
+  const parts = dataUrl.split(',');
+  if (parts.length < 2) return null;
+  const match = parts[0].match(/:(.*?);/);
+  if (!match) return null;
+  const mimeType = match[1];
+  const ext = mimeType.split('/')[1] || 'png';
+  const blob = Utilities.newBlob(Utilities.base64Decode(parts[1]), mimeType, 'boss-' + phase + '.' + ext);
+  let folder;
+  const folders = DriveApp.getFoldersByName('SOOP-Game-Bot-Images');
+  if (folders.hasNext()) { folder = folders.next(); }
+  else { folder = DriveApp.createFolder('SOOP-Game-Bot-Images'); }
+  const existing = folder.getFilesByName('boss-' + phase + '.' + ext);
+  while (existing.hasNext()) existing.next().setTrashed(true);
+  const file = folder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return 'https://drive.google.com/uc?export=view&id=' + file.getId();
+}
+
+function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
     const ss   = SpreadsheetApp.getActiveSpreadsheet();
@@ -1610,6 +1630,14 @@ const APPS_SCRIPT = \`function doPost(e) {
         ['critMultiplier',   cfg.critMultiplier   ?? 2],
         ['lootItems',        JSON.stringify(cfg.lootItems ?? [])],
       ];
+      if (data.images) {
+        for (const phase of ['phase1', 'phase2', 'success']) {
+          if (data.images[phase]) {
+            const url = saveBossImageToDrive_(phase, data.images[phase]);
+            if (url) rows.push([phase + 'ImageUrl', url]);
+          }
+        }
+      }
       sheet.getRange(1, 1, rows.length, 2).setValues(rows);
       sheet.getRange(1, 1, rows.length, 1).setFontWeight('bold');
       sheet.autoResizeColumns(1, 2);
@@ -1634,7 +1662,12 @@ const APPS_SCRIPT = \`function doPost(e) {
       if (cfg.enabled          !== undefined) cfg.enabled          = cfg.enabled === 'true' || cfg.enabled === true;
       if (cfg.critEnabled      !== undefined) cfg.critEnabled      = cfg.critEnabled === 'true' || cfg.critEnabled === true;
       if (cfg.lootItems        !== undefined) { try { cfg.lootItems = JSON.parse(cfg.lootItems); } catch { cfg.lootItems = []; } }
-      return ContentService.createTextOutput(JSON.stringify({ok:true,settings:cfg}))
+      const imageUrls = {};
+      for (const phase of ['phase1', 'phase2', 'success']) {
+        const key = phase + 'ImageUrl';
+        if (cfg[key]) { imageUrls[phase] = cfg[key]; delete cfg[key]; }
+      }
+      return ContentService.createTextOutput(JSON.stringify({ok:true,settings:cfg,imageUrls}))
         .setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -1727,6 +1760,27 @@ async function loadFromSheets() {
     if (cfg.damagePerDot != null) {
       const v = Number(cfg.damagePerDot)||0
       g('dmgHint').textContent = '주사위 6 × '+v+' = '+(6*v).toLocaleString()+' 데미지'
+    }
+    // Drive 이미지 복원
+    if (j.imageUrls) {
+      for (const [phase, url] of Object.entries(j.imageUrls)) {
+        if (!url) continue
+        try {
+          const ir = await fetch(url as string)
+          if (!ir.ok) continue
+          const blob = await ir.blob()
+          const dataUrl = await new Promise<string>(resolve => {
+            const rd = new FileReader()
+            rd.onload = e => resolve(e.target!.result as string)
+            rd.readAsDataURL(blob)
+          })
+          await fetch('/api/boss-image/'+phase, {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({dataUrl})
+          })
+          showPhasePreview(phase, dataUrl)
+        } catch { /* 이미지 복원 실패 무시 */ }
+      }
     }
     // Save locally
     await fetch('/api/boss-settings', {
@@ -1896,9 +1950,25 @@ async function doSave() {
     // Sync to Google Sheets if URL is configured
     if (data.sheetsWebhookUrl) {
       try {
+        // 현재 저장된 이미지를 base64로 변환해서 Drive에 함께 업로드
+        st.textContent = '이미지 동기화 중...'
+        const images: Record<string, string> = {}
+        for (const phase of ['phase1','phase2','success']) {
+          try {
+            const ir = await fetch('/api/boss-image/'+phase)
+            if (ir.ok) {
+              const blob = await ir.blob()
+              images[phase] = await new Promise<string>(resolve => {
+                const rd = new FileReader()
+                rd.onload = e => resolve(e.target!.result as string)
+                rd.readAsDataURL(blob)
+              })
+            }
+          } catch { /* 이미지 없으면 스킵 */ }
+        }
         await fetch(data.sheetsWebhookUrl, {
           method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({action:'saveSettings', settings: data})
+          body: JSON.stringify({action:'saveSettings', settings: data, images})
         })
       } catch { /* sheets sync failure is non-fatal */ }
     }
