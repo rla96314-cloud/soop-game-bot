@@ -1496,7 +1496,7 @@ const BOSS_SETTINGS_HTML = (port: number) => `<!DOCTYPE html>
 
   <!-- Google Sheets 연동 -->
   <div class="card">
-    <div class="ctitle">Google Sheets 데미지 기록</div>
+    <div class="ctitle">Google Sheets 연동 <span style="font-size:10px;font-weight:400;color:#6e7681;text-transform:none;letter-spacing:0;margin-left:8px">설정 동기화 + 레이드 기록</span></div>
     <div class="steps">
       <div class="step">아래 Apps Script 코드를 복사하세요</div>
       <div class="step">연동할 구글 스프레드시트에서 <b>확장 프로그램 → Apps Script</b>를 열고 붙여넣은 뒤 저장하세요</div>
@@ -1508,7 +1508,11 @@ const BOSS_SETTINGS_HTML = (port: number) => `<!DOCTYPE html>
     <div class="field" style="margin-top:16px">
       <label class="lbl">웹 앱 URL</label>
       <input type="url" id="sheetsWebhookUrl" placeholder="https://script.google.com/macros/s/.../exec">
-      <div class="hint">보스 처치 시 새 탭을 자동으로 생성하여 레이드 기록을 저장합니다</div>
+      <div class="hint">저장 시 시트의 <b>"보스 설정"</b> 탭에 자동 동기화됩니다 · 보스 처치 시 레이드 기록 탭도 자동 생성됩니다</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:10px">
+      <button class="copy-btn" style="margin:0" onclick="loadFromSheets()">시트에서 불러오기</button>
+      <span id="sheetLoadStatus" style="font-size:12px;color:#6e7681"></span>
     </div>
   </div>
 </div>
@@ -1526,6 +1530,54 @@ const APPS_SCRIPT = \`function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
     const ss   = SpreadsheetApp.getActiveSpreadsheet();
+
+    // ── 보스 설정 저장 ───────────────────────────────────────
+    if (data.action === 'saveSettings') {
+      let sheet = ss.getSheetByName('보스 설정');
+      if (!sheet) sheet = ss.insertSheet('보스 설정');
+      sheet.clearContents();
+      const cfg = data.settings || {};
+      const rows = [
+        ['bossName',         cfg.bossName         ?? '보스'],
+        ['maxHp',            cfg.maxHp            ?? 100000],
+        ['balloonThreshold', cfg.balloonThreshold ?? 100],
+        ['damagePerDot',     cfg.damagePerDot     ?? 100],
+        ['phase2HpPercent',  cfg.phase2HpPercent  ?? 50],
+        ['enabled',          String(cfg.enabled   ?? true)],
+        ['critEnabled',      String(cfg.critEnabled ?? true)],
+        ['critChance',       cfg.critChance       ?? 0.15],
+        ['critMultiplier',   cfg.critMultiplier   ?? 2],
+        ['lootItems',        JSON.stringify(cfg.lootItems ?? [])],
+      ];
+      sheet.getRange(1, 1, rows.length, 2).setValues(rows);
+      sheet.getRange(1, 1, rows.length, 1).setFontWeight('bold');
+      sheet.autoResizeColumns(1, 2);
+      return ContentService.createTextOutput(JSON.stringify({ok:true}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // ── 보스 설정 불러오기 ───────────────────────────────────
+    if (data.action === 'getSettings') {
+      const sheet = ss.getSheetByName('보스 설정');
+      if (!sheet) return ContentService.createTextOutput(JSON.stringify({ok:false,error:'보스 설정 탭 없음'}))
+        .setMimeType(ContentService.MimeType.JSON);
+      const rows = sheet.getDataRange().getValues();
+      const cfg  = {};
+      rows.forEach(([k,v]) => { if (k) cfg[String(k)] = v; });
+      if (cfg.maxHp            !== undefined) cfg.maxHp            = Number(cfg.maxHp);
+      if (cfg.balloonThreshold !== undefined) cfg.balloonThreshold = Number(cfg.balloonThreshold);
+      if (cfg.damagePerDot     !== undefined) cfg.damagePerDot     = Number(cfg.damagePerDot);
+      if (cfg.phase2HpPercent  !== undefined) cfg.phase2HpPercent  = Number(cfg.phase2HpPercent);
+      if (cfg.critChance       !== undefined) cfg.critChance       = Number(cfg.critChance);
+      if (cfg.critMultiplier   !== undefined) cfg.critMultiplier   = Number(cfg.critMultiplier);
+      if (cfg.enabled          !== undefined) cfg.enabled          = cfg.enabled === 'true' || cfg.enabled === true;
+      if (cfg.critEnabled      !== undefined) cfg.critEnabled      = cfg.critEnabled === 'true' || cfg.critEnabled === true;
+      if (cfg.lootItems        !== undefined) { try { cfg.lootItems = JSON.parse(cfg.lootItems); } catch { cfg.lootItems = []; } }
+      return ContentService.createTextOutput(JSON.stringify({ok:true,settings:cfg}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // ── 레이드 기록 (기존 동작) ──────────────────────────────
     const now  = new Date();
     const name = Utilities.formatDate(now, 'Asia/Seoul', 'MM-dd HH:mm') + ' ' + (data.bossName || '보스');
     const sheet = ss.insertSheet(name, 0);
@@ -1583,6 +1635,61 @@ function copyScript() {
     const b = document.querySelector('.copy-btn'); b.textContent='복사됨 ✓'; b.style.color='#3fb950'; b.style.borderColor='#3fb950';
     setTimeout(()=>{b.textContent='코드 복사';b.style.color='';b.style.borderColor='';},2000)
   })
+}
+
+async function loadFromSheets() {
+  const url = g('sheetsWebhookUrl').value.trim()
+  const st  = g('sheetLoadStatus')
+  if (!url) { st.textContent='웹 앱 URL을 먼저 입력하세요'; st.style.color='#f85149'; setTimeout(()=>{st.textContent='';st.style.color='#6e7681'},3000); return }
+  st.textContent='불러오는 중...'; st.style.color='#6e7681'
+  try {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({action:'getSettings'})
+    })
+    const j = await r.json()
+    if (!j.ok) throw new Error(j.error || '불러오기 실패')
+    const cfg = j.settings || {}
+    // Populate form fields
+    if (cfg.bossName         != null) g('bossName').value         = cfg.bossName
+    if (cfg.maxHp            != null) g('maxHp').value            = cfg.maxHp
+    if (cfg.balloonThreshold != null) g('balloonThreshold').value = cfg.balloonThreshold
+    if (cfg.damagePerDot     != null) g('damagePerDot').value     = cfg.damagePerDot
+    if (cfg.phase2HpPercent  != null) g('phase2HpPercent').value  = cfg.phase2HpPercent
+    if (cfg.enabled          != null) g('enabled').checked        = !!cfg.enabled
+    if (cfg.critEnabled      != null) g('critEnabled').checked    = !!cfg.critEnabled
+    if (cfg.critChance       != null) g('critChance').value       = Math.round(cfg.critChance * 100)
+    if (cfg.critMultiplier   != null) g('critMultiplier').value   = cfg.critMultiplier
+    if (cfg.lootItems        != null) renderLoot(cfg.lootItems)
+    g('critSub').classList.toggle('on', !!cfg.critEnabled)
+    if (cfg.damagePerDot != null) {
+      const v = Number(cfg.damagePerDot)||0
+      g('dmgHint').textContent = '주사위 6 × '+v+' = '+(6*v).toLocaleString()+' 데미지'
+    }
+    // Save locally
+    await fetch('/api/boss-settings', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        bossName:         g('bossName').value    || '보스',
+        maxHp:            Number(g('maxHp').value)            || 100000,
+        balloonThreshold: Number(g('balloonThreshold').value) || 100,
+        damagePerDot:     Number(g('damagePerDot').value)     || 100,
+        phase2HpPercent:  Number(g('phase2HpPercent').value)  || 50,
+        enabled:          g('enabled').checked,
+        critEnabled:      g('critEnabled').checked,
+        critChance:       (Number(g('critChance').value) || 15) / 100,
+        critMultiplier:   Number(g('critMultiplier').value)   || 2,
+        sheetsWebhookUrl: g('sheetsWebhookUrl').value.trim(),
+        lootItems:        loot,
+      })
+    })
+    st.textContent='불러오기 완료 ✓'; st.style.color='#3fb950'
+    setTimeout(()=>{st.textContent='';st.style.color='#6e7681'},3000)
+  } catch(e) {
+    st.textContent='실패: '+e.message; st.style.color='#f85149'
+    setTimeout(()=>{st.textContent='';st.style.color='#6e7681'},4000)
+  }
 }
 
 /* ── Phase image state ── */
@@ -1724,6 +1831,17 @@ async function doSave() {
     })
     const j = await r.json()
     if (!j.ok) throw new Error(j.error)
+
+    // Sync to Google Sheets if URL is configured
+    if (data.sheetsWebhookUrl) {
+      try {
+        await fetch(data.sheetsWebhookUrl, {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({action:'saveSettings', settings: data})
+        })
+      } catch { /* sheets sync failure is non-fatal */ }
+    }
+
     st.textContent='저장됨 ✓'; st.className='savestatus ok'
   } catch(e) {
     st.textContent='저장 실패: '+e.message; st.className='savestatus err'
