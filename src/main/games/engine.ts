@@ -53,6 +53,7 @@ export interface BossState {
   critEnabled:      boolean
   critMultiplier:   number
   balloonThreshold: number
+  phase2HpPercent:  number
   participants:     Record<string, BossParticipant>
   lastRoll?:        BossRollResult
   lootResults?:     BossLootResult[]
@@ -111,6 +112,22 @@ export interface SlotSpinState {
   spinMs:      number
 }
 
+export interface LotteryPrize {
+  name:    string
+  prob:    number
+  color:   string
+  detail?: string
+}
+
+export interface LotteryPickState {
+  prize:       string
+  color:       string
+  detail:      string
+  triggeredBy: string
+  scratchMs:   number
+  isWin:       boolean
+}
+
 export interface GameState {
   id:       GameId
   status:   GameStatus
@@ -121,6 +138,7 @@ export interface GameState {
   roulette?: RouletteSpinState
   slot?:    SlotSpinState
   number?:  NumberPickState
+  lottery?: LotteryPickState
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -423,12 +441,13 @@ export class GameEngine extends EventEmitter {
       alive:            true,
       maxHp,
       currentHp:        maxHp,
-      bossName:         (cfg?.bossName         as string)  ?? '보스',
-      damagePerDot:     (cfg?.damagePerDot     as number)  ?? 100,
-      critChance:       (cfg?.critChance        as number)  ?? 0.15,
-      critEnabled:      (cfg?.critEnabled       as boolean) !== false,
-      critMultiplier:   (cfg?.critMultiplier    as number)  ?? 2,
-      balloonThreshold: (cfg?.balloonThreshold  as number)  ?? 100,
+      bossName:         (cfg?.bossName          as string)  ?? '보스',
+      damagePerDot:     (cfg?.damagePerDot      as number)  ?? 100,
+      critChance:       (cfg?.critChance         as number)  ?? 0.15,
+      critEnabled:      (cfg?.critEnabled        as boolean) !== false,
+      critMultiplier:   (cfg?.critMultiplier     as number)  ?? 2,
+      balloonThreshold: (cfg?.balloonThreshold   as number)  ?? 100,
+      phase2HpPercent:  (cfg?.phase2HpPercent    as number)  ?? 50,
       participants:     {},
     }
     this.emit('game:update', 'boss', state)
@@ -438,17 +457,13 @@ export class GameEngine extends EventEmitter {
     const state = this.getState('boss')
     if (!state.boss?.alive) return
 
-    const p = state.boss.participants[user] ??= {
+    const threshold = state.boss.balloonThreshold
+    if (amount !== threshold) return  // exact match only — no accumulation
+
+    state.boss.participants[user] ??= {
       totalDamage: 0, attackCount: 0, critCount: 0, pendingBalloons: 0,
     }
-    p.pendingBalloons += amount
-
-    const threshold = state.boss.balloonThreshold
-    while (p.pendingBalloons >= threshold) {
-      p.pendingBalloons -= threshold
-      this.bossRollDice(user, state)
-      if (!state.boss.alive) break   // boss defeated mid-loop
-    }
+    this.bossRollDice(user, state)
   }
 
   private bossRollDice(user: string, state: GameState) {
@@ -489,6 +504,12 @@ export class GameEngine extends EventEmitter {
     const totalDamage = Object.values(state.boss.participants)
       .reduce((s, p) => s + p.totalDamage, 0)
 
+    // Fire-and-forget Google Sheets webhook
+    const webhookUrl = (cfg as Record<string, unknown>)?.sheetsWebhookUrl as string
+    if (webhookUrl) {
+      this.postRaidToSheets(webhookUrl, state.boss, loot).catch(() => {})
+    }
+
     const result: GameResult = {
       gameId:      'boss',
       triggeredBy: lastUser,
@@ -498,6 +519,40 @@ export class GameEngine extends EventEmitter {
       ts:          Date.now(),
     }
     this.finishGame('boss', result)
+  }
+
+  private async postRaidToSheets(url: string, boss: BossState, loot: BossLootResult[]) {
+    const totalDmg = Object.values(boss.participants).reduce((s, p) => s + p.totalDamage, 0)
+    const participants = Object.entries(boss.participants)
+      .filter(([, p]) => p.totalDamage > 0)
+      .sort((a, b) => b[1].totalDamage - a[1].totalDamage)
+      .map(([user, p]) => ({
+        user,
+        totalDamage:      p.totalDamage,
+        attackCount:      p.attackCount,
+        critCount:        p.critCount,
+        contributionRate: totalDmg > 0 ? +(p.totalDamage / totalDmg * 100).toFixed(1) : 0,
+      }))
+
+    const payload = {
+      bossName:    boss.bossName,
+      maxHp:       boss.maxHp,
+      raidedAt:    new Date().toISOString(),
+      participants,
+      lootResults: loot.map((r, i) => ({
+        rank:             i + 1,
+        user:             r.user,
+        item:             r.item.name,
+        description:      r.item.description ?? '',
+        contributionRate: +r.contributionRate.toFixed(1),
+      })),
+    }
+
+    await fetch(url, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload),
+    })
   }
 
   private drawBossLoot(
@@ -760,23 +815,46 @@ export class GameEngine extends EventEmitter {
   }
 
   private runLottery(by: string, balloon: number) {
-    const state  = this.getState('lottery')
-    state.status = 'running'
+    const cfg = this.settings.games.lottery
+    const prizes = (cfg?.prizes as LotteryPrize[])?.length
+      ? (cfg.prizes as LotteryPrize[])
+      : [
+          { name: '꽝',              prob: 55, color: '#9CA3AF', detail: '다음엔 행운이 찾아올 거예요!' },
+          { name: '별풍선 10개',     prob: 25, color: '#F97316', detail: '소소한 행운!' },
+          { name: '별풍선 50개',     prob: 12, color: '#10B981', detail: '행운이 찾아왔어요!' },
+          { name: '별풍선 200개',    prob: 6,  color: '#8B5CF6', detail: '대박 행운!' },
+          { name: '별풍선 500개!',   prob: 2,  color: '#EF4444', detail: '초대박!!!' },
+        ]
+    const scratchMs = (cfg?.scratchDuration as number) ?? 3000
+
+    const total  = prizes.reduce((s, p) => s + p.prob, 0)
+    let r        = Math.random() * total
+    let picked   = prizes[prizes.length - 1]
+    for (const p of prizes) { r -= p.prob; if (r <= 0) { picked = p; break } }
+
+    const state     = this.getState('lottery')
+    state.status    = 'running'
+    state.lottery   = {
+      prize:       picked.name,
+      color:       picked.color,
+      detail:      picked.detail ?? '',
+      triggeredBy: by,
+      scratchMs,
+      isWin:       picked.name !== '꽝',
+    }
     this.emit('game:update', 'lottery', state)
 
     setTimeout(() => {
-      const nums  = Array.from({ length: 6 }, () => Math.floor(Math.random() * 45) + 1).sort((a,b) => a-b)
-      const bonus = Math.floor(Math.random() * 45) + 1
       const result: GameResult = {
         gameId:      'lottery',
         triggeredBy: by,
         balloon,
-        result:      nums.join(', ') + ` 보너스: ${bonus}`,
-        detail:      `${by}님이 추첨한 번호: ${nums.join(', ')} + 보너스 ${bonus}`,
+        result:      picked.name,
+        detail:      `${by}님의 복권 결과: ${picked.name}`,
         ts:          Date.now(),
       }
       this.finishGame('lottery', result)
-    }, 3500)
+    }, scratchMs + 5000)
   }
 
   private runNumber(by: string, balloon: number) {

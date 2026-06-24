@@ -1282,6 +1282,9 @@ connect()
 
 // ── Boss Settings Web Page ────────────────────────────────────────────────────
 
+
+// ── Boss Settings Web Page ────────────────────────────────────────────────────
+
 const BOSS_SETTINGS_HTML = (port: number) => `<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -1291,28 +1294,22 @@ const BOSS_SETTINGS_HTML = (port: number) => `<!DOCTYPE html>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:#0d1117;color:#e6edf3;font-family:'Noto Sans KR',sans-serif;min-height:100vh;padding:32px 24px 80px}
-  .container{max-width:820px;margin:0 auto}
-
-  .header{display:flex;align-items:center;gap:16px;margin-bottom:32px}
+  body{background:#0d1117;color:#e6edf3;font-family:'Noto Sans KR',sans-serif;min-height:100vh;padding:32px 24px 100px}
+  .container{max-width:860px;margin:0 auto}
+  .header{display:flex;align-items:center;gap:16px;margin-bottom:28px}
   .hicon{width:52px;height:52px;background:linear-gradient(135deg,#f85149,#da3633);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0}
   .htitle{font-size:26px;font-weight:900;letter-spacing:-0.03em}
   .hsub{font-size:12px;color:#6e7681;margin-top:3px;font-family:monospace}
-
-  .card{background:#161b22;border:1px solid #21262d;border-radius:16px;padding:24px;margin-bottom:20px}
-  .ctitle{font-size:11px;font-weight:800;color:#f85149;text-transform:uppercase;letter-spacing:.1em;margin-bottom:20px;display:flex;align-items:center;gap:8px}
+  .card{background:#161b22;border:1px solid #21262d;border-radius:16px;padding:24px;margin-bottom:18px}
+  .ctitle{font-size:11px;font-weight:800;color:#f85149;text-transform:uppercase;letter-spacing:.1em;margin-bottom:18px;display:flex;align-items:center;gap:8px}
   .ctitle::before{content:'';display:block;width:3px;height:14px;background:#f85149;border-radius:2px}
-
   .field{margin-bottom:14px}
   .field:last-child{margin-bottom:0}
   .lbl{display:block;font-size:11px;font-weight:700;color:#8b949e;margin-bottom:5px;letter-spacing:.04em;text-transform:uppercase}
-  input[type=text],input[type=number]{width:100%;background:#0d1117;border:1px solid #21262d;border-radius:8px;color:#e6edf3;font-size:14px;font-family:inherit;padding:9px 12px;outline:none;transition:border-color .15s}
-  input:focus{border-color:#f85149;box-shadow:0 0 0 3px rgba(248,81,73,.12)}
-  .hint{font-size:11px;color:#6e7681;margin-top:4px}
+  input[type=text],input[type=number],input[type=url]{width:100%;background:#0d1117;border:1px solid #21262d;border-radius:8px;color:#e6edf3;font-size:14px;font-family:inherit;padding:9px 12px;outline:none;transition:border-color .15s}
+  input:focus{border-color:#f85149;box-shadow:0 0 0 3px rgba(248,81,73,.1)}
+  .hint{font-size:11px;color:#6e7681;margin-top:4px;line-height:1.5}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
-
-  /* toggle */
   .trow{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
   .tinp{display:none}
   .ttrack{width:40px;height:22px;background:#21262d;border-radius:11px;position:relative;transition:background .2s;flex-shrink:0}
@@ -1320,49 +1317,60 @@ const BOSS_SETTINGS_HTML = (port: number) => `<!DOCTYPE html>
   .tthumb{width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;top:3px;left:3px;transition:left .2s}
   .tinp:checked+.ttrack .tthumb{left:21px}
   .tlbl{font-size:13px;color:#e6edf3}
-
-  /* crit sub */
-  #critSub{margin-top:16px;display:none}
+  #critSub{margin-top:14px;display:none}
   #critSub.on{display:block}
 
-  /* image */
-  .imgzone{border:2px dashed #21262d;border-radius:12px;padding:30px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative;overflow:hidden}
-  .imgzone:hover,.imgzone.drag{border-color:#f85149;background:rgba(248,81,73,.04)}
-  .imgzone input{position:absolute;inset:0;opacity:0;cursor:pointer;z-index:1}
-  .imgicon{font-size:32px;margin-bottom:10px}
-  .imghint{font-size:13px;color:#6e7681;line-height:1.6}
-  .imghint span{color:#f85149;font-weight:700}
-  .imgpreview{width:100%;max-height:220px;border-radius:10px;object-fit:contain;margin-top:16px;display:none;border:1px solid #21262d}
-  .imgpreview.show{display:block}
-  .imgacts{display:none;gap:8px;margin-top:12px;justify-content:center}
-  .imgacts.show{display:flex}
-  .imgbtn{padding:7px 16px;border-radius:8px;border:1px solid #21262d;background:#0d1117;color:#8b949e;font-size:12px;font-family:inherit;cursor:pointer;transition:all .15s}
-  .imgbtn:hover{border-color:#f85149;color:#f85149}
-  .imgbtn.del:hover{border-color:#EF4444;color:#EF4444}
+  /* phase images */
+  .phases{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .phase-box{background:#0d1117;border:1px solid #21262d;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px}
+  .phase-label{font-size:11px;font-weight:800;color:#8b949e;text-transform:uppercase;letter-spacing:.06em}
+  .phase-label span{display:block;font-size:10px;color:#6e7681;font-weight:400;margin-top:2px;text-transform:none;letter-spacing:0}
+  .img-zone{border:2px dashed #21262d;border-radius:8px;padding:20px 12px;text-align:center;cursor:pointer;position:relative;transition:border-color .2s}
+  .img-zone:hover,.img-zone.drag{border-color:#f85149}
+  .img-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;z-index:1}
+  .img-zone .iz-icon{font-size:24px;margin-bottom:6px}
+  .img-zone .iz-hint{font-size:11px;color:#6e7681}
+  .phase-preview{width:100%;height:90px;border-radius:8px;object-fit:contain;display:none;background:#0d1117;border:1px solid #21262d}
+  .phase-preview.show{display:block}
+  .phase-acts{display:none;gap:6px}
+  .phase-acts.show{display:flex}
+  .phase-btn{flex:1;padding:6px;border-radius:6px;border:1px solid #21262d;background:transparent;color:#8b949e;font-size:11px;font-family:inherit;cursor:pointer;transition:all .15s}
+  .phase-btn:hover{border-color:#f85149;color:#f85149}
+  .phase-btn.del:hover{border-color:#EF4444;color:#EF4444}
+  .phase-threshold{display:flex;align-items:center;gap:6px;font-size:12px;color:#8b949e}
+  .phase-threshold input{width:64px;padding:5px 8px;font-size:12px;margin:0}
+  .phase-threshold span{white-space:nowrap}
 
   /* loot */
-  .loot-list{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+  .loot-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
   .loot-row{display:flex;gap:8px;align-items:center}
   .loot-num{width:22px;font-size:11px;color:#6e7681;text-align:center;flex-shrink:0}
   .loot-row input{margin-bottom:0}
   .loot-del{width:34px;height:38px;background:transparent;border:1px solid #21262d;border-radius:8px;color:#6e7681;font-size:18px;cursor:pointer;flex-shrink:0;transition:all .15s;font-family:inherit}
   .loot-del:hover{border-color:#EF4444;color:#EF4444}
-  .loot-add{width:100%;padding:10px;background:transparent;border:1px dashed #21262d;border-radius:8px;color:#6e7681;font-size:13px;font-family:inherit;cursor:pointer;transition:all .15s}
+  .loot-add{width:100%;padding:9px;background:transparent;border:1px dashed #21262d;border-radius:8px;color:#6e7681;font-size:13px;font-family:inherit;cursor:pointer;transition:all .15s}
   .loot-add:hover{border-color:#f85149;color:#f85149}
+
+  /* google sheets */
+  .code-block{background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:14px;font-family:monospace;font-size:11px;color:#8b949e;white-space:pre-wrap;max-height:180px;overflow-y:auto;line-height:1.5}
+  .copy-btn{margin-top:8px;padding:7px 14px;border-radius:7px;border:1px solid #21262d;background:#0d1117;color:#8b949e;font-size:12px;font-family:inherit;cursor:pointer;transition:all .15s}
+  .copy-btn:hover{border-color:#3fb950;color:#3fb950}
+  .steps{counter-reset:step;display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
+  .step{display:flex;gap:10px;font-size:13px;color:#8b949e;line-height:1.5}
+  .step::before{counter-increment:step;content:counter(step);width:22px;height:22px;background:#21262d;border-radius:50%;font-size:11px;font-weight:800;color:#f85149;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
 
   /* save bar */
   .savebar{position:fixed;bottom:0;left:0;right:0;background:#0d1117;border-top:1px solid #21262d;padding:14px 24px;display:flex;align-items:center;gap:16px;z-index:100}
-  .savebtn{flex:1;max-width:820px;margin:0 auto;display:block;padding:13px;background:linear-gradient(135deg,#f85149,#da3633);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:800;font-family:inherit;cursor:pointer;transition:filter .15s}
+  .savebtn{flex:1;max-width:860px;margin:0 auto;display:block;padding:13px;background:linear-gradient(135deg,#f85149,#da3633);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:800;font-family:inherit;cursor:pointer;transition:filter .15s}
   .savebtn:hover:not(:disabled){filter:brightness(1.1)}
   .savebtn:disabled{opacity:.6;cursor:not-allowed}
-  .savestatus{font-size:12px;color:#8b949e;white-space:nowrap;transition:color .3s}
+  .savestatus{font-size:12px;color:#8b949e;white-space:nowrap}
   .savestatus.ok{color:#3fb950}
   .savestatus.err{color:#f85149}
 </style>
 </head>
 <body>
 <div class="container">
-
   <div class="header">
     <div class="hicon">&#x1F480;</div>
     <div>
@@ -1371,18 +1379,57 @@ const BOSS_SETTINGS_HTML = (port: number) => `<!DOCTYPE html>
     </div>
   </div>
 
-  <!-- 보스 이미지 -->
+  <!-- 보스 이미지 (3 페이즈) -->
   <div class="card">
-    <div class="ctitle">보스 이미지</div>
-    <div class="imgzone" id="imgZone">
-      <input type="file" id="imgFile" accept="image/*">
-      <div class="imgicon" id="imgIcon">&#x1F5BC;&#xFE0F;</div>
-      <div class="imghint" id="imgHint">클릭하거나 <span>드래그 앤 드롭</span>으로 이미지 업로드<br>PNG · JPG · GIF · WebP 지원 · 최대 10MB</div>
-    </div>
-    <img class="imgpreview" id="imgPreview" alt="보스 이미지">
-    <div class="imgacts" id="imgActs">
-      <button class="imgbtn" onclick="document.getElementById('imgFile').click()">이미지 변경</button>
-      <button class="imgbtn del" onclick="removeImg()">삭제</button>
+    <div class="ctitle">보스 이미지 페이즈</div>
+    <div class="phases">
+      <!-- Phase 1 -->
+      <div class="phase-box" id="pb-phase1">
+        <div class="phase-label">1 페이즈 <span>HP 100% 시작</span></div>
+        <div class="img-zone" id="iz-phase1">
+          <input type="file" accept="image/*" onchange="onFile('phase1',this)">
+          <div class="iz-icon" id="icon-phase1">&#x1F5BC;&#xFE0F;</div>
+          <div class="iz-hint" id="hint-phase1">클릭하여 이미지 업로드</div>
+        </div>
+        <img class="phase-preview" id="prev-phase1" alt="">
+        <div class="phase-acts" id="acts-phase1">
+          <button class="phase-btn" onclick="document.querySelector('#iz-phase1 input').click()">변경</button>
+          <button class="phase-btn del" onclick="removePhase('phase1')">삭제</button>
+        </div>
+      </div>
+      <!-- Phase 2 -->
+      <div class="phase-box" id="pb-phase2">
+        <div class="phase-label">2 페이즈 <span>HP 전환 기준점 설정</span></div>
+        <div class="phase-threshold">
+          <span>HP</span>
+          <input type="number" id="phase2HpPercent" value="50" min="1" max="99">
+          <span>% 이하일 때</span>
+        </div>
+        <div class="img-zone" id="iz-phase2">
+          <input type="file" accept="image/*" onchange="onFile('phase2',this)">
+          <div class="iz-icon" id="icon-phase2">&#x1F5BC;&#xFE0F;</div>
+          <div class="iz-hint" id="hint-phase2">클릭하여 이미지 업로드</div>
+        </div>
+        <img class="phase-preview" id="prev-phase2" alt="">
+        <div class="phase-acts" id="acts-phase2">
+          <button class="phase-btn" onclick="document.querySelector('#iz-phase2 input').click()">변경</button>
+          <button class="phase-btn del" onclick="removePhase('phase2')">삭제</button>
+        </div>
+      </div>
+      <!-- Success -->
+      <div class="phase-box" id="pb-success">
+        <div class="phase-label">레이드 성공 <span>보스 처치 후 표시</span></div>
+        <div class="img-zone" id="iz-success">
+          <input type="file" accept="image/*" onchange="onFile('success',this)">
+          <div class="iz-icon" id="icon-success">&#x1F3C6;</div>
+          <div class="iz-hint" id="hint-success">클릭하여 이미지 업로드</div>
+        </div>
+        <img class="phase-preview" id="prev-success" alt="">
+        <div class="phase-acts" id="acts-success">
+          <button class="phase-btn" onclick="document.querySelector('#iz-success input').click()">변경</button>
+          <button class="phase-btn del" onclick="removePhase('success')">삭제</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1399,9 +1446,9 @@ const BOSS_SETTINGS_HTML = (port: number) => `<!DOCTYPE html>
         <input type="number" id="maxHp" min="100" step="1000" placeholder="100000">
       </div>
       <div class="field">
-        <label class="lbl">트리거 별풍선</label>
-        <input type="number" id="balloonThreshold" min="0" placeholder="100">
-        <div class="hint">이 개수 후원 시 주사위 1회 (0 = 비활성)</div>
+        <label class="lbl">트리거 별풍선 수</label>
+        <input type="number" id="balloonThreshold" min="1" placeholder="100">
+        <div class="hint">이 개수 정확히 후원해야 주사위 1회 발동</div>
       </div>
     </div>
     <div class="field">
@@ -1427,7 +1474,7 @@ const BOSS_SETTINGS_HTML = (port: number) => `<!DOCTYPE html>
       <span class="tlbl">크리티컬 히트 활성화</span>
     </label>
     <div id="critSub">
-      <div class="row2" style="margin-top:16px">
+      <div class="row2" style="margin-top:14px">
         <div class="field">
           <label class="lbl">크리티컬 확률 (%)</label>
           <input type="number" id="critChance" min="1" max="99" placeholder="15">
@@ -1442,11 +1489,28 @@ const BOSS_SETTINGS_HTML = (port: number) => `<!DOCTYPE html>
 
   <!-- 전리품 -->
   <div class="card">
-    <div class="ctitle">전리품 목록</div>
+    <div class="ctitle">전리품 목록 <span style="font-size:10px;font-weight:400;color:#6e7681;text-transform:none;letter-spacing:0;margin-left:8px">보스 처치 시 기여도 기반 가중 추첨으로 배분</span></div>
     <div class="loot-list" id="lootList"></div>
     <button class="loot-add" onclick="addLoot()">+ 전리품 추가</button>
   </div>
 
+  <!-- Google Sheets 연동 -->
+  <div class="card">
+    <div class="ctitle">Google Sheets 데미지 기록</div>
+    <div class="steps">
+      <div class="step">아래 Apps Script 코드를 복사하세요</div>
+      <div class="step">연동할 구글 스프레드시트에서 <b>확장 프로그램 → Apps Script</b>를 열고 붙여넣은 뒤 저장하세요</div>
+      <div class="step"><b>배포 → 새 배포</b>를 클릭하고 유형 <b>웹 앱</b>, 액세스 <b>모든 사용자</b>로 배포하세요</div>
+      <div class="step">발급된 <b>웹 앱 URL</b>을 아래 입력란에 붙여넣으세요</div>
+    </div>
+    <div class="code-block" id="appsScriptCode"></div>
+    <button class="copy-btn" onclick="copyScript()">코드 복사</button>
+    <div class="field" style="margin-top:16px">
+      <label class="lbl">웹 앱 URL</label>
+      <input type="url" id="sheetsWebhookUrl" placeholder="https://script.google.com/macros/s/.../exec">
+      <div class="hint">보스 처치 시 새 탭을 자동으로 생성하여 레이드 기록을 저장합니다</div>
+    </div>
+  </div>
 </div>
 
 <!-- 저장 바 -->
@@ -1458,123 +1522,200 @@ const BOSS_SETTINGS_HTML = (port: number) => `<!DOCTYPE html>
 <script>
 const g = id => document.getElementById(id)
 
-/* ── Init ── */
-async function init() {
+const APPS_SCRIPT = \`function doPost(e) {
   try {
-    const r  = await fetch('/api/boss-settings')
-    const { data } = await r.json()
-    applySettings(data)
-  } catch(e) { console.error(e) }
+    const data = JSON.parse(e.postData.contents);
+    const ss   = SpreadsheetApp.getActiveSpreadsheet();
+    const now  = new Date();
+    const name = Utilities.formatDate(now, 'Asia/Seoul', 'MM-dd HH:mm') + ' ' + (data.bossName || '보스');
+    const sheet = ss.insertSheet(name, 0);
 
-  try {
-    const r = await fetch('/api/boss-image')
-    if (r.ok) { const b = await r.blob(); showPreview(URL.createObjectURL(b)) }
-  } catch {}
+    let r = 1;
+    sheet.getRange(r,1,1,5).merge().setValue('레이드 결과 — ' + (data.bossName || '보스'));
+    sheet.getRange(r,1).setFontSize(14).setFontWeight('bold').setBackground('#c0392b').setFontColor('#fff');
+    r++;
+
+    [['보스',data.bossName||''],['최대 HP',data.maxHp||''],['레이드 시각',data.raidedAt||'']].forEach(row=>{
+      sheet.getRange(r,1,1,2).setValues([row]);
+      sheet.getRange(r,1).setFontWeight('bold');
+      r++;
+    });
+    r++;
+
+    sheet.getRange(r,1,1,5).setValues([['참여자','총 데미지','공격 횟수','크리티컬','기여도(%)']]);
+    sheet.getRange(r,1,1,5).setFontWeight('bold').setBackground('#333').setFontColor('#fff');
+    r++;
+
+    (data.participants||[]).forEach((p,i)=>{
+      sheet.getRange(r,1,1,5).setValues([[p.user,p.totalDamage,p.attackCount,p.critCount,p.contributionRate]]);
+      sheet.getRange(r,1,1,5).setBackground(i%2===0?'#fff':'#f5f5f5');
+      r++;
+    });
+
+    if(data.lootResults && data.lootResults.length){
+      r++;
+      sheet.getRange(r,1,1,4).merge().setValue('전리품 결과');
+      sheet.getRange(r,1).setFontWeight('bold').setBackground('#c0392b').setFontColor('#fff');
+      r++;
+      sheet.getRange(r,1,1,4).setValues([['순번','당첨자','상품명','기여도(%)']]);
+      sheet.getRange(r,1,1,4).setFontWeight('bold').setBackground('#333').setFontColor('#fff');
+      r++;
+      data.lootResults.forEach((l,i)=>{
+        sheet.getRange(r,1,1,4).setValues([[l.rank,l.user,l.item,l.contributionRate]]);
+        sheet.getRange(r,1,1,4).setBackground(i%2===0?'#fff':'#f5f5f5');
+        r++;
+      });
+    }
+
+    sheet.autoResizeColumns(1,5);
+    return ContentService.createTextOutput(JSON.stringify({ok:true,sheet:name}))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({ok:false,error:err.toString()}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}\`;
+
+g('appsScriptCode').textContent = APPS_SCRIPT;
+
+function copyScript() {
+  navigator.clipboard.writeText(APPS_SCRIPT).then(()=>{
+    const b = document.querySelector('.copy-btn'); b.textContent='복사됨 ✓'; b.style.color='#3fb950'; b.style.borderColor='#3fb950';
+    setTimeout(()=>{b.textContent='코드 복사';b.style.color='';b.style.borderColor='';},2000)
+  })
 }
 
-function applySettings(d) {
-  if (!d) return
-  if (d.bossName          != null) g('bossName').value        = d.bossName
-  if (d.maxHp             != null) g('maxHp').value           = d.maxHp
-  if (d.balloonThreshold  != null) g('balloonThreshold').value= d.balloonThreshold
-  if (d.damagePerDot      != null) g('damagePerDot').value    = d.damagePerDot
-  if (d.enabled           != null) g('enabled').checked       = d.enabled !== false
-  if (d.critEnabled       != null) g('critEnabled').checked   = !!d.critEnabled
-  if (d.critChance        != null) g('critChance').value      = Math.round(d.critChance * 100)
-  if (d.critMultiplier    != null) g('critMultiplier').value  = d.critMultiplier
-  updateCritSub(); updateDmgHint()
-  renderLoot(d.lootItems ?? [])
+/* ── Phase image state ── */
+const pending = {phase1:null, phase2:null, success:null}
+
+function showPhasePreview(phase, url) {
+  const prev = g('prev-'+phase), zone = g('iz-'+phase), acts = g('acts-'+phase)
+  prev.src = url; prev.classList.add('show')
+  g('icon-'+phase).style.display='none'; g('hint-'+phase).style.display='none'
+  acts.classList.add('show')
+  zone.style.padding='6px'
 }
+function hidePhasePreview(phase) {
+  const prev = g('prev-'+phase), zone = g('iz-'+phase), acts = g('acts-'+phase)
+  prev.classList.remove('show'); prev.src=''
+  g('icon-'+phase).style.display=''; g('hint-'+phase).style.display=''
+  acts.classList.remove('show')
+  zone.style.padding=''
+}
+function onFile(phase, inp) {
+  const f = inp.files[0]; if (!f) return
+  if (f.size > 10*1024*1024) { alert('이미지 크기가 10MB를 초과합니다'); return }
+  const r = new FileReader()
+  r.onload = e => { pending[phase] = {dataUrl: e.target.result}; showPhasePreview(phase, e.target.result) }
+  r.readAsDataURL(f)
+}
+function removePhase(phase) { pending[phase] = {remove:true}; hidePhasePreview(phase) }
+
+// Drag-and-drop for each zone
+['phase1','phase2','success'].forEach(phase => {
+  const zone = g('iz-'+phase)
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag') })
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag'))
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('drag')
+    const f = e.dataTransfer?.files[0]
+    if (f && f.type.startsWith('image/')) {
+      if (f.size > 10*1024*1024) { alert('10MB 초과'); return }
+      const r = new FileReader()
+      r.onload = ev => { pending[phase]={dataUrl:ev.target.result}; showPhasePreview(phase, ev.target.result) }
+      r.readAsDataURL(f)
+    }
+  })
+})
 
 /* ── Crit sub ── */
-g('critEnabled').addEventListener('change', updateCritSub)
-function updateCritSub() {
-  g('critSub').classList.toggle('on', g('critEnabled').checked)
-}
+g('critEnabled').addEventListener('change', () => g('critSub').classList.toggle('on', g('critEnabled').checked))
 
 /* ── Damage hint ── */
-g('damagePerDot').addEventListener('input', updateDmgHint)
-function updateDmgHint() {
-  const v = Number(g('damagePerDot').value) || 0
-  g('dmgHint').textContent = '주사위 6 × ' + v + ' = ' + (6*v).toLocaleString() + ' 데미지'
-}
+g('damagePerDot').addEventListener('input', () => {
+  const v = Number(g('damagePerDot').value)||0
+  g('dmgHint').textContent = '주사위 6 × '+v+' = '+(6*v).toLocaleString()+' 데미지'
+})
 
 /* ── Loot ── */
 let loot = []
 function renderLoot(items) {
-  loot = items.map(x => ({...x}))
-  const el = g('lootList'); el.innerHTML = ''
-  loot.forEach((item, i) => {
-    const row = document.createElement('div')
-    row.className = 'loot-row'
-    row.innerHTML =
-      '<span class="loot-num">' + (i+1) + '</span>' +
-      '<input type="text" placeholder="상품명" value="' + esc(item.name||'') + '" oninput="loot['+i+'].name=this.value">' +
-      '<input type="text" placeholder="설명 (선택)" value="' + esc(item.description||'') + '" oninput="loot['+i+'].description=this.value">' +
+  loot = items.map(x=>({...x}))
+  const el = g('lootList'); el.innerHTML=''
+  loot.forEach((item,i)=>{
+    const row=document.createElement('div'); row.className='loot-row'
+    row.innerHTML='<span class="loot-num">'+(i+1)+'</span>'+
+      '<input type="text" placeholder="상품명" value="'+esc(item.name||'')+'" oninput="loot['+i+'].name=this.value">'+
+      '<input type="text" placeholder="설명 (선택)" value="'+esc(item.description||'')+'" oninput="loot['+i+'].description=this.value">'+
       '<button class="loot-del" onclick="removeLoot('+i+')">&#x00D7;</button>'
     el.appendChild(row)
   })
 }
-function addLoot() { loot.push({name:'',description:''}); renderLoot(loot) }
-function removeLoot(i) { loot.splice(i,1); renderLoot(loot) }
-function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;') }
+function addLoot(){ loot.push({name:'',description:''}); renderLoot(loot) }
+function removeLoot(i){ loot.splice(i,1); renderLoot(loot) }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;') }
 
-/* ── Image ── */
-let pendingImg = null  // { dataUrl } | { remove: true } | null
+/* ── Init ── */
+async function init() {
+  try {
+    const r = await fetch('/api/boss-settings')
+    const { data } = await r.json()
+    if (!data) return
+    if (data.bossName          != null) g('bossName').value         = data.bossName
+    if (data.maxHp             != null) g('maxHp').value            = data.maxHp
+    if (data.balloonThreshold  != null) g('balloonThreshold').value = data.balloonThreshold
+    if (data.damagePerDot      != null) g('damagePerDot').value     = data.damagePerDot
+    if (data.phase2HpPercent   != null) g('phase2HpPercent').value  = data.phase2HpPercent
+    if (data.enabled           != null) g('enabled').checked        = data.enabled !== false
+    if (data.critEnabled       != null) g('critEnabled').checked    = !!data.critEnabled
+    if (data.critChance        != null) g('critChance').value       = Math.round(data.critChance * 100)
+    if (data.critMultiplier    != null) g('critMultiplier').value   = data.critMultiplier
+    if (data.sheetsWebhookUrl  != null) g('sheetsWebhookUrl').value = data.sheetsWebhookUrl
+    g('critSub').classList.toggle('on', !!data.critEnabled)
+    const v = Number(data.damagePerDot)||0
+    g('dmgHint').textContent = '주사위 6 × '+v+' = '+(6*v).toLocaleString()+' 데미지'
+    renderLoot(data.lootItems ?? [])
+  } catch(e) { console.error(e) }
 
-function showPreview(url) {
-  const img = g('imgPreview'); img.src = url; img.classList.add('show')
-  g('imgIcon').style.display = 'none'; g('imgHint').style.display = 'none'
-  g('imgActs').classList.add('show')
-}
-function hidePreview() {
-  const img = g('imgPreview'); img.classList.remove('show'); img.src = ''
-  g('imgIcon').style.display = ''; g('imgHint').style.display = ''
-  g('imgActs').classList.remove('show')
-}
-function removeImg() { pendingImg = {remove:true}; hidePreview() }
-
-const zone = g('imgZone'); const fileInp = g('imgFile')
-fileInp.addEventListener('change', e => { const f = e.target.files[0]; if (f) readImgFile(f) })
-zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag') })
-zone.addEventListener('dragleave', () => zone.classList.remove('drag'))
-zone.addEventListener('drop', e => {
-  e.preventDefault(); zone.classList.remove('drag')
-  const f = e.dataTransfer?.files[0]
-  if (f && f.type.startsWith('image/')) readImgFile(f)
-})
-function readImgFile(f) {
-  if (f.size > 10*1024*1024) { alert('이미지 크기가 10MB를 초과합니다'); return }
-  const r = new FileReader()
-  r.onload = e => { pendingImg = {dataUrl: e.target.result}; showPreview(e.target.result) }
-  r.readAsDataURL(f)
+  // Load existing phase images
+  for (const phase of ['phase1','phase2','success']) {
+    try {
+      const r = await fetch('/api/boss-image/'+phase)
+      if (r.ok) { const b = await r.blob(); showPhasePreview(phase, URL.createObjectURL(b)) }
+    } catch {}
+  }
 }
 
 /* ── Save ── */
 async function doSave() {
-  const btn = g('saveBtn'), st = g('saveStatus')
-  btn.disabled = true; st.textContent = '저장 중...'; st.className = 'savestatus'
+  const btn=g('saveBtn'), st=g('saveStatus')
+  btn.disabled=true; st.textContent='저장 중...'; st.className='savestatus'
   try {
-    if (pendingImg) {
-      if (pendingImg.remove) {
-        await fetch('/api/boss-image', {method:'DELETE'})
+    // Upload/delete phase images
+    for (const phase of ['phase1','phase2','success']) {
+      if (!pending[phase]) continue
+      if (pending[phase].remove) {
+        await fetch('/api/boss-image/'+phase, {method:'DELETE'})
       } else {
-        await fetch('/api/boss-image', {
+        await fetch('/api/boss-image/'+phase, {
           method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({dataUrl: pendingImg.dataUrl})
+          body: JSON.stringify({dataUrl: pending[phase].dataUrl})
         })
       }
-      pendingImg = null
+      pending[phase] = null
     }
+
     const data = {
-      bossName:         g('bossName').value   || '보스',
+      bossName:         g('bossName').value    || '보스',
       maxHp:            Number(g('maxHp').value)            || 100000,
       balloonThreshold: Number(g('balloonThreshold').value) || 100,
       damagePerDot:     Number(g('damagePerDot').value)     || 100,
+      phase2HpPercent:  Number(g('phase2HpPercent').value)  || 50,
       enabled:          g('enabled').checked,
       critEnabled:      g('critEnabled').checked,
       critChance:       (Number(g('critChance').value) || 15) / 100,
       critMultiplier:   Number(g('critMultiplier').value)   || 2,
+      sheetsWebhookUrl: g('sheetsWebhookUrl').value.trim(),
       lootItems:        loot,
     }
     const r = await fetch('/api/boss-settings', {
@@ -1583,12 +1724,12 @@ async function doSave() {
     })
     const j = await r.json()
     if (!j.ok) throw new Error(j.error)
-    st.textContent = '저장됨 ✓'; st.className = 'savestatus ok'
+    st.textContent='저장됨 ✓'; st.className='savestatus ok'
   } catch(e) {
-    st.textContent = '저장 실패: ' + e.message; st.className = 'savestatus err'
+    st.textContent='저장 실패: '+e.message; st.className='savestatus err'
   } finally {
-    btn.disabled = false
-    setTimeout(() => { st.textContent = ''; st.className = 'savestatus' }, 3000)
+    btn.disabled=false
+    setTimeout(()=>{st.textContent='';st.className='savestatus'},3000)
   }
 }
 
@@ -2251,212 +2392,191 @@ const BOSS_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 <meta charset="UTF-8">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { background: transparent !important; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:transparent !important;overflow:hidden;font-family:'Noto Sans KR',sans-serif}
 
-  #boss-hud {
-    position: fixed; top: 40px; left: 40px; width: 520px;
-    background: rgba(10,6,28,0.88); border: 2px solid rgba(239,68,68,0.55);
-    border-radius: 20px; padding: 18px 22px; backdrop-filter: blur(16px);
-    box-shadow: 0 8px 32px rgba(239,68,68,0.25);
-    opacity: 0; transform: translateX(-60px);
-    transition: opacity 0.5s ease, transform 0.5s ease;
-  }
-  #boss-hud.show { opacity: 1; transform: translateX(0); }
+  /* Boss image */
+  #boss-img-wrap{position:fixed;right:60px;top:50%;transform:translateY(-50%);opacity:0;transition:opacity .6s ease;pointer-events:none}
+  #boss-img-wrap.show{opacity:1}
+  #boss-img{max-width:420px;max-height:600px;object-fit:contain;filter:drop-shadow(0 8px 32px rgba(239,68,68,0.4))}
+  #boss-img.p2{filter:drop-shadow(0 8px 40px rgba(239,100,68,0.6)) brightness(0.85) saturate(1.3)}
+  #boss-img.success{filter:drop-shadow(0 8px 40px rgba(245,158,11,0.7)) brightness(1.1) saturate(1.2);animation:successPulse 1.5s ease-in-out infinite}
+  @keyframes successPulse{0%,100%{filter:drop-shadow(0 8px 40px rgba(245,158,11,0.7)) brightness(1.1)}50%{filter:drop-shadow(0 12px 60px rgba(245,158,11,1)) brightness(1.25)}}
 
-  .boss-name-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-  .boss-skull    { font-size: 22px; }
-  .boss-name     { font-size: 18px; font-weight: 900; color: #fff; letter-spacing: -0.02em; }
-  .hp-label      { margin-left: auto; font-size: 11px; font-weight: 800; color: rgba(239,68,68,0.8); letter-spacing: 0.1em; }
-  .hp-numbers    { font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.6); margin-bottom: 7px; text-align: right; }
-  .hp-bar-bg     { height: 16px; background: rgba(255,255,255,0.08); border-radius: 8px; overflow: hidden; }
-  .hp-bar-fill   {
-    height: 100%; border-radius: 8px;
-    background: linear-gradient(90deg, #EF4444, #F97316);
-    box-shadow: 0 0 12px rgba(239,68,68,0.5);
-    transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
-  }
-  .participants  { margin-top: 14px; display: flex; flex-direction: column; gap: 4px; }
-  .participant-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: rgba(255,255,255,0.65); }
-  .p-name { font-weight: 700; color: #fff; min-width: 80px; }
-  .p-dmg  { margin-left: auto; font-weight: 800; color: #F97316; }
-  .p-crit { font-size: 10px; color: #FBBF24; }
+  /* HUD */
+  #boss-hud{position:fixed;top:40px;left:40px;width:480px;background:rgba(10,6,28,0.88);border:2px solid rgba(239,68,68,0.55);border-radius:20px;padding:18px 22px;backdrop-filter:blur(16px);box-shadow:0 8px 32px rgba(239,68,68,0.25);opacity:0;transform:translateX(-60px);transition:opacity .5s,transform .5s}
+  #boss-hud.show{opacity:1;transform:translateX(0)}
+  .bname-row{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .bskull{font-size:20px}
+  .bname{font-size:18px;font-weight:900;color:#fff;letter-spacing:-.02em}
+  .hplabel{margin-left:auto;font-size:11px;font-weight:800;color:rgba(239,68,68,0.8);letter-spacing:.1em}
+  .hpnums{font-size:12px;font-weight:700;color:rgba(255,255,255,0.6);margin-bottom:7px;text-align:right}
+  .hpbg{height:16px;background:rgba(255,255,255,0.08);border-radius:8px;overflow:hidden}
+  .hpfill{height:100%;border-radius:8px;background:linear-gradient(90deg,#EF4444,#F97316);box-shadow:0 0 12px rgba(239,68,68,0.5);transition:width .6s cubic-bezier(0.4,0,0.2,1)}
+  .hpfill.p2{background:linear-gradient(90deg,#b91c1c,#EF4444)}
+  .parts{margin-top:12px;display:flex;flex-direction:column;gap:4px}
+  .prow{display:flex;align-items:center;gap:8px;font-size:11px;color:rgba(255,255,255,0.65)}
+  .pname{font-weight:700;color:#fff;min-width:80px}.pdmg{margin-left:auto;font-weight:800;color:#F97316}.pcrit{font-size:10px;color:#FBBF24}
 
-  #dice-popup {
-    position: fixed; bottom: 60px; left: 50%;
-    transform: translateX(-50%) translateY(100px); opacity: 0;
-    transition: opacity 0.3s ease, transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
-    text-align: center; pointer-events: none;
-  }
-  #dice-popup.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  /* Dice popup */
+  #dice-popup{position:fixed;bottom:60px;left:50%;transform:translateX(-50%) translateY(100px);opacity:0;transition:opacity .3s,transform .35s cubic-bezier(0.34,1.56,0.64,1);text-align:center;pointer-events:none}
+  #dice-popup.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .dice-face{width:90px;height:90px;margin:0 auto 10px;background:rgba(10,6,28,0.95);border:3px solid rgba(239,68,68,0.7);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:42px;font-weight:900;color:#fff;box-shadow:0 8px 30px rgba(239,68,68,0.35)}
+  .dice-face.spin{animation:diceSpin .9s cubic-bezier(0.25,0.46,0.45,0.94) forwards}
+  @keyframes diceSpin{0%{transform:rotateX(0) rotateY(0)}50%{transform:rotateX(540deg) rotateY(270deg)}100%{transform:rotateX(720deg) rotateY(360deg)}}
+  .dice-user{font-size:13px;font-weight:700;color:rgba(255,255,255,0.7);margin-bottom:6px}
+  .dmg-tag{display:inline-block;padding:6px 20px;border-radius:20px;font-size:22px;font-weight:900;color:#fff;background:rgba(239,68,68,0.85);box-shadow:0 4px 16px rgba(239,68,68,0.4);letter-spacing:-.02em}
+  .dmg-tag.crit{background:linear-gradient(135deg,#F59E0B,#EF4444);animation:critPulse .3s ease}
+  @keyframes critPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+  .crit-badge{display:block;font-size:11px;font-weight:800;letter-spacing:.15em;color:#FBBF24;margin-top:4px}
+  .float-dmg{position:fixed;font-size:28px;font-weight:900;color:#F97316;text-shadow:0 2px 8px rgba(0,0,0,0.5);pointer-events:none;animation:floatUp 1.8s ease-out forwards}
+  .float-dmg.crit{color:#FBBF24;font-size:38px}
+  @keyframes floatUp{0%{opacity:1;transform:translateY(0) scale(1)}60%{opacity:1}100%{opacity:0;transform:translateY(-120px) scale(0.7)}}
 
-  .dice-face {
-    width: 90px; height: 90px; margin: 0 auto 10px;
-    background: rgba(10,6,28,0.95); border: 3px solid rgba(239,68,68,0.7);
-    border-radius: 18px; display: flex; align-items: center; justify-content: center;
-    font-size: 42px; font-weight: 900; color: #fff;
-    box-shadow: 0 8px 30px rgba(239,68,68,0.35);
-  }
-  .dice-face.spin { animation: diceSpin 0.9s cubic-bezier(0.25,0.46,0.45,0.94) forwards; }
-  @keyframes diceSpin {
-    0%   { transform: rotateX(0deg)   rotateY(0deg);   }
-    50%  { transform: rotateX(540deg) rotateY(270deg); }
-    100% { transform: rotateX(720deg) rotateY(360deg); }
-  }
-  .dice-user   { font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.7); margin-bottom: 6px; }
-  .damage-tag  {
-    display: inline-block; padding: 6px 20px; border-radius: 20px;
-    font-size: 22px; font-weight: 900; color: #fff;
-    background: rgba(239,68,68,0.85); box-shadow: 0 4px 16px rgba(239,68,68,0.4);
-    letter-spacing: -0.02em;
-  }
-  .damage-tag.critical {
-    background: linear-gradient(135deg, #F59E0B, #EF4444);
-    animation: critPulse 0.3s ease;
-  }
-  @keyframes critPulse {
-    0%,100% { transform: scale(1); }
-    50%     { transform: scale(1.15); }
-  }
-  .critical-badge { display: block; font-size: 11px; font-weight: 800; letter-spacing: 0.15em; color: #FBBF24; margin-top: 4px; }
-
-  .float-dmg {
-    position: fixed; font-size: 28px; font-weight: 900; color: #F97316;
-    text-shadow: 0 2px 8px rgba(0,0,0,0.5); pointer-events: none;
-    animation: floatUp 1.8s ease-out forwards;
-  }
-  .float-dmg.crit { color: #FBBF24; font-size: 38px; }
-  @keyframes floatUp {
-    0%   { opacity: 1; transform: translateY(0) scale(1); }
-    60%  { opacity: 1; }
-    100% { opacity: 0; transform: translateY(-120px) scale(0.7); }
-  }
-
-  #defeat-screen {
-    position: fixed; inset: 0; display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    background: rgba(0,0,0,0.75); opacity: 0; pointer-events: none;
-    transition: opacity 0.6s ease;
-  }
-  #defeat-screen.show { opacity: 1; }
-  .defeat-title {
-    font-size: 72px; font-weight: 900; color: #fff;
-    text-shadow: 0 0 40px #F59E0B; letter-spacing: -0.04em;
-    animation: defeatBounce 0.6s cubic-bezier(0.34,1.56,0.64,1);
-  }
-  @keyframes defeatBounce { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-  .defeat-sub { font-size: 20px; color: rgba(255,255,255,0.7); margin-top: 12px; font-weight: 700; }
+  /* Defeat */
+  #defeat-screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);opacity:0;pointer-events:none;transition:opacity .6s}
+  #defeat-screen.show{opacity:1}
+  .defeat-title{font-size:72px;font-weight:900;color:#fff;text-shadow:0 0 40px #F59E0B;letter-spacing:-.04em;animation:defeatBounce .6s cubic-bezier(0.34,1.56,0.64,1)}
+  @keyframes defeatBounce{from{transform:scale(0.4);opacity:0}to{transform:scale(1);opacity:1}}
+  .defeat-sub{font-size:20px;color:rgba(255,255,255,0.7);margin-top:12px;font-weight:700}
 </style>
 </head>
 <body>
-<div id="boss-hud">
-  <div class="boss-name-row">
-    <span class="boss-skull">💀</span>
-    <span class="boss-name" id="boss-name">보스</span>
-    <span class="hp-label">BOSS HP</span>
-  </div>
-  <div class="hp-numbers" id="hp-numbers">100,000 / 100,000</div>
-  <div class="hp-bar-bg"><div class="hp-bar-fill" id="hp-fill" style="width:100%"></div></div>
-  <div class="participants" id="participants"></div>
+
+<!-- Boss image (right side) -->
+<div id="boss-img-wrap">
+  <img id="boss-img" alt="">
 </div>
 
+<!-- HUD (left side) -->
+<div id="boss-hud">
+  <div class="bname-row">
+    <span class="bskull">&#x1F480;</span>
+    <span class="bname" id="boss-name">보스</span>
+    <span class="hplabel">BOSS HP</span>
+  </div>
+  <div class="hpnums" id="hp-nums">100,000 / 100,000</div>
+  <div class="hpbg"><div class="hpfill" id="hp-fill" style="width:100%"></div></div>
+  <div class="parts" id="parts"></div>
+</div>
+
+<!-- Dice popup -->
 <div id="dice-popup">
   <div class="dice-user" id="dice-user"></div>
   <div class="dice-face" id="dice-face">?</div>
-  <div class="damage-tag" id="damage-tag">0</div>
-  <span class="critical-badge" id="crit-badge" style="display:none">🎯 CRITICAL HIT!</span>
+  <div class="dmg-tag" id="dmg-tag">0</div>
+  <span class="crit-badge" id="crit-badge" style="display:none">&#x1F3AF; CRITICAL HIT!</span>
 </div>
 
+<!-- Defeat overlay -->
 <div id="defeat-screen">
-  <div class="defeat-title">👑 BOSS DEFEATED!</div>
+  <div class="defeat-title">&#x1F451; BOSS DEFEATED!</div>
   <div class="defeat-sub" id="defeat-sub"></div>
 </div>
 
 <script>
-let lastRollTs = 0, bossAlive = false, diceTimer = null
-const hud      = document.getElementById('boss-hud')
-const bossName = document.getElementById('boss-name')
-const hpNums   = document.getElementById('hp-numbers')
-const hpFill   = document.getElementById('hp-fill')
-const partList = document.getElementById('participants')
-const dicePopup= document.getElementById('dice-popup')
-const diceUser = document.getElementById('dice-user')
-const diceFace = document.getElementById('dice-face')
-const dmgTag   = document.getElementById('damage-tag')
-const critBadge= document.getElementById('crit-badge')
-const defeatScr= document.getElementById('defeat-screen')
-const defeatSub= document.getElementById('defeat-sub')
+let lastRollTs=0, bossAlive=false, diceTimer=null, currentPhase=null
+const hud=document.getElementById('boss-hud')
+const hudBossName=document.getElementById('boss-name')
+const hpNums=document.getElementById('hp-nums')
+const hpFill=document.getElementById('hp-fill')
+const parts=document.getElementById('parts')
+const dicePopup=document.getElementById('dice-popup')
+const diceUser=document.getElementById('dice-user')
+const diceFace=document.getElementById('dice-face')
+const dmgTag=document.getElementById('dmg-tag')
+const critBadge=document.getElementById('crit-badge')
+const defeatScr=document.getElementById('defeat-screen')
+const defeatSub=document.getElementById('defeat-sub')
+const bossImgWrap=document.getElementById('boss-img-wrap')
+const bossImg=document.getElementById('boss-img')
+
+function setPhaseImage(phase) {
+  if (phase===currentPhase) return
+  currentPhase=phase
+  if (!phase) { bossImgWrap.classList.remove('show'); return }
+  const url='/api/boss-image/'+phase+'?t='+Date.now()
+  bossImg.onload=()=>{ bossImg.className=phase==='phase2'?'p2':phase==='success'?'success':''; bossImgWrap.classList.add('show') }
+  bossImg.onerror=()=>{ bossImgWrap.classList.remove('show') }
+  bossImg.src=url
+}
 
 function updateHud(boss) {
-  bossName.textContent = boss.bossName ?? '보스'
-  const pct = Math.max(0, (boss.currentHp / boss.maxHp) * 100)
-  hpFill.style.width   = pct + '%'
-  hpNums.textContent   = boss.currentHp.toLocaleString() + ' / ' + boss.maxHp.toLocaleString()
-  const entries = Object.entries(boss.participants ?? {})
-    .sort((a, b) => b[1].totalDamage - a[1].totalDamage).slice(0, 5)
-  partList.innerHTML = entries.map(([u, p]) => {
-    const cp = p.attackCount ? Math.round(p.critCount / p.attackCount * 100) : 0
-    return '<div class="participant-row"><span class="p-name">' + u + '</span>' +
-      (cp > 0 ? '<span class="p-crit">⚡' + cp + '%</span>' : '') +
-      '<span class="p-dmg">' + p.totalDamage.toLocaleString() + '</span></div>'
+  hudBossName.textContent=boss.bossName??'보스'
+  const pct=Math.max(0,(boss.currentHp/boss.maxHp)*100)
+  hpFill.style.width=pct+'%'
+  hpNums.textContent=boss.currentHp.toLocaleString()+' / '+boss.maxHp.toLocaleString()
+  const p2=boss.phase2HpPercent??50
+  hpFill.className='hpfill'+(pct<=p2?' p2':'')
+  const entries=Object.entries(boss.participants??{}).sort((a,b)=>b[1].totalDamage-a[1].totalDamage).slice(0,5)
+  parts.innerHTML=entries.map(([u,p])=>{
+    const cp=p.attackCount?Math.round(p.critCount/p.attackCount*100):0
+    return '<div class="prow"><span class="pname">'+u+'</span>'+(cp>0?'<span class="pcrit">&#x26A1;'+cp+'%</span>':'')+'<span class="pdmg">'+p.totalDamage.toLocaleString()+'</span></div>'
   }).join('')
 }
 
 function showRoll(roll) {
-  if (roll.ts === lastRollTs) return
-  lastRollTs = roll.ts
-  diceUser.textContent = roll.user + '님'
-  diceFace.textContent = '?'
+  if (roll.ts===lastRollTs) return
+  lastRollTs=roll.ts
+  diceUser.textContent=roll.user+'님'
+  diceFace.textContent='?'
   diceFace.classList.remove('spin')
   void diceFace.offsetWidth
   diceFace.classList.add('spin')
-  let f = 0
-  const iv = setInterval(() => {
-    diceFace.textContent = Math.floor(Math.random() * 12) + 1
-    if (++f >= 16) { clearInterval(iv); diceFace.textContent = roll.roll }
-  }, 55)
-  setTimeout(() => {
-    dmgTag.textContent  = (roll.isCritical ? '💥 ' : '') + roll.damage.toLocaleString() + ' DMG'
-    dmgTag.className    = 'damage-tag' + (roll.isCritical ? ' critical' : '')
-    critBadge.style.display = roll.isCritical ? 'block' : 'none'
-  }, 950)
+  let f=0
+  const iv=setInterval(()=>{
+    diceFace.textContent=Math.floor(Math.random()*12)+1
+    if(++f>=16){clearInterval(iv);diceFace.textContent=roll.roll}
+  },55)
+  setTimeout(()=>{
+    dmgTag.textContent=(roll.isCritical?'&#x1F4A5; ':'')+roll.damage.toLocaleString()+' DMG'
+    dmgTag.className='dmg-tag'+(roll.isCritical?' crit':'')
+    critBadge.style.display=roll.isCritical?'block':'none'
+  },950)
   dicePopup.classList.add('show')
   clearTimeout(diceTimer)
-  diceTimer = setTimeout(() => dicePopup.classList.remove('show'), 4000)
-  const el = document.createElement('div')
-  el.className = 'float-dmg' + (roll.isCritical ? ' crit' : '')
-  el.textContent = (roll.isCritical ? '💥' : '−') + roll.damage.toLocaleString()
-  el.style.left  = (25 + Math.random() * 50) + '%'
-  el.style.top   = '55%'
+  diceTimer=setTimeout(()=>dicePopup.classList.remove('show'),4000)
+  const el=document.createElement('div')
+  el.className='float-dmg'+(roll.isCritical?' crit':'')
+  el.textContent=(roll.isCritical?'&#x1F4A5;':'&#x2212;')+roll.damage.toLocaleString()
+  el.style.left=(25+Math.random()*50)+'%'
+  el.style.top='55%'
   document.body.appendChild(el)
-  el.addEventListener('animationend', () => el.remove())
+  el.addEventListener('animationend',()=>el.remove())
 }
 
-function connect() {
-  const ws = new WebSocket('ws://localhost:${port}/__overlay_ws__')
-  ws.onmessage = e => {
-    try {
-      const msg = JSON.parse(e.data)
-      if (msg.type === 'game:state' && msg.data?.id === 'boss') {
-        const s    = msg.data
-        const boss = s.boss
-        if (!boss) return
-        if (s.status === 'running' || s.status === 'showing_result') hud.classList.add('show')
-        if (s.status === 'idle') { hud.classList.remove('show'); defeatScr.classList.remove('show') }
-        updateHud(boss)
-        if (boss.lastRoll) showRoll(boss.lastRoll)
-        if (s.status === 'showing_result' && bossAlive) {
-          const total = Object.values(boss.participants ?? {}).reduce((x, p) => x + p.totalDamage, 0)
-          defeatSub.textContent = '총 데미지: ' + total.toLocaleString() + ' | 참여자: ' + Object.keys(boss.participants ?? {}).length + '명'
-          defeatScr.classList.add('show')
-          setTimeout(() => defeatScr.classList.remove('show'), 7000)
+function connect(){
+  const ws=new WebSocket('ws://localhost:${port}/__overlay_ws__')
+  ws.onmessage=e=>{
+    try{
+      const msg=JSON.parse(e.data)
+      if(msg.type==='game:state'&&msg.data?.id==='boss'){
+        const s=msg.data, boss=s.boss
+        if(!boss) return
+        if(s.status==='running'||s.status==='showing_result') hud.classList.add('show')
+        if(s.status==='idle'){hud.classList.remove('show');defeatScr.classList.remove('show');setPhaseImage(null)}
+        if(s.status==='running'||s.status==='showing_result') updateHud(boss)
+        if(boss.lastRoll) showRoll(boss.lastRoll)
+        // Phase image
+        if(s.status==='showing_result'){
+          setPhaseImage('success')
+        } else if(s.status==='running'){
+          const pct=(boss.currentHp/boss.maxHp)*100
+          setPhaseImage(pct<=(boss.phase2HpPercent??50)?'phase2':'phase1')
         }
-        bossAlive = boss.alive
+        // Defeat banner
+        if(s.status==='showing_result'&&bossAlive){
+          const total=Object.values(boss.participants??{}).reduce((x,p)=>x+p.totalDamage,0)
+          defeatSub.textContent='총 데미지: '+total.toLocaleString()+' | 참여자: '+Object.keys(boss.participants??{}).length+'명'
+          defeatScr.classList.add('show')
+          setTimeout(()=>defeatScr.classList.remove('show'),7000)
+        }
+        bossAlive=boss.alive
       }
-      if (msg.type === 'ping') ws.send(JSON.stringify({type:'pong'}))
-    } catch {}
+      if(msg.type==='ping') ws.send(JSON.stringify({type:'pong'}))
+    }catch{}
   }
-  ws.onclose = () => setTimeout(connect, 2000)
+  ws.onclose=()=>setTimeout(connect,2000)
 }
 connect()
 <\/script>
@@ -2634,21 +2754,21 @@ export class OverlayServer {
         }
       }
 
-      // ── API: boss image ───────────────────────────────────────────────────
-      if (url === '/api/boss-image') {
-        const dataDir  = join(app.getPath('userData'), 'data')
-        const imgBase  = join(dataDir, 'boss-image')
-        const EXTS     = ['png', 'jpg', 'jpeg', 'gif', 'webp']
-        const findImg  = () => EXTS.map(e => ({ path: `${imgBase}.${e}`, ext: e })).find(f => existsSync(f.path))
+      // ── API: boss image (phase1 / phase2 / success) ──────────────────────
+      const imgMatch = url.match(/^\/api\/boss-image\/(phase1|phase2|success)$/)
+      if (imgMatch) {
+        const phase   = imgMatch[1]
+        const dataDir = join(app.getPath('userData'), 'data')
+        const imgBase = join(dataDir, `boss-image-${phase}`)
+        const EXTS    = ['png', 'jpg', 'jpeg', 'gif', 'webp']
+        const findImg = () => EXTS.map(e => ({ path: `${imgBase}.${e}`, ext: e })).find(f => existsSync(f.path))
+        const mime    = (ext: string) => ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg'
+                      : ext === 'gif' ? 'image/gif' : ext === 'webp' ? 'image/webp' : 'image/png'
 
         if (method === 'GET') {
           const found = findImg()
           if (!found) { res.writeHead(404); res.end(); return }
-          const mime = found.ext === 'jpg' || found.ext === 'jpeg' ? 'image/jpeg'
-                     : found.ext === 'gif' ? 'image/gif'
-                     : found.ext === 'webp' ? 'image/webp'
-                     : 'image/png'
-          res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'no-cache' })
+          res.writeHead(200, { 'Content-Type': mime(found.ext), 'Cache-Control': 'no-cache' })
           res.end(readFileSync(found.path))
           return
         }
@@ -2660,12 +2780,10 @@ export class OverlayServer {
               const { dataUrl } = JSON.parse(body)
               const match = (dataUrl as string).match(/^data:(image\/(\w+));base64,(.+)$/)
               if (!match) throw new Error('Invalid data URL')
-              const ext    = match[2] === 'jpeg' ? 'jpg' : match[2]
-              const buf    = Buffer.from(match[3], 'base64')
+              const ext = match[2] === 'jpeg' ? 'jpg' : match[2]
               if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true })
-              // Remove old images
               EXTS.forEach(e => { try { unlinkSync(`${imgBase}.${e}`) } catch {} })
-              writeFileSync(`${imgBase}.${ext}`, buf)
+              writeFileSync(`${imgBase}.${ext}`, Buffer.from(match[3], 'base64'))
               res.writeHead(200, { 'Content-Type': 'application/json' })
               res.end(JSON.stringify({ ok: true }))
             } catch (e) {
