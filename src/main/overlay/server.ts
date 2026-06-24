@@ -1,5 +1,9 @@
 import { createServer, IncomingMessage, ServerResponse } from 'http'
 import { WebSocketServer, WebSocket } from 'ws'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs'
+import { join } from 'path'
+import { app } from 'electron'
+import { loadSettings, patchSettings } from '../store/settings'
 import type { GameResult, GameState } from '../games/engine'
 
 // ── Quiz overlay ──────────────────────────────────────────────────────────────
@@ -1276,6 +1280,323 @@ connect()
 </body>
 </html>`
 
+// ── Boss Settings Web Page ────────────────────────────────────────────────────
+
+const BOSS_SETTINGS_HTML = (port: number) => `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>보스전 설정</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0d1117;color:#e6edf3;font-family:'Noto Sans KR',sans-serif;min-height:100vh;padding:32px 24px 80px}
+  .container{max-width:820px;margin:0 auto}
+
+  .header{display:flex;align-items:center;gap:16px;margin-bottom:32px}
+  .hicon{width:52px;height:52px;background:linear-gradient(135deg,#f85149,#da3633);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0}
+  .htitle{font-size:26px;font-weight:900;letter-spacing:-0.03em}
+  .hsub{font-size:12px;color:#6e7681;margin-top:3px;font-family:monospace}
+
+  .card{background:#161b22;border:1px solid #21262d;border-radius:16px;padding:24px;margin-bottom:20px}
+  .ctitle{font-size:11px;font-weight:800;color:#f85149;text-transform:uppercase;letter-spacing:.1em;margin-bottom:20px;display:flex;align-items:center;gap:8px}
+  .ctitle::before{content:'';display:block;width:3px;height:14px;background:#f85149;border-radius:2px}
+
+  .field{margin-bottom:14px}
+  .field:last-child{margin-bottom:0}
+  .lbl{display:block;font-size:11px;font-weight:700;color:#8b949e;margin-bottom:5px;letter-spacing:.04em;text-transform:uppercase}
+  input[type=text],input[type=number]{width:100%;background:#0d1117;border:1px solid #21262d;border-radius:8px;color:#e6edf3;font-size:14px;font-family:inherit;padding:9px 12px;outline:none;transition:border-color .15s}
+  input:focus{border-color:#f85149;box-shadow:0 0 0 3px rgba(248,81,73,.12)}
+  .hint{font-size:11px;color:#6e7681;margin-top:4px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+
+  /* toggle */
+  .trow{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
+  .tinp{display:none}
+  .ttrack{width:40px;height:22px;background:#21262d;border-radius:11px;position:relative;transition:background .2s;flex-shrink:0}
+  .tinp:checked+.ttrack{background:#f85149}
+  .tthumb{width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;top:3px;left:3px;transition:left .2s}
+  .tinp:checked+.ttrack .tthumb{left:21px}
+  .tlbl{font-size:13px;color:#e6edf3}
+
+  /* crit sub */
+  #critSub{margin-top:16px;display:none}
+  #critSub.on{display:block}
+
+  /* image */
+  .imgzone{border:2px dashed #21262d;border-radius:12px;padding:30px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative;overflow:hidden}
+  .imgzone:hover,.imgzone.drag{border-color:#f85149;background:rgba(248,81,73,.04)}
+  .imgzone input{position:absolute;inset:0;opacity:0;cursor:pointer;z-index:1}
+  .imgicon{font-size:32px;margin-bottom:10px}
+  .imghint{font-size:13px;color:#6e7681;line-height:1.6}
+  .imghint span{color:#f85149;font-weight:700}
+  .imgpreview{width:100%;max-height:220px;border-radius:10px;object-fit:contain;margin-top:16px;display:none;border:1px solid #21262d}
+  .imgpreview.show{display:block}
+  .imgacts{display:none;gap:8px;margin-top:12px;justify-content:center}
+  .imgacts.show{display:flex}
+  .imgbtn{padding:7px 16px;border-radius:8px;border:1px solid #21262d;background:#0d1117;color:#8b949e;font-size:12px;font-family:inherit;cursor:pointer;transition:all .15s}
+  .imgbtn:hover{border-color:#f85149;color:#f85149}
+  .imgbtn.del:hover{border-color:#EF4444;color:#EF4444}
+
+  /* loot */
+  .loot-list{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+  .loot-row{display:flex;gap:8px;align-items:center}
+  .loot-num{width:22px;font-size:11px;color:#6e7681;text-align:center;flex-shrink:0}
+  .loot-row input{margin-bottom:0}
+  .loot-del{width:34px;height:38px;background:transparent;border:1px solid #21262d;border-radius:8px;color:#6e7681;font-size:18px;cursor:pointer;flex-shrink:0;transition:all .15s;font-family:inherit}
+  .loot-del:hover{border-color:#EF4444;color:#EF4444}
+  .loot-add{width:100%;padding:10px;background:transparent;border:1px dashed #21262d;border-radius:8px;color:#6e7681;font-size:13px;font-family:inherit;cursor:pointer;transition:all .15s}
+  .loot-add:hover{border-color:#f85149;color:#f85149}
+
+  /* save bar */
+  .savebar{position:fixed;bottom:0;left:0;right:0;background:#0d1117;border-top:1px solid #21262d;padding:14px 24px;display:flex;align-items:center;gap:16px;z-index:100}
+  .savebtn{flex:1;max-width:820px;margin:0 auto;display:block;padding:13px;background:linear-gradient(135deg,#f85149,#da3633);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:800;font-family:inherit;cursor:pointer;transition:filter .15s}
+  .savebtn:hover:not(:disabled){filter:brightness(1.1)}
+  .savebtn:disabled{opacity:.6;cursor:not-allowed}
+  .savestatus{font-size:12px;color:#8b949e;white-space:nowrap;transition:color .3s}
+  .savestatus.ok{color:#3fb950}
+  .savestatus.err{color:#f85149}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div class="hicon">&#x1F480;</div>
+    <div>
+      <div class="htitle">보스전 설정</div>
+      <div class="hsub">http://localhost:${port}/boss-settings</div>
+    </div>
+  </div>
+
+  <!-- 보스 이미지 -->
+  <div class="card">
+    <div class="ctitle">보스 이미지</div>
+    <div class="imgzone" id="imgZone">
+      <input type="file" id="imgFile" accept="image/*">
+      <div class="imgicon" id="imgIcon">&#x1F5BC;&#xFE0F;</div>
+      <div class="imghint" id="imgHint">클릭하거나 <span>드래그 앤 드롭</span>으로 이미지 업로드<br>PNG · JPG · GIF · WebP 지원 · 최대 10MB</div>
+    </div>
+    <img class="imgpreview" id="imgPreview" alt="보스 이미지">
+    <div class="imgacts" id="imgActs">
+      <button class="imgbtn" onclick="document.getElementById('imgFile').click()">이미지 변경</button>
+      <button class="imgbtn del" onclick="removeImg()">삭제</button>
+    </div>
+  </div>
+
+  <!-- 기본 설정 -->
+  <div class="card">
+    <div class="ctitle">기본 설정</div>
+    <div class="field">
+      <label class="lbl">보스 이름</label>
+      <input type="text" id="bossName" placeholder="보스">
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label class="lbl">최대 HP</label>
+        <input type="number" id="maxHp" min="100" step="1000" placeholder="100000">
+      </div>
+      <div class="field">
+        <label class="lbl">트리거 별풍선</label>
+        <input type="number" id="balloonThreshold" min="0" placeholder="100">
+        <div class="hint">이 개수 후원 시 주사위 1회 (0 = 비활성)</div>
+      </div>
+    </div>
+    <div class="field">
+      <label class="lbl">1면당 데미지</label>
+      <input type="number" id="damagePerDot" min="1" placeholder="100">
+      <div class="hint" id="dmgHint">주사위 6 × 100 = 600 데미지</div>
+    </div>
+    <div class="field">
+      <label class="trow">
+        <input type="checkbox" class="tinp" id="enabled">
+        <div class="ttrack"><div class="tthumb"></div></div>
+        <span class="tlbl">게임 활성화</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- 크리티컬 -->
+  <div class="card">
+    <div class="ctitle">크리티컬 설정</div>
+    <label class="trow">
+      <input type="checkbox" class="tinp" id="critEnabled">
+      <div class="ttrack"><div class="tthumb"></div></div>
+      <span class="tlbl">크리티컬 히트 활성화</span>
+    </label>
+    <div id="critSub">
+      <div class="row2" style="margin-top:16px">
+        <div class="field">
+          <label class="lbl">크리티컬 확률 (%)</label>
+          <input type="number" id="critChance" min="1" max="99" placeholder="15">
+        </div>
+        <div class="field">
+          <label class="lbl">크리티컬 배율 (&times;)</label>
+          <input type="number" id="critMultiplier" min="1.5" step="0.5" placeholder="2">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 전리품 -->
+  <div class="card">
+    <div class="ctitle">전리품 목록</div>
+    <div class="loot-list" id="lootList"></div>
+    <button class="loot-add" onclick="addLoot()">+ 전리품 추가</button>
+  </div>
+
+</div>
+
+<!-- 저장 바 -->
+<div class="savebar">
+  <button class="savebtn" id="saveBtn" onclick="doSave()">설정 저장</button>
+  <div class="savestatus" id="saveStatus"></div>
+</div>
+
+<script>
+const g = id => document.getElementById(id)
+
+/* ── Init ── */
+async function init() {
+  try {
+    const r  = await fetch('/api/boss-settings')
+    const { data } = await r.json()
+    applySettings(data)
+  } catch(e) { console.error(e) }
+
+  try {
+    const r = await fetch('/api/boss-image')
+    if (r.ok) { const b = await r.blob(); showPreview(URL.createObjectURL(b)) }
+  } catch {}
+}
+
+function applySettings(d) {
+  if (!d) return
+  if (d.bossName          != null) g('bossName').value        = d.bossName
+  if (d.maxHp             != null) g('maxHp').value           = d.maxHp
+  if (d.balloonThreshold  != null) g('balloonThreshold').value= d.balloonThreshold
+  if (d.damagePerDot      != null) g('damagePerDot').value    = d.damagePerDot
+  if (d.enabled           != null) g('enabled').checked       = d.enabled !== false
+  if (d.critEnabled       != null) g('critEnabled').checked   = !!d.critEnabled
+  if (d.critChance        != null) g('critChance').value      = Math.round(d.critChance * 100)
+  if (d.critMultiplier    != null) g('critMultiplier').value  = d.critMultiplier
+  updateCritSub(); updateDmgHint()
+  renderLoot(d.lootItems ?? [])
+}
+
+/* ── Crit sub ── */
+g('critEnabled').addEventListener('change', updateCritSub)
+function updateCritSub() {
+  g('critSub').classList.toggle('on', g('critEnabled').checked)
+}
+
+/* ── Damage hint ── */
+g('damagePerDot').addEventListener('input', updateDmgHint)
+function updateDmgHint() {
+  const v = Number(g('damagePerDot').value) || 0
+  g('dmgHint').textContent = '주사위 6 × ' + v + ' = ' + (6*v).toLocaleString() + ' 데미지'
+}
+
+/* ── Loot ── */
+let loot = []
+function renderLoot(items) {
+  loot = items.map(x => ({...x}))
+  const el = g('lootList'); el.innerHTML = ''
+  loot.forEach((item, i) => {
+    const row = document.createElement('div')
+    row.className = 'loot-row'
+    row.innerHTML =
+      '<span class="loot-num">' + (i+1) + '</span>' +
+      '<input type="text" placeholder="상품명" value="' + esc(item.name||'') + '" oninput="loot['+i+'].name=this.value">' +
+      '<input type="text" placeholder="설명 (선택)" value="' + esc(item.description||'') + '" oninput="loot['+i+'].description=this.value">' +
+      '<button class="loot-del" onclick="removeLoot('+i+')">&#x00D7;</button>'
+    el.appendChild(row)
+  })
+}
+function addLoot() { loot.push({name:'',description:''}); renderLoot(loot) }
+function removeLoot(i) { loot.splice(i,1); renderLoot(loot) }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;') }
+
+/* ── Image ── */
+let pendingImg = null  // { dataUrl } | { remove: true } | null
+
+function showPreview(url) {
+  const img = g('imgPreview'); img.src = url; img.classList.add('show')
+  g('imgIcon').style.display = 'none'; g('imgHint').style.display = 'none'
+  g('imgActs').classList.add('show')
+}
+function hidePreview() {
+  const img = g('imgPreview'); img.classList.remove('show'); img.src = ''
+  g('imgIcon').style.display = ''; g('imgHint').style.display = ''
+  g('imgActs').classList.remove('show')
+}
+function removeImg() { pendingImg = {remove:true}; hidePreview() }
+
+const zone = g('imgZone'); const fileInp = g('imgFile')
+fileInp.addEventListener('change', e => { const f = e.target.files[0]; if (f) readImgFile(f) })
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag') })
+zone.addEventListener('dragleave', () => zone.classList.remove('drag'))
+zone.addEventListener('drop', e => {
+  e.preventDefault(); zone.classList.remove('drag')
+  const f = e.dataTransfer?.files[0]
+  if (f && f.type.startsWith('image/')) readImgFile(f)
+})
+function readImgFile(f) {
+  if (f.size > 10*1024*1024) { alert('이미지 크기가 10MB를 초과합니다'); return }
+  const r = new FileReader()
+  r.onload = e => { pendingImg = {dataUrl: e.target.result}; showPreview(e.target.result) }
+  r.readAsDataURL(f)
+}
+
+/* ── Save ── */
+async function doSave() {
+  const btn = g('saveBtn'), st = g('saveStatus')
+  btn.disabled = true; st.textContent = '저장 중...'; st.className = 'savestatus'
+  try {
+    if (pendingImg) {
+      if (pendingImg.remove) {
+        await fetch('/api/boss-image', {method:'DELETE'})
+      } else {
+        await fetch('/api/boss-image', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({dataUrl: pendingImg.dataUrl})
+        })
+      }
+      pendingImg = null
+    }
+    const data = {
+      bossName:         g('bossName').value   || '보스',
+      maxHp:            Number(g('maxHp').value)            || 100000,
+      balloonThreshold: Number(g('balloonThreshold').value) || 100,
+      damagePerDot:     Number(g('damagePerDot').value)     || 100,
+      enabled:          g('enabled').checked,
+      critEnabled:      g('critEnabled').checked,
+      critChance:       (Number(g('critChance').value) || 15) / 100,
+      critMultiplier:   Number(g('critMultiplier').value)   || 2,
+      lootItems:        loot,
+    }
+    const r = await fetch('/api/boss-settings', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(data)
+    })
+    const j = await r.json()
+    if (!j.ok) throw new Error(j.error)
+    st.textContent = '저장됨 ✓'; st.className = 'savestatus ok'
+  } catch(e) {
+    st.textContent = '저장 실패: ' + e.message; st.className = 'savestatus err'
+  } finally {
+    btn.disabled = false
+    setTimeout(() => { st.textContent = ''; st.className = 'savestatus' }, 3000)
+  }
+}
+
+init()
+<\/script>
+</body>
+</html>`
+
 const PREVIEW_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -2285,8 +2606,92 @@ export class OverlayServer {
 
     this.httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
       const url    = req.url ?? '/'
-      const gameId = url.replace('/overlay/', '').split('?')[0] || 'roulette'
+      const method = req.method ?? 'GET'
 
+      // ── API: boss settings ────────────────────────────────────────────────
+      if (url === '/api/boss-settings') {
+        if (method === 'GET') {
+          const s = loadSettings()
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ ok: true, data: s.games.boss ?? {} }))
+          return
+        }
+        if (method === 'POST') {
+          let body = ''
+          req.on('data', chunk => { body += chunk })
+          req.on('end', () => {
+            try {
+              const patch = JSON.parse(body)
+              patchSettings({ games: { boss: patch } })
+              res.writeHead(200, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({ ok: true }))
+            } catch (e) {
+              res.writeHead(400, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({ ok: false, error: String(e) }))
+            }
+          })
+          return
+        }
+      }
+
+      // ── API: boss image ───────────────────────────────────────────────────
+      if (url === '/api/boss-image') {
+        const dataDir  = join(app.getPath('userData'), 'data')
+        const imgBase  = join(dataDir, 'boss-image')
+        const EXTS     = ['png', 'jpg', 'jpeg', 'gif', 'webp']
+        const findImg  = () => EXTS.map(e => ({ path: `${imgBase}.${e}`, ext: e })).find(f => existsSync(f.path))
+
+        if (method === 'GET') {
+          const found = findImg()
+          if (!found) { res.writeHead(404); res.end(); return }
+          const mime = found.ext === 'jpg' || found.ext === 'jpeg' ? 'image/jpeg'
+                     : found.ext === 'gif' ? 'image/gif'
+                     : found.ext === 'webp' ? 'image/webp'
+                     : 'image/png'
+          res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'no-cache' })
+          res.end(readFileSync(found.path))
+          return
+        }
+        if (method === 'POST') {
+          let body = ''
+          req.on('data', chunk => { body += chunk })
+          req.on('end', () => {
+            try {
+              const { dataUrl } = JSON.parse(body)
+              const match = (dataUrl as string).match(/^data:(image\/(\w+));base64,(.+)$/)
+              if (!match) throw new Error('Invalid data URL')
+              const ext    = match[2] === 'jpeg' ? 'jpg' : match[2]
+              const buf    = Buffer.from(match[3], 'base64')
+              if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true })
+              // Remove old images
+              EXTS.forEach(e => { try { unlinkSync(`${imgBase}.${e}`) } catch {} })
+              writeFileSync(`${imgBase}.${ext}`, buf)
+              res.writeHead(200, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({ ok: true }))
+            } catch (e) {
+              res.writeHead(400, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({ ok: false, error: String(e) }))
+            }
+          })
+          return
+        }
+        if (method === 'DELETE') {
+          EXTS.forEach(e => { try { unlinkSync(`${imgBase}.${e}`) } catch {} })
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ ok: true }))
+          return
+        }
+      }
+
+      // ── Boss settings page ────────────────────────────────────────────────
+      if (url === '/boss-settings') {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+        res.end(BOSS_SETTINGS_HTML(port))
+        return
+      }
+
+      // ── Overlay pages ─────────────────────────────────────────────────────
+      const gameId = url.replace('/overlay/', '').split('?')[0] || 'roulette'
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
       let html: string
       if      (gameId === 'quiz')      html = QUIZ_OVERLAY_HTML(port)
