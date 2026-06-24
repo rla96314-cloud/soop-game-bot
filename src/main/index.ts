@@ -5,6 +5,7 @@ import { gameEngine }           from './games/engine'
 import { soopClient }           from './soop/client'
 import { overlayServer }        from './overlay/server'
 import { registerIpcHandlers }  from './ipc/handlers'
+import { weflabWatcher }        from './weflab/watcher'
 
 const isDev = !app.isPackaged
 
@@ -68,6 +69,12 @@ app.whenReady().then(() => {
     simulation: settings.soop.simulationMode !== false,
   })
 
+  // Auto-start weflab watcher if previously enabled
+  const wf = settings.weflab as Record<string, unknown> | undefined
+  if (wf?.enabled && wf?.url) {
+    weflabWatcher.start(wf.url as string)
+  }
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
@@ -75,6 +82,7 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   soopClient.disconnect()
+  weflabWatcher.stop()
   overlayServer.stop()
   if (process.platform !== 'darwin') app.quit()
 })

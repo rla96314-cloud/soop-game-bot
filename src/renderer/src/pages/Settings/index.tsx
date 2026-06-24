@@ -26,6 +26,7 @@ export default function Settings() {
   const [triggers,      setTriggers]      = useState<WeflabTrigger[]>([])
   const [weflabRunning, setWeflabRunning] = useState(false)
   const [weflabLog,     setWeflabLog]     = useState<string[]>([])
+  const [urlDirty,      setUrlDirty]      = useState(false)
 
   const [saved,        setSaved]        = useState(false)
   const [reconnecting, setReconnecting] = useState(false)
@@ -60,12 +61,12 @@ export default function Settings() {
     return () => { offResult(); offLoaded(); offError() }
   }, [])
 
-  // Check initial weflab status
+  // Sync weflab running state on every mount (tab switch 후 정확한 상태 반영)
   useEffect(() => {
-    (el().weflabStatus as () => Promise<{ running: boolean }>)()
+    (el().weflabStatus as () => Promise<{ running: boolean; url: string }>)()
       .then(s => setWeflabRunning(s.running))
       .catch(() => {})
-  }, [])
+  })
 
   const save = () => {
     patchSettings({
@@ -98,16 +99,32 @@ export default function Settings() {
     }
   }
 
+  // 체크박스 토글: 감지 시작/중지 + 즉시 설정 저장
   const toggleWeflab = async () => {
     const e = el()
-    if (weflabRunning) {
-      await (e.weflabStop as () => Promise<unknown>)()
-      setWeflabRunning(false)
-    } else {
-      if (!weflabUrl.trim()) return
+    const newEnabled = !weflabEnabled
+    setWeflabEnabled(newEnabled)
+
+    if (newEnabled) {
+      if (!weflabUrl.trim()) { setWeflabEnabled(false); return }
       await (e.weflabStart as (url: string) => Promise<unknown>)(weflabUrl.trim())
       setWeflabRunning(true)
+    } else {
+      await (e.weflabStop as () => Promise<unknown>)()
+      setWeflabRunning(false)
     }
+    // 즉시 저장 (프로그램 재시작 시 자동 감지용)
+    patchSettings({ weflab: { enabled: newEnabled, url: weflabUrl, triggers } } as Parameters<typeof patchSettings>[0])
+  }
+
+  // URL 변경 후 재시작
+  const restartWeflab = async () => {
+    if (!weflabUrl.trim()) return
+    const e = el()
+    await (e.weflabStop  as () => Promise<unknown>)()
+    await (e.weflabStart as (url: string) => Promise<unknown>)(weflabUrl.trim())
+    setWeflabRunning(true); setUrlDirty(false)
+    patchSettings({ weflab: { enabled: true, url: weflabUrl, triggers } } as Parameters<typeof patchSettings>[0])
   }
 
   const saveTriggers = (next: WeflabTrigger[]) => {
@@ -193,7 +210,7 @@ export default function Settings() {
           />
         </div>
         <div className={styles.overlayUrls}>
-          {['roulette','ladder','quiz','slot','boss','number'].map(id => (
+          {['roulette','ladder','quiz','slot','boss','number','lottery'].map(id => (
             <div key={id} className={styles.overlayRow}>
               <span className={styles.overlayName}>{id}</span>
               <code className={styles.overlayCode}>
@@ -208,31 +225,32 @@ export default function Settings() {
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>weflab 연동</h2>
 
-        <div className={styles.toggle}>
-          <label>
-            <input type="checkbox" checked={weflabEnabled} onChange={e => setWeflabEnabled(e.target.checked)} />
-            <span>weflab 룰렛 결과 감지 사용</span>
-          </label>
-        </div>
-
-        <div className={styles.field} style={{ marginTop: 12 }}>
+        <div className={styles.field}>
           <label>weflab 방송 URL</label>
           <div className={styles.rwRow}>
             <input
               className={styles.rwInput}
               value={weflabUrl}
-              onChange={e => setWeflabUrl(e.target.value)}
+              onChange={e => { setWeflabUrl(e.target.value); if (weflabRunning) setUrlDirty(true) }}
               placeholder="https://weflab.com/page/..."
-              disabled={!weflabEnabled}
             />
-            <button
-              className={`${styles.rwToggleBtn} ${weflabRunning ? styles.rwToggleBtnOn : ''}`}
-              onClick={toggleWeflab}
-              disabled={(!weflabUrl.trim() && !weflabRunning) || !weflabEnabled}
-            >
-              {weflabRunning ? '■ 중지' : '▶ 시작'}
-            </button>
+            {urlDirty && weflabRunning && (
+              <button className={styles.rwToggleBtn} onClick={restartWeflab}>재시작</button>
+            )}
           </div>
+        </div>
+
+        <div className={styles.toggle} style={{ marginTop: 8 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input type="checkbox" checked={weflabEnabled} onChange={toggleWeflab} disabled={!weflabUrl.trim() && !weflabEnabled} />
+            <span>weflab 룰렛 결과 감지 활성화</span>
+          </label>
+          <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: weflabRunning ? '#3fb950' : '#6e7681' }}>
+            {weflabRunning ? '● 감지 중' : '○ 중지됨'}
+          </span>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>
+          활성화하면 프로그램 시작 시 자동으로 감지를 시작합니다
         </div>
 
         <div className={styles.field}>
