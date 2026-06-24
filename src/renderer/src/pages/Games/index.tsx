@@ -1582,53 +1582,6 @@ function BossPanel({
   const boss  = state?.boss as BossStateData | undefined
   const status = (state?.status as string) ?? 'idle'
 
-  // Settings form state (used in idle mode)
-  const [bossName,    setBossName]    = useState((gSettings.bossName        as string)  ?? '보스')
-  const [maxHp,       setMaxHp]       = useState((gSettings.maxHp           as number)  ?? 100000)
-  const [dmgPerDot,   setDmgPerDot]   = useState((gSettings.damagePerDot    as number)  ?? 100)
-  const [threshold,   setThreshold]   = useState((gSettings.balloonThreshold as number) ?? 100)
-  const [critEnabled, setCritEnabled] = useState((gSettings.critEnabled      as boolean) !== false)
-  const [critChance,  setCritChance]  = useState(Math.round(((gSettings.critChance as number) ?? 0.15) * 100))
-  const [critMult,    setCritMult]    = useState((gSettings.critMultiplier   as number)  ?? 2)
-  const [lootItems,   setLootItems]   = useState<BossLootItem[]>((gSettings.lootItems as BossLootItem[]) ?? [])
-
-  // Sync settings form from gSettings when props update
-  useEffect(() => {
-    setBossName(   (gSettings.bossName         as string)  ?? '보스')
-    setMaxHp(      (gSettings.maxHp            as number)  ?? 100000)
-    setDmgPerDot(  (gSettings.damagePerDot     as number)  ?? 100)
-    setThreshold(  (gSettings.balloonThreshold  as number)  ?? 100)
-    setCritEnabled((gSettings.critEnabled       as boolean) !== false)
-    setCritChance( Math.round(((gSettings.critChance as number) ?? 0.15) * 100))
-    setCritMult(   (gSettings.critMultiplier    as number)  ?? 2)
-    setLootItems(  (gSettings.lootItems         as BossLootItem[]) ?? [])
-  }, [gSettings])
-
-  // Last roll animation state
-  const [animRoll, setAnimRoll] = useState<BossRollResult | null>(null)
-  const lastRollRef = useRef<number>(0)
-  useEffect(() => {
-    if (!boss?.lastRoll) return
-    if (boss.lastRoll.ts !== lastRollRef.current) {
-      lastRollRef.current = boss.lastRoll.ts
-      setAnimRoll(boss.lastRoll)
-      const t = setTimeout(() => setAnimRoll(null), 4000)
-      return () => clearTimeout(t)
-    }
-  }, [boss?.lastRoll])
-
-  const saveAll = () => {
-    saveSetting('bossName',         bossName)
-    saveSetting('maxHp',            maxHp)
-    saveSetting('damagePerDot',     dmgPerDot)
-    saveSetting('balloonThreshold', threshold)
-    saveSetting('critEnabled',      critEnabled)
-    saveSetting('critChance',       critChance / 100)
-    saveSetting('critMultiplier',   critMult)
-    saveSetting('lootItems',        lootItems)
-  }
-
-  const start = () => { saveAll(); (el.bossStart as () => void)() }
   const reset = () => (el.bossReset as () => void)()
 
   const hpPct = boss ? Math.max(0, (boss.currentHp / boss.maxHp) * 100) : 100
@@ -1687,16 +1640,12 @@ function BossPanel({
 
   // ── Running (raid active) ─────────────────────────────────────────────────
   if (status === 'running' && boss) {
-    const totalDmg = Object.values(boss.participants).reduce((s, p) => s + p.totalDamage, 0)
-    const sorted   = Object.entries(boss.participants).sort((a, b) => b[1].totalDamage - a[1].totalDamage)
-    const top3     = sorted.slice(0, 3)
     const phase2Pct = (gSettings.phase2HpPercent as number) ?? 50
     const phase    = hpPct <= phase2Pct ? 'phase2' : 'phase1'
     const hpColor  = hpPct > 50 ? '#EF4444' : hpPct > 25 ? '#F97316' : '#FBBF24'
 
     return (
       <div className={styles.brRunning}>
-        {/* Main row: image left, HP + top3 right */}
         <div className={styles.brMainRow}>
           {/* Phase image */}
           <div className={styles.brPhaseImgWrap}>
@@ -1711,22 +1660,17 @@ function BossPanel({
             <div className={styles.brPhaseLabel}>{hpPct <= phase2Pct ? '2 페이즈' : '1 페이즈'}</div>
           </div>
 
-          {/* HP bar + top 3 */}
+          {/* HP bar */}
           <div className={styles.brHpTop3Col}>
-            {/* Boss name */}
             <div className={styles.brBossNameRow}>
               <span className={styles.brBossName}>{boss.bossName}</span>
               <span className={styles.brHpBadge}>RAID</span>
             </div>
-
-            {/* HP numbers */}
             <div className={styles.brHpNumbers}>
               <span style={{ color: hpColor }}>{boss.currentHp.toLocaleString()}</span>
               <span className={styles.brHpSep}>/</span>
               <span className={styles.brHpMax}>{boss.maxHp.toLocaleString()}</span>
             </div>
-
-            {/* Ornate HP bar */}
             <div className={styles.brOrnateBar}>
               <div className={styles.brOrnateTrack}>
                 <div className={styles.brOrnateFill} style={{ width: `${hpPct}%`, background: `linear-gradient(180deg, ${hpColor}cc 0%, ${hpColor} 40%, ${hpColor}cc 100%)` }} />
@@ -1740,42 +1684,7 @@ function BossPanel({
               <div className={styles.brOrnateGemB} />
             </div>
             <div className={styles.brHpPct}>{hpPct.toFixed(1)}% 남음</div>
-
-            {/* Top 3 damage */}
-            <div className={styles.brTop3}>
-              <div className={styles.brTop3Title}>데미지 TOP 3</div>
-              {top3.length === 0
-                ? <div className={styles.brTop3Empty}>별풍선 {boss.balloonThreshold}개를 후원하면 공격 시작!</div>
-                : top3.map(([user, p], i) => (
-                  <div key={user} className={styles.brTop3Row}>
-                    <span className={`${styles.brTop3Rank} ${i === 0 ? styles.brRank1 : i === 1 ? styles.brRank2 : styles.brRank3}`}>{i + 1}</span>
-                    <span className={styles.brTop3User}>{user}</span>
-                    <span className={styles.brTop3Dmg}>{p.totalDamage.toLocaleString()}</span>
-                    <span className={styles.brTop3Pct}>{totalDmg > 0 ? (p.totalDamage / totalDmg * 100).toFixed(1) : 0}%</span>
-                  </div>
-                ))
-              }
-            </div>
           </div>
-        </div>
-
-        {/* Last roll animation */}
-        {animRoll && (
-          <div className={`${styles.brDiceCard} ${styles.brDiceShow}`}>
-            <div className={styles.brDiceUser}>{animRoll.user}님의 공격!</div>
-            <div className={`${styles.brDiceFace} ${styles.brDiceSpin}`}>{animRoll.roll}</div>
-            <div className={`${styles.brDmgPill} ${animRoll.isCritical ? styles.brDmgCrit : ''}`}>
-              {animRoll.isCritical ? 'CRIT! ' : ''}{animRoll.damage.toLocaleString()} DMG
-            </div>
-            {animRoll.isCritical && <div className={styles.brCritBadge}>CRITICAL HIT!</div>}
-          </div>
-        )}
-
-        {/* Config summary */}
-        <div className={styles.brConfigRow}>
-          <span>별풍선 {boss.balloonThreshold}개 → 주사위 1회</span>
-          <span>1면당 {boss.damagePerDot.toLocaleString()} 데미지</span>
-          {boss.critEnabled && <span>크리티컬 {Math.round(boss.critChance * 100)}% (×{boss.critMultiplier})</span>}
         </div>
 
         <button className={styles.brResetBtn} onClick={reset}>레이드 초기화</button>
@@ -1783,67 +1692,15 @@ function BossPanel({
     )
   }
 
-  // ── Idle (setup form) ─────────────────────────────────────────────────────
+  // ── Idle ─────────────────────────────────────────────────────────────────
+  const idleBossName = (gSettings.bossName as string) ?? '보스'
+
   return (
     <div className={styles.brSetup}>
-      <div className={styles.brSection}>
-        <div className={styles.brSectionTitle}>보스 설정</div>
-        <div className={styles.brRow}>
-          <label className={styles.brLabel}>보스 이름</label>
-          <input className={styles.brInput} value={bossName} onChange={e => setBossName(e.target.value)} />
-        </div>
-        <div className={styles.brRow}>
-          <label className={styles.brLabel}>최대 HP</label>
-          <input type="number" className={styles.brInput} value={maxHp} min={100}
-            onChange={e => setMaxHp(Number(e.target.value))} />
-        </div>
-        <div className={styles.brRow}>
-          <label className={styles.brLabel}>1면당 데미지</label>
-          <input type="number" className={styles.brInput} value={dmgPerDot} min={1}
-            onChange={e => setDmgPerDot(Number(e.target.value))} />
-          <span className={styles.brHint}>주사위 6 × {dmgPerDot} = {(6 * dmgPerDot).toLocaleString()} 데미지</span>
-        </div>
-        <div className={styles.brRow}>
-          <label className={styles.brLabel}>트리거 별풍선</label>
-          <input type="number" className={styles.brInput} value={threshold} min={1}
-            onChange={e => setThreshold(Number(e.target.value))} />
-          <span className={styles.brHint}>개 후원 시 주사위 1회</span>
-        </div>
+      <div className={styles.brIdleCard}>
+        <div className={styles.brIdleTitle}>{idleBossName}</div>
+        <div className={styles.brIdleHint}>레이드 대기 중</div>
       </div>
-
-      <div className={styles.brSection}>
-        <div className={styles.brSectionTitle}>크리티컬 설정</div>
-        <div className={styles.brRow}>
-          <label className={styles.brLabel}>
-            <input type="checkbox" checked={critEnabled} onChange={e => setCritEnabled(e.target.checked)}
-              style={{ marginRight: 6 }} />
-            크리티컬 활성화
-          </label>
-        </div>
-        {critEnabled && (<>
-          <div className={styles.brRow}>
-            <label className={styles.brLabel}>크리티컬 확률</label>
-            <input type="number" className={styles.brInput} value={critChance} min={1} max={99}
-              onChange={e => setCritChance(Number(e.target.value))} />
-            <span className={styles.brHint}>%</span>
-          </div>
-          <div className={styles.brRow}>
-            <label className={styles.brLabel}>크리티컬 배율</label>
-            <input type="number" className={styles.brInput} value={critMult} min={1.5} step={0.5}
-              onChange={e => setCritMult(Number(e.target.value))} />
-            <span className={styles.brHint}>× (데미지 {critMult}배)</span>
-          </div>
-        </>)}
-      </div>
-
-      <BossLootEditor
-        items={lootItems}
-        onSave={v => { setLootItems(v); saveSetting('lootItems', v) }}
-      />
-
-      <button className={styles.brStartBtn} onClick={start}>
-        레이드 시작
-      </button>
     </div>
   )
 }

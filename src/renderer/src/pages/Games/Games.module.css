@@ -1157,6 +1157,32 @@
 .brInput:focus { border-color: var(--p400); }
 .brHint { font-size: 11px; color: var(--text3); }
 
+/* Idle simple card */
+.brIdleCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px 24px;
+  display: flex; flex-direction: column; gap: 10px;
+  align-items: center; text-align: center;
+}
+.brIdleTitle {
+  font-size: 22px; font-weight: 800; color: var(--text);
+  letter-spacing: -0.02em;
+}
+.brIdleHint {
+  font-size: 12px; color: var(--text3);
+}
+.brSettingsBtn {
+  display: inline-block;
+  background: linear-gradient(135deg, var(--p500), var(--p400));
+  color: #fff; border: none; border-radius: 10px;
+  padding: 10px 18px; font-size: 13px; font-weight: 700;
+  cursor: pointer; font-family: inherit;
+  transition: opacity 0.15s;
+}
+.brSettingsBtn:hover { opacity: 0.85; }
+
 .brStartBtn {
   width: 100%; padding: 14px;
   background: linear-gradient(135deg, #EF4444, #F97316);
