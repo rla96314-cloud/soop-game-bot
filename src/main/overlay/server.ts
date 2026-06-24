@@ -1276,6 +1276,52 @@ connect()
 </body>
 </html>`
 
+const PREVIEW_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#0a0a0f;font-family:'Noto Sans KR',sans-serif}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(2,1fr);gap:6px;padding:6px;width:1920px;height:1080px}
+.cell{position:relative;background:#111118;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,0.06)}
+.label{position:absolute;top:6px;left:8px;z-index:10;font-size:11px;font-weight:700;color:rgba(255,255,255,0.55);background:rgba(0,0,0,0.5);padding:2px 8px;border-radius:6px;pointer-events:none;letter-spacing:0.05em}
+iframe{position:absolute;top:0;left:0;width:1920px;height:1080px;border:none;transform-origin:top left;pointer-events:none}
+</style>
+</head>
+<body>
+<div class="grid" id="grid"></div>
+<script>
+const GAMES=[
+  {id:'roulette',  name:'룰렛'},
+  {id:'ladder',    name:'사다리타기'},
+  {id:'slot',      name:'슬롯머신'},
+  {id:'boss',      name:'보스전'},
+  {id:'quiz',      name:'퀴즈'},
+  {id:'number',    name:'숫자추첨'},
+  {id:'lottery',   name:'행운복권'},
+  {id:'pickboard', name:'뽑기판'},
+]
+const grid=document.getElementById('grid')
+function layout(){
+  const cellW=grid.offsetWidth/4
+  const cellH=grid.offsetHeight/2
+  const scale=Math.min(cellW/1920, cellH/1080)
+  grid.querySelectorAll('iframe').forEach(f=>{f.style.transform='scale('+scale+')'})
+}
+GAMES.forEach(g=>{
+  const cell=document.createElement('div')
+  cell.className='cell'
+  cell.innerHTML='<div class="label">'+g.name+'</div><iframe src="http://localhost:${port}/overlay/'+g.id+'" scrolling="no"></iframe>'
+  grid.appendChild(cell)
+})
+layout()
+window.addEventListener('resize',layout)
+<\/script>
+</body>
+</html>`
+
 const MONITOR_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -2252,6 +2298,7 @@ export class OverlayServer {
       else if (gameId === 'lottery')   html = LOTTERY_OVERLAY_HTML(port)
       else if (gameId === 'pickboard') html = PICKBOARD_OVERLAY_HTML(port)
       else if (gameId === 'monitor')   html = MONITOR_OVERLAY_HTML(port)
+      else if (gameId === 'preview')   html = PREVIEW_OVERLAY_HTML(port)
       else html = OVERLAY_HTML(gameId, 'purple', port)
       res.end(html)
     })
