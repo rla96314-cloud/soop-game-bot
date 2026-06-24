@@ -1276,6 +1276,99 @@ connect()
 </body>
 </html>`
 
+const MONITOR_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#0d1117;font-family:'Noto Sans KR',sans-serif;color:#e6edf3}
+.hd{display:flex;align-items:center;justify-content:space-between;padding:20px 28px 16px;border-bottom:1px solid rgba(255,255,255,0.07)}
+.hd-title{font-size:15px;font-weight:800;color:#58a6ff;letter-spacing:0.08em;text-transform:uppercase}
+.hd-clock{font-size:13px;color:#6e7681;font-weight:600;font-variant-numeric:tabular-nums}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:16px 20px;height:calc(100% - 65px)}
+.card{background:#161b22;border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:8px;position:relative;overflow:hidden;transition:border-color 0.3s,box-shadow 0.3s}
+.card::after{content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:var(--accent,#30363d);border-radius:14px 0 0 14px}
+.card.running{--accent:#3fb950;border-color:rgba(63,185,80,0.25);box-shadow:0 0 24px rgba(63,185,80,0.07)}
+.card.running .card::after{animation:pl 1s ease-in-out infinite}
+.card.waiting{--accent:#e3b341;border-color:rgba(227,179,65,0.25);box-shadow:0 0 24px rgba(227,179,65,0.07)}
+.card.finished{--accent:#58a6ff;border-color:rgba(88,166,255,0.2)}
+@keyframes pl{0%,100%{opacity:.5}50%{opacity:1}}
+.ch{display:flex;align-items:center;justify-content:space-between}
+.cname{font-size:13px;font-weight:800;color:var(--accent,#8b949e)}
+.cbadge{font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px;letter-spacing:0.04em}
+.badge-idle    {background:rgba(110,118,129,0.15);color:#6e7681}
+.badge-running {background:rgba(63,185,80,0.15);color:#3fb950}
+.badge-waiting {background:rgba(227,179,65,0.15);color:#e3b341}
+.badge-finished{background:rgba(88,166,255,0.15);color:#58a6ff}
+.cresult{font-size:22px;font-weight:800;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#e6edf3;min-height:28px}
+.cresult.empty{color:#21262d;font-size:18px}
+.cmeta{font-size:11px;color:#6e7681;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.c-roulette{--accent:#a371f7}.c-ladder{--accent:#58a6ff}.c-boss{--accent:#f85149}
+.c-gacha{--accent:#e3b341}.c-quiz{--accent:#3fb950}.c-slot{--accent:#d2a8ff}
+.c-race{--accent:#79c0ff}.c-rps{--accent:#f778ba}.c-fish{--accent:#56d364}
+.c-lottery{--accent:#ff9966}.c-number{--accent:#39c5cf}.c-pickboard{--accent:#ff7eb6}
+</style>
+</head>
+<body>
+<div class="hd">
+  <div class="hd-title">게임 모니터링</div>
+  <div class="hd-clock" id="clock">--:--:--</div>
+</div>
+<div class="grid" id="grid"></div>
+<script>
+const GAMES=[
+  {id:'roulette',name:'룰렛'},{id:'ladder',name:'사다리타기'},{id:'boss',name:'보스전'},{id:'gacha',name:'가챠'},
+  {id:'quiz',name:'퀴즈'},{id:'slot',name:'슬롯머신'},{id:'race',name:'경주'},{id:'rps',name:'가위바위보'},
+  {id:'fish',name:'낚시'},{id:'lottery',name:'행운복권'},{id:'number',name:'숫자추첨'},{id:'pickboard',name:'뽑기판'},
+]
+const states={};GAMES.forEach(g=>{states[g.id]={status:'idle',result:'',by:''}})
+const grid=document.getElementById('grid'),cards={}
+const BL={idle:'badge-idle',running:'badge-running',waiting:'badge-waiting',finished:'badge-finished'}
+const BT={idle:'대기',running:'진행 중',waiting:'모집 중',finished:'완료'}
+GAMES.forEach(g=>{
+  const el=document.createElement('div')
+  el.className='card c-'+g.id
+  el.innerHTML='<div class="ch"><span class="cname">'+g.name+'</span><span class="cbadge badge-idle" id="b-'+g.id+'">대기</span></div><div class="cresult empty" id="r-'+g.id+'">—</div><div class="cmeta" id="m-'+g.id+'">대기 중</div>'
+  grid.appendChild(el);cards[g.id]=el
+})
+function upd(id,st,res,by,meta){
+  const c=cards[id];if(!c)return
+  c.className='card c-'+id+(st!=='idle'?' '+st:'')
+  const b=document.getElementById('b-'+id);b.className='cbadge '+(BL[st]||BL.idle);b.textContent=BT[st]||st
+  const r=document.getElementById('r-'+id)
+  if(res){r.textContent=res;r.className='cresult'}else{r.textContent='—';r.className='cresult empty'}
+  const m=document.getElementById('m-'+id)
+  m.textContent=(by?by+'님':'')+((by&&meta)?' · ':'')+( meta||(!by?'대기 중':''))
+}
+setInterval(()=>{const d=new Date();document.getElementById('clock').textContent=d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0')+':'+d.getSeconds().toString().padStart(2,'0')},1000)
+function connect(){
+  const ws=new WebSocket('ws://localhost:${port}/__overlay_ws__')
+  ws.onmessage=e=>{
+    try{
+      const msg=JSON.parse(e.data)
+      if(msg.type==='game:state'&&msg.data?.id){
+        const d=msg.data,s=states[d.id]||{}
+        s.status=d.status||'idle';states[d.id]=s
+        upd(d.id,s.status,s.result||'',s.by||'',s.meta||'')
+      }
+      if(msg.type==='game:result'&&msg.data?.gameId){
+        const d=msg.data,id=d.gameId
+        states[id]={status:'finished',result:d.result||'',by:d.triggeredBy||'',meta:d.detail||''}
+        upd(id,'finished',d.result||'',d.triggeredBy||'',d.detail||'')
+        setTimeout(()=>{if(states[id]?.status==='finished'){states[id].status='idle';upd(id,'idle',d.result||'',d.triggeredBy||'')}},8000)
+      }
+      if(msg.type==='ping')ws.send(JSON.stringify({type:'pong'}))
+    }catch{}
+  }
+  ws.onclose=()=>setTimeout(connect,2000)
+}
+connect()
+<\/script>
+</body>
+</html>`
+
 const LOTTERY_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -2158,6 +2251,7 @@ export class OverlayServer {
       else if (gameId === 'number')    html = NUMBER_OVERLAY_HTML(port)
       else if (gameId === 'lottery')   html = LOTTERY_OVERLAY_HTML(port)
       else if (gameId === 'pickboard') html = PICKBOARD_OVERLAY_HTML(port)
+      else if (gameId === 'monitor')   html = MONITOR_OVERLAY_HTML(port)
       else html = OVERLAY_HTML(gameId, 'purple', port)
       res.end(html)
     })
