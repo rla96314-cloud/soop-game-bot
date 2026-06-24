@@ -1568,7 +1568,7 @@ const BOSS_SETTINGS_HTML = (port: number) => `<!DOCTYPE html>
     <button class="copy-btn" onclick="copyScript()">코드 복사</button>
     <div class="field" style="margin-top:16px">
       <label class="lbl">웹 앱 URL</label>
-      <input type="url" id="sheetsWebhookUrl" placeholder="https://script.google.com/macros/s/.../exec">
+      <input type="url" id="sheetsWebhookUrl" placeholder="https://script.google.com/macros/s/.../exec" value="https://script.google.com/macros/s/AKfycbybNbyhO7Lc9kM7FEKbWAwgctr1Xc3Cq9kSwzMymnyV-8NFuzaujCcyCZ4ru75KsLXt/exec">
       <div class="hint">저장 시 시트의 <b>"보스 설정"</b> 탭에 자동 동기화됩니다 · 보스 처치 시 레이드 기록 탭도 자동 생성됩니다</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-top:10px">

@@ -61,37 +61,20 @@ function ObsUrlChip() {
 }
 
 export default function BossPage() {
-  const { settings, patchSettings, gameStates } = useApp()
-  const el = (window as unknown as Record<string, Record<string, unknown>>).electron
+  const { settings, gameStates } = useApp()
 
   const gSettings = (settings?.games as Record<string, Record<string, unknown>> | undefined)?.boss ?? {}
-  const saveS     = (key: string, value: unknown) => patchSettings({ games: { boss: { [key]: value } } })
 
   const state  = gameStates['boss']
   const boss   = state?.boss as BossStateData | undefined
   const status = (state?.status as string) ?? 'idle'
-
-  const [bossName,    setBossName]    = useState((gSettings.bossName         as string)  ?? '보스')
-  const [maxHp,       setMaxHp]       = useState((gSettings.maxHp            as number)  ?? 100000)
-  const [dmgPerDot,   setDmgPerDot]   = useState((gSettings.damagePerDot     as number)  ?? 100)
-  const [threshold,   setThreshold]   = useState((gSettings.balloonThreshold as number)  ?? 100)
-  const [critEnabled, setCritEnabled] = useState((gSettings.critEnabled       as boolean) !== false)
-  const [critChance,  setCritChance]  = useState(Math.round(((gSettings.critChance as number) ?? 0.15) * 100))
-  const [critMult,    setCritMult]    = useState((gSettings.critMultiplier    as number)  ?? 2)
-  const [lootItems,   setLootItems]   = useState<BossLootItem[]>((gSettings.lootItems as BossLootItem[]) ?? [])
 
   const hpPct   = boss ? Math.max(0, (boss.currentHp / boss.maxHp) * 100) : 100
   const hpColor = hpPct > 60 ? '#10B981' : hpPct > 30 ? '#F59E0B' : '#EF4444'
   const parts   = boss?.participants ? Object.entries(boss.participants) : []
   const totalDmg= parts.reduce((s, [, p]) => s + (p as BossParticipant).totalDamage, 0)
 
-  const startRaid = async () => {
-    saveS('bossName', bossName); saveS('maxHp', maxHp); saveS('damagePerDot', dmgPerDot)
-    saveS('balloonThreshold', threshold); saveS('critEnabled', critEnabled)
-    saveS('critChance', critChance / 100); saveS('critMultiplier', critMult); saveS('lootItems', lootItems)
-    await new Promise(r => setTimeout(r, 100))
-    await (el.bossStart as () => Promise<unknown>)()
-  }
+  const idleBossName = (gSettings.bossName as string) ?? '보스'
 
   return (
     <div className={styles.page}>
@@ -104,9 +87,6 @@ export default function BossPage() {
         </div>
         <div className={styles.headerRight}>
           <ObsUrlChip />
-          {status === 'idle' && (
-            <button className={styles.startBtn} onClick={startRaid}>레이드 시작</button>
-          )}
         </div>
       </div>
 
@@ -128,38 +108,9 @@ export default function BossPage() {
       )}
 
       {status === 'idle' && (
-        <div className={styles.body}>
-          <div className={styles.col}>
-            <section className={styles.section}>
-              <h2 className={styles.sectionTitle}>기본 설정</h2>
-              <div className={styles.fieldGrid}>
-                <Field label="보스 이름"><input className={styles.input} value={bossName} onChange={e => setBossName(e.target.value)} /></Field>
-                <Field label="최대 HP"><input className={styles.input} type="number" min={1000} step={1000} value={maxHp} onChange={e => setMaxHp(Number(e.target.value))} /></Field>
-                <Field label="풍선당 데미지"><input className={styles.input} type="number" min={1} value={dmgPerDot} onChange={e => setDmgPerDot(Number(e.target.value))} /></Field>
-                <Field label="트리거 별풍선"><input className={styles.input} type="number" min={1} value={threshold} onChange={e => setThreshold(Number(e.target.value))} /></Field>
-              </div>
-            </section>
-            <section className={styles.section}>
-              <h2 className={styles.sectionTitle}>크리티컬 설정</h2>
-              <div className={styles.fieldGrid}>
-                <Field label="크리티컬 활성화">
-                  <label className={styles.toggleWrap}>
-                    <input type="checkbox" className={styles.toggleInput} checked={critEnabled} onChange={e => setCritEnabled(e.target.checked)} />
-                    <span className={styles.toggleTrack}><span className={styles.toggleThumb} /></span>
-                    <span className={styles.toggleLabel}>{critEnabled ? '활성' : '비활성'}</span>
-                  </label>
-                </Field>
-                <Field label="크리티컬 확률 (%)"><input className={styles.input} type="number" min={1} max={100} value={critChance} onChange={e => setCritChance(Number(e.target.value))} disabled={!critEnabled} /></Field>
-                <Field label="크리티컬 배율"><input className={styles.input} type="number" min={1.1} step={0.1} value={critMult} onChange={e => setCritMult(Number(e.target.value))} disabled={!critEnabled} /></Field>
-              </div>
-            </section>
-          </div>
-          <div className={styles.col}>
-            <section className={styles.section}>
-              <h2 className={styles.sectionTitle}>전리품</h2>
-              <BossLootEditor list={lootItems} onSave={next => { setLootItems(next); saveS('lootItems', next) }} />
-            </section>
-          </div>
+        <div className={styles.idleCard}>
+          <div className={styles.idleName}>{idleBossName}</div>
+          <div className={styles.idleHint}>레이드 대기 중</div>
         </div>
       )}
 
