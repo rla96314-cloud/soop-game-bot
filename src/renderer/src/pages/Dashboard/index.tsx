@@ -1,10 +1,8 @@
-import StatsHeader from './StatsHeader'
-import LiveChat from './LiveChat'
-import GameShortcuts from './GameShortcuts'
 import RecentHistory from './RecentHistory'
-import TodayStats from './TodayStats'
-import Schedule from './Schedule'
-import GameGrid from './GameGrid'
+import GameGrid      from './GameGrid'
+import TodayStats    from './TodayStats'
+import Schedule      from './Schedule'
+import StatsHeader   from './StatsHeader'
 import styles from './Dashboard.module.css'
 
 export default function Dashboard() {
@@ -12,22 +10,18 @@ export default function Dashboard() {
     <div className={styles.page}>
       <StatsHeader />
       <div className={styles.content}>
-        {/* 3-column layout */}
         <div className={styles.columns}>
           <div className={styles.colLeft}>
-            <LiveChat />
+            <RecentHistory />
           </div>
           <div className={styles.colMid}>
-            <GameShortcuts />
-            <RecentHistory />
+            <GameGrid />
           </div>
           <div className={styles.colRight}>
             <TodayStats />
             <Schedule />
           </div>
         </div>
-        {/* Game grid */}
-        <GameGrid />
       </div>
     </div>
   )
