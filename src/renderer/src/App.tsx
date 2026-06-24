@@ -17,9 +17,15 @@ export type Page = 'dashboard' | 'games' | 'boss' | 'overlay' | 'history' | 'set
 interface AuthUser { id: string; name: string }
 
 export default function App() {
-  const [page, setPage]   = useState<Page>('dashboard')
-  const [user, setUser]   = useState<AuthUser | null>(null)
-  const [ready, setReady] = useState(false)
+  const [page, setPage]         = useState<Page>('dashboard')
+  const [gamesInitial, setGamesInitial] = useState<string>('roulette')
+  const [user, setUser]         = useState<AuthUser | null>(null)
+  const [ready, setReady]       = useState(false)
+
+  const navigateToGame = (gameId: string) => {
+    setGamesInitial(gameId)
+    setPage('games')
+  }
 
   const el = (window as unknown as Record<string, unknown>).electron as Record<string, (...args: unknown[]) => unknown>
 
@@ -77,8 +83,8 @@ export default function App() {
         <div className={styles.body}>
           <Sidebar current={page} onChange={setPage} />
           <main className={styles.main}>
-            {page === 'dashboard' && <Dashboard />}
-            {page === 'games'     && <GamesPage />}
+            {page === 'dashboard' && <Dashboard onNavigateToGame={navigateToGame} />}
+            {page === 'games'     && <GamesPage initialSelected={gamesInitial} />}
             {page === 'boss'      && <BossPage />}
             {page === 'overlay'   && <OverlayPage />}
             {page === 'settings'  && <Settings />}

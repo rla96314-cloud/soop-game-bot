@@ -9,6 +9,7 @@ interface GachaGrade   { name: string; probability: number; color: string }
 interface QuizQuestion { question: string; answer: string }
 interface Prize        { name: string; description: string }
 interface PickItem     { name: string; description: string; color: string; count: number }
+interface LotteryPrize { name: string; prob: number; color: string; detail?: string }
 interface BossLootItem { name: string; description: string }
 
 interface BossParticipant { totalDamage: number; attackCount: number; critCount: number; pendingBalloons: number }
@@ -198,6 +199,51 @@ function GachaEditor({ grades: init, onSave }: { grades: GachaGrade[]; onSave: (
       ))}
 
       {grades.length === 0 && <div className={styles.listEmpty}>등급을 추가하세요</div>}
+    </div>
+  )
+}
+
+/** 복권 상품 편집 */
+function LotteryEditor({ prizes: init, onSave }: { prizes: LotteryPrize[]; onSave: (v: LotteryPrize[]) => void }) {
+  const [prizes, setPrizes] = useState<LotteryPrize[]>(init)
+  const commit = (next: LotteryPrize[]) => { setPrizes(next); onSave(next) }
+  const setField = (i: number, key: keyof LotteryPrize, val: string | number) => {
+    const next = prizes.map((p, idx) => idx === i ? { ...p, [key]: val } : p)
+    setPrizes(next); return next
+  }
+  const total = prizes.reduce((s, p) => s + (p.prob || 0), 0)
+  const DEFAULT: LotteryPrize[] = [
+    { name: '꽝',           prob: 55, color: '#9CA3AF', detail: '다음엔 행운이!' },
+    { name: '별풍선 10개',  prob: 25, color: '#F97316', detail: '소소한 행운!' },
+    { name: '별풍선 50개',  prob: 12, color: '#10B981', detail: '행운이 찾아왔어요!' },
+    { name: '별풍선 200개', prob: 6,  color: '#8B5CF6', detail: '대박 행운!' },
+    { name: '별풍선 500개', prob: 2,  color: '#EF4444', detail: '초대박!!!' },
+  ]
+  return (
+    <div className={styles.listEditor}>
+      <div className={styles.listHeader}>
+        <span className={styles.listTitle}>상품 목록</span>
+        <span className={`${styles.totalBadge} ${total !== 100 ? styles.totalWarn : ''}`}>합계 {total}%</span>
+        <button className={styles.addBtn} onClick={() => commit([...prizes, { name: '새 상품', prob: 5, color: '#6B7280', detail: '' }])}>+ 추가</button>
+        {prizes.length === 0 && <button className={styles.addBtn} style={{ background: 'none', border: '1px dashed var(--border)', color: 'var(--p500)' }} onClick={() => commit(DEFAULT)}>기본값 불러오기</button>}
+      </div>
+      <div className={styles.listHead4}>
+        <span style={{ width: 36 }}>색상</span>
+        <span style={{ flex: 1 }}>상품명</span>
+        <span style={{ width: 100 }}>설명</span>
+        <span style={{ width: 70, textAlign: 'right' }}>확률(%)</span>
+        <span style={{ width: 32 }} />
+      </div>
+      {prizes.map((p, i) => (
+        <div key={i} className={styles.listRow}>
+          <input type="color" className={styles.colorInput} value={p.color} onChange={e => commit(setField(i, 'color', e.target.value))} />
+          <input className={styles.listInput} style={{ flex: 1 }} value={p.name} onChange={e => setField(i, 'name', e.target.value)} onBlur={() => onSave(prizes)} />
+          <input className={styles.listInput} style={{ width: 100 }} placeholder="설명" value={p.detail ?? ''} onChange={e => setField(i, 'detail', e.target.value)} onBlur={() => onSave(prizes)} />
+          <input className={styles.listInput} style={{ width: 70, textAlign: 'right' }} type="number" min={0} max={100} value={p.prob} onChange={e => commit(setField(i, 'prob', Number(e.target.value)))} />
+          <button className={styles.delBtn} onClick={() => commit(prizes.filter((_, idx) => idx !== i))}>✕</button>
+        </div>
+      ))}
+      {prizes.length === 0 && <div className={styles.listEmpty}>상품을 추가하거나 기본값을 불러오세요</div>}
     </div>
   )
 }
@@ -1350,85 +1396,92 @@ function NumberPanel({
   const running = state?.status === 'running'
   const numData = state?.number as NumberPickState | undefined
 
-  const minNumber   = (gSettings.minNumber   as number)   ?? 1
-  const maxNumber   = (gSettings.maxNumber   as number)   ?? 100
-  const count       = (gSettings.count       as number)   ?? 1
-  const spinDuration= (gSettings.spinDuration as number)  ?? 3000
-  const excludeList = (gSettings.excludeList  as number[]) ?? []
-
+  const minNumber    = (gSettings.minNumber    as number)   ?? 1
+  const maxNumber    = (gSettings.maxNumber    as number)   ?? 100
+  const count        = (gSettings.count        as number)   ?? 1
+  const spinDuration = (gSettings.spinDuration as number)   ?? 3000
+  const excludeList  = (gSettings.excludeList  as number[]) ?? []
   const [excludeInput, setExcludeInput] = useState('')
 
   function addExclude() {
     const n = parseInt(excludeInput.trim(), 10)
-    if (isNaN(n)) return
-    if (excludeList.includes(n)) { setExcludeInput(''); return }
-    saveSetting('excludeList', [...excludeList, n].sort((a,b) => a - b))
+    if (isNaN(n) || excludeList.includes(n)) { setExcludeInput(''); return }
+    saveSetting('excludeList', [...excludeList, n].sort((a, b) => a - b))
     setExcludeInput('')
   }
-  function removeExclude(n: number) {
-    saveSetting('excludeList', excludeList.filter(x => x !== n))
-  }
-  function clearExclude() {
-    saveSetting('excludeList', [])
-  }
+
+  const rangeSize = Math.max(0, maxNumber - minNumber + 1 - excludeList.length)
 
   return (
-    <div className={styles.nbWrap}>
-      {/* Settings */}
-      <div className={styles.nbSettings}>
-        <div className={styles.nbRow}>
-          <span className={styles.nbLabel}>범위</span>
-          <input type="number" className={styles.nbInput} value={minNumber}
-            onChange={e => saveSetting('minNumber', Number(e.target.value))} style={{ width: 80 }} />
-          <span className={styles.nbSep}>~</span>
-          <input type="number" className={styles.nbInput} value={maxNumber}
-            onChange={e => saveSetting('maxNumber', Number(e.target.value))} style={{ width: 80 }} />
-        </div>
-        <div className={styles.nbRow}>
-          <span className={styles.nbLabel}>추첨 개수</span>
-          <input type="number" min={1} className={styles.nbInput} value={count}
-            onChange={e => saveSetting('count', Number(e.target.value))} style={{ width: 80 }} />
-          <span className={styles.nbLabel} style={{ marginLeft: 24 }}>애니메이션(ms)</span>
-          <input type="number" step={500} className={styles.nbInput} value={spinDuration}
-            onChange={e => saveSetting('spinDuration', Number(e.target.value))} style={{ width: 90 }} />
-        </div>
+    <div className={styles.listEditor}>
+
+      {/* ── 추첨 설정 ── */}
+      <div className={styles.listHeader}>
+        <span className={styles.listTitle}>추첨 설정</span>
+        <span className={styles.totalBadge} style={{ background: rangeSize < count ? 'rgba(239,68,68,0.15)' : undefined, color: rangeSize < count ? '#EF4444' : undefined }}>
+          풀 {rangeSize}개
+        </span>
       </div>
 
-      {/* Exclude list */}
-      <div className={styles.nbExclude}>
-        <div className={styles.nbExcludeHeader}>
-          <span className={styles.nbLabel}>제외 번호</span>
-          {excludeList.length > 0 && (
-            <button className={styles.nbClearBtn} onClick={clearExclude}>전체 삭제</button>
-          )}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '0 0 4px' }}>
+        <div>
+          <div className={styles.nbLabel} style={{ marginBottom: 6 }}>추첨 범위</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input type="number" className={styles.nbInput} style={{ width: 72, flex: 1 }}
+              value={minNumber} onChange={e => saveSetting('minNumber', Number(e.target.value))} />
+            <span className={styles.nbSep}>~</span>
+            <input type="number" className={styles.nbInput} style={{ width: 72, flex: 1 }}
+              value={maxNumber} onChange={e => saveSetting('maxNumber', Number(e.target.value))} />
+          </div>
         </div>
-        <div className={styles.nbExcludeAdd}>
-          <input type="number" className={styles.nbInput} placeholder="제외할 번호"
-            value={excludeInput} onChange={e => setExcludeInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && addExclude()} style={{ width: 120 }} />
-          <button className={styles.nbAddBtn} onClick={addExclude}>추가</button>
+        <div>
+          <div className={styles.nbLabel} style={{ marginBottom: 6 }}>추첨 개수</div>
+          <input type="number" min={1} className={styles.nbInput} style={{ width: '100%' }}
+            value={count} onChange={e => saveSetting('count', Number(e.target.value))} />
         </div>
-        <div className={styles.nbChips}>
-          {excludeList.map(n => (
-            <span key={n} className={styles.nbChip}>
-              {n}
-              <button className={styles.nbChipRemove} onClick={() => removeExclude(n)}>×</button>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <div className={styles.nbLabel} style={{ marginBottom: 6 }}>애니메이션 시간 (ms)</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="range" min={1000} max={8000} step={500} style={{ flex: 1 }}
+              value={spinDuration} onChange={e => saveSetting('spinDuration', Number(e.target.value))} />
+            <span className={styles.nbInput} style={{ width: 72, textAlign: 'center', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              {spinDuration}
             </span>
-          ))}
-          {excludeList.length === 0 && <span className={styles.nbEmpty}>제외 번호 없음</span>}
+          </div>
         </div>
       </div>
 
-      {/* Result */}
+      {/* ── 제외 번호 ── */}
+      <div className={styles.listHeader} style={{ marginTop: 8 }}>
+        <span className={styles.listTitle}>제외 번호</span>
+        {excludeList.length > 0 && (
+          <button className={styles.nbClearBtn} onClick={() => saveSetting('excludeList', [])}>전체 삭제</button>
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+        <input type="number" className={styles.nbInput} placeholder="제외할 번호 입력" style={{ flex: 1 }}
+          value={excludeInput} onChange={e => setExcludeInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && addExclude()} />
+        <button className={styles.nbAddBtn} onClick={addExclude}>추가</button>
+      </div>
+      <div className={styles.nbChips}>
+        {excludeList.map(n => (
+          <span key={n} className={styles.nbChip}>
+            {n}
+            <button className={styles.nbChipRemove} onClick={() => saveSetting('excludeList', excludeList.filter(x => x !== n))}>×</button>
+          </span>
+        ))}
+        {excludeList.length === 0 && <span className={styles.nbEmpty}>제외 번호 없음</span>}
+      </div>
+
+      {/* ── 추첨 결과 ── */}
       {(running || numData) && (
         <div className={styles.nbResult}>
-          <div className={styles.nbResultLabel}>{running ? '추첨 중...' : '추첨 결과'}</div>
+          <div className={styles.nbResultLabel}>{running ? '추첨 중...' : `추첨 결과 · ${numData?.triggeredBy ?? ''}님`}</div>
           <div className={styles.nbNumbers}>
             {running
               ? <div className={styles.nbNumberRolling}>?</div>
-              : numData?.result.map((n, i) => (
-                  <div key={i} className={styles.nbNumber}>{n}</div>
-                ))
+              : numData?.result.map((n, i) => <div key={i} className={styles.nbNumber}>{n}</div>)
             }
           </div>
           {!running && numData && (
@@ -1756,9 +1809,13 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-export default function GamesPage() {
+export default function GamesPage({ initialSelected }: { initialSelected?: string }) {
   const { settings, patchSettings, triggerGame, gameStates } = useApp()
-  const [selected, setSelected] = useState<string>('roulette')
+  const [selected, setSelected] = useState<string>(initialSelected ?? 'roulette')
+
+  useEffect(() => {
+    if (initialSelected) setSelected(initialSelected)
+  }, [initialSelected])
 
   const game      = GAMES.find(g => g.id === selected)!
   const gSettings = (settings?.games as Record<string, Record<string, unknown>> | undefined)?.[game.settingKey] ?? {}
@@ -1955,6 +2012,25 @@ export default function GamesPage() {
             gSettings={gSettings}
             gameStates={gameStates}
             saveSetting={saveSetting}
+          />
+        )}
+
+        {game.id === 'lottery' && (
+          <div className={styles.fields} style={{ marginTop: 0 }}>
+            <Field label="스크래치 시간 (ms)">
+              <input type="number" step={500} min={1000} max={8000}
+                value={(gSettings.scratchDuration as number) ?? 3000}
+                onChange={e => saveSetting('scratchDuration', Number(e.target.value))}
+              />
+            </Field>
+          </div>
+        )}
+
+        {game.id === 'lottery' && (
+          <LotteryEditor
+            key={selected}
+            prizes={(gSettings.prizes as LotteryPrize[]) ?? []}
+            onSave={v => saveSetting('prizes', v)}
           />
         )}
 

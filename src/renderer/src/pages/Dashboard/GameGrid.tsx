@@ -21,8 +21,8 @@ const STATUS_LABEL: Record<string, { text: string; color: string }> = {
   ended:   { text: '종료',   color: '#8B5CF6' },
 }
 
-export default function GameGrid() {
-  const { gameStates, triggerGame } = useApp()
+export default function GameGrid({ onNavigateToGame }: { onNavigateToGame: (id: string) => void }) {
+  const { gameStates } = useApp()
 
   return (
     <div className={styles.grid}>
@@ -33,7 +33,7 @@ export default function GameGrid() {
         const busy   = status === 'running' || status === 'waiting'
 
         return (
-          <div key={g.id} className={styles.card}>
+          <div key={g.id} className={styles.card} onClick={() => onNavigateToGame(g.id)} style={{ cursor: 'pointer' }}>
             <div className={styles.iconWrap} style={{ background: `${g.color}18` }}>
               <span className={styles.icon} style={{ background: g.color }}>
                 {g.name.charAt(0)}
@@ -43,11 +43,10 @@ export default function GameGrid() {
             <div className={styles.status} style={{ color: sl.color }}>{sl.text}</div>
             <button
               className={styles.runBtn}
-              style={{ background: busy ? '#9CA3AF' : g.color }}
-              onClick={() => !busy && triggerGame(g.id)}
-              disabled={busy}
+              style={{ background: busy ? '#10B981' : g.color }}
+              onClick={e => { e.stopPropagation(); onNavigateToGame(g.id) }}
             >
-              {busy ? '진행중' : '실행'}
+              {busy ? '진행중' : '설정'}
             </button>
           </div>
         )

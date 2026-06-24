@@ -5,7 +5,7 @@ import Schedule      from './Schedule'
 import StatsHeader   from './StatsHeader'
 import styles from './Dashboard.module.css'
 
-export default function Dashboard() {
+export default function Dashboard({ onNavigateToGame }: { onNavigateToGame: (id: string) => void }) {
   return (
     <div className={styles.page}>
       <StatsHeader />
@@ -15,7 +15,7 @@ export default function Dashboard() {
             <RecentHistory />
           </div>
           <div className={styles.colMid}>
-            <GameGrid />
+            <GameGrid onNavigateToGame={onNavigateToGame} />
           </div>
           <div className={styles.colRight}>
             <TodayStats />
