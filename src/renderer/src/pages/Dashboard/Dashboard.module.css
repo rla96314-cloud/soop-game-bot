@@ -17,7 +17,7 @@
   display: grid;
   grid-template-columns: 380px 1fr 260px;
   gap: 14px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .colLeft,

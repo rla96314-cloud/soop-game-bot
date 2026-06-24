@@ -4,6 +4,9 @@
   border-radius: 14px;
   overflow: hidden;
   box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .header {
@@ -28,6 +31,12 @@
   cursor: pointer;
   font-weight: 600;
   font-family: inherit;
+}
+
+.tableWrap {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .table {

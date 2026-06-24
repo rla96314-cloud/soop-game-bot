@@ -32,52 +32,44 @@ export default function RecentHistory() {
         <span className={styles.title}>최근 실행 기록</span>
         <span className={styles.count}>{history.length}개</span>
       </div>
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            <th>게임</th>
-            <th>트리거한 사람</th>
-            <th>소모 별풍선</th>
-            <th>결과</th>
-            <th>시간</th>
-          </tr>
-        </thead>
-        <tbody>
-          {history.length === 0 && (
+      <div className={styles.tableWrap}>
+        <table className={styles.table}>
+          <thead>
             <tr>
-              <td colSpan={5} className={styles.empty}>게임 기록 없음</td>
+              <th>게임</th>
+              <th>트리거</th>
+              <th>결과</th>
+              <th>시간</th>
             </tr>
-          )}
-          {history.map((h, i) => (
-            <tr key={i}>
-              <td>
-                <div className={styles.gameCell}>
-                  {h.gameName}
-                </div>
-              </td>
-              <td>
-                <div className={styles.userCell}>
-                  <div className={styles.userDot} />
-                  {h.triggeredBy}
-                </div>
-              </td>
-              <td>
-                {h.balloon > 0 && (
-                  <div className={styles.balloonCell}>
-                    <span className={styles.balloonAmt}>{h.balloon.toLocaleString()}</span>
+          </thead>
+          <tbody>
+            {history.length === 0 && (
+              <tr>
+                <td colSpan={4} className={styles.empty}>게임 기록 없음</td>
+              </tr>
+            )}
+            {history.map((h, i) => (
+              <tr key={i}>
+                <td>
+                  <div className={styles.gameCell}>{h.gameName}</div>
+                </td>
+                <td>
+                  <div className={styles.userCell}>
+                    <div className={styles.userDot} />
+                    {h.triggeredBy}
                   </div>
-                )}
-              </td>
-              <td>
-                <span className={styles.result} style={{ color: colorFor(h.result) }}>
-                  {h.result}
-                </span>
-              </td>
-              <td className={styles.timeCell}>{fmtTime(h.ts)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                </td>
+                <td>
+                  <span className={styles.result} style={{ color: colorFor(h.result) }}>
+                    {h.result}
+                  </span>
+                </td>
+                <td className={styles.timeCell}>{fmtTime(h.ts)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
