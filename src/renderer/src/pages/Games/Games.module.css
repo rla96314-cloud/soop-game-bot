@@ -936,6 +936,35 @@
 .ladderManualStartBtn { background: #10B981; color: #fff; }
 .ladderManualResetBtn { background: var(--bg2); color: var(--text2); border: 1.5px solid var(--border); }
 
+.ladderRevealSection {
+  margin-top: 10px;
+}
+.ladderRevealLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text3);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ladderRevealBtns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.ladderRevealBtn {
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1.5px solid;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.ladderRevealBtn:disabled { cursor: not-allowed; opacity: 0.8; }
+.ladderRevealBtnDone { opacity: 0.7; }
+
 /* ── RoulettePanel ────────────────────────────────────────────── */
 
 .rwPanel {

@@ -851,6 +851,7 @@ function LadderPanel({ gSettings, gameStates }: {
   const [previewData, setPreviewData]         = useState<LadderData | null>(null)
   const [manualResult, setManualResult]       = useState<LadderData | null>(null)
   const [manualAnimating, setManualAnimating] = useState(false)
+  const [revealedSet, setRevealedSet]         = useState<Set<number>>(new Set())
 
   const broadcast = (type: string, data: unknown) => {
     if (el?.overlayBroadcast)
@@ -862,30 +863,40 @@ function LadderPanel({ gSettings, gameStates }: {
     if (!name || manualParticipants.includes(name)) return
     setManualParticipants(prev => [...prev, name])
     setManualInput('')
-    setPreviewData(null); setManualResult(null)
+    setPreviewData(null); setManualResult(null); setRevealedSet(new Set())
   }
 
   const removeParticipant = (i: number) => {
     setManualParticipants(prev => prev.filter((_, idx) => idx !== i))
-    setPreviewData(null); setManualResult(null)
+    setPreviewData(null); setManualResult(null); setRevealedSet(new Set())
   }
 
   const showOverlay = () => {
     if (manualParticipants.length < 2) return
     const data = buildLadderData(manualParticipants, prizes)
-    setPreviewData(data); setManualResult(null)
+    setPreviewData(data); setManualResult(null); setRevealedSet(new Set())
     broadcast('game:state', { id: 'ladder', status: 'manual_preview', ladder: { ladderData: data } })
   }
 
-  const startLadder = () => {
+  const revealParticipant = (idx: number) => {
+    if (!previewData || revealedSet.has(idx)) return
+    setRevealedSet(prev => new Set([...prev, idx]))
+    setManualResult(previewData)
+    broadcast('game:ladder:reveal', { ladderData: previewData, revealIdx: idx })
+  }
+
+  const revealAll = () => {
     if (!previewData) return
     setManualResult(previewData); setManualAnimating(true)
     broadcast('game:state', { id: 'ladder', status: 'manual_running', ladder: { ladderData: previewData } })
+    const unrevealed = manualParticipants.map((_, i) => i).filter(i => !revealedSet.has(i))
+    setRevealedSet(new Set(manualParticipants.map((_, i) => i)))
     setTimeout(() => setManualAnimating(false), (previewData.rows + 2) * 60 + 500)
+    void unrevealed
   }
 
   const resetManual = () => {
-    setPreviewData(null); setManualResult(null)
+    setPreviewData(null); setManualResult(null); setRevealedSet(new Set())
     broadcast('game:state', { id: 'ladder', status: 'idle', ladder: null })
   }
 
@@ -968,13 +979,32 @@ function LadderPanel({ gSettings, gameStates }: {
               disabled={manualParticipants.length < 2 || !!previewData}
               onClick={showOverlay}
             >오버레이 노출</button>
-            <button
-              className={styles.ladderManualStartBtn}
-              disabled={!previewData || !!manualResult}
-              onClick={startLadder}
-            >사다리 타기</button>
             <button className={styles.ladderManualResetBtn} onClick={resetManual}>초기화</button>
           </div>
+
+          {/* 참가자별 공개 버튼 */}
+          {previewData && (
+            <div className={styles.ladderRevealSection}>
+              <div className={styles.ladderRevealLabel}>참가자별 공개</div>
+              <div className={styles.ladderRevealBtns}>
+                {manualParticipants.map((p, i) => (
+                  <button
+                    key={i}
+                    className={`${styles.ladderRevealBtn} ${revealedSet.has(i) ? styles.ladderRevealBtnDone : ''}`}
+                    style={{ borderColor: PLAYER_COLORS[i % PLAYER_COLORS.length], color: revealedSet.has(i) ? '#fff' : PLAYER_COLORS[i % PLAYER_COLORS.length], background: revealedSet.has(i) ? PLAYER_COLORS[i % PLAYER_COLORS.length] : PLAYER_COLORS[i % PLAYER_COLORS.length] + '18' }}
+                    disabled={revealedSet.has(i)}
+                    onClick={() => revealParticipant(i)}
+                  >{p}</button>
+                ))}
+                <button
+                  className={styles.ladderManualStartBtn}
+                  style={{ flex: 'none', padding: '6px 12px' }}
+                  disabled={revealedSet.size === manualParticipants.length}
+                  onClick={revealAll}
+                >전체 공개</button>
+              </div>
+            </div>
+          )}
 
           {/* 수동 결과 */}
           {manualResult && (

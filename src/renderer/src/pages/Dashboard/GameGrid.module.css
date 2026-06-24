@@ -28,9 +28,9 @@
 }
 
 .iconWrap {
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;

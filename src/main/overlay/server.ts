@@ -303,6 +303,65 @@ const phRes   = document.getElementById('phase-result')
 const svgEl   = document.getElementById('lsvg')
 const resList = document.getElementById('res-list')
 let hideTimer = null
+let _revealLd = null   // 수동 모드 현재 ladderData 저장
+
+function _orthoPts(cols, upTo, rows, COL_W, PAD_X, PAD_T, ROW_H) {
+  const xp = c => PAD_X + c * COL_W
+  const pts = [xp(cols[0]) + ',' + PAD_T]
+  for (let r = 0; r < Math.min(upTo, rows); r++) {
+    const curY = PAD_T + r * ROW_H
+    const nxtY = PAD_T + (r + 1) * ROW_H
+    if (cols[r + 1] !== cols[r]) pts.push(xp(cols[r + 1]) + ',' + curY)
+    pts.push(xp(cols[r + 1]) + ',' + nxtY)
+  }
+  return pts.join(' ')
+}
+
+function revealSinglePath(ld, idx) {
+  if (!ld) return
+  const cols = ld.cols, rows = ld.rows
+  const COL_W = Math.min(120, Math.floor(760 / Math.max(cols - 1, 1)))
+  const ROW_H = 30, PAD_X = 50, PAD_T = 52
+  const xp = c => PAD_X + c * COL_W
+  const mkEl = (tag, attrs) => {
+    const el = document.createElementNS('http://www.w3.org/2000/svg', tag)
+    Object.entries(attrs).forEach(([k,v]) => el.setAttribute(k,v)); return el
+  }
+  const path = ld.paths[idx]; if (!path) return
+  const color = COLORS[idx % COLORS.length]
+
+  const pl = mkEl('polyline', { fill:'none', stroke: color,
+    'stroke-width': 3.5, 'stroke-opacity': 0.9,
+    'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+    points: xp(path.cols[0]) + ',' + PAD_T })
+  svgEl.appendChild(pl)
+  const dot = mkEl('circle', { r: 6, fill: color, cx: xp(path.cols[0]), cy: PAD_T, stroke:'#fff', 'stroke-width': 2 })
+  svgEl.appendChild(dot)
+
+  let step = 0
+  const tick = setInterval(() => {
+    step++
+    pl.setAttribute('points', _orthoPts(path.cols, step, rows, COL_W, PAD_X, PAD_T, ROW_H))
+    const cr = Math.min(step, rows)
+    dot.setAttribute('cx', xp(path.cols[cr]))
+    dot.setAttribute('cy', PAD_T + cr * ROW_H)
+    if (step >= rows) {
+      clearInterval(tick)
+      const res = ld.results[idx]
+      if (res) {
+        const col = COLORS[res.startCol % COLORS.length], bg = BGTINT[res.startCol % BGTINT.length]
+        const row = document.createElement('div')
+        row.className = 'res-row'
+        row.style.borderColor = col; row.style.background = bg
+        row.innerHTML = '<span class="res-user" style="color:' + col + '">' + res.user + '</span>' +
+          '<span class="res-arrow">→</span><span class="res-prize">' + res.prize + '</span>'
+        resList.appendChild(row)
+      }
+      if (hideTimer) clearTimeout(hideTimer)
+      hideTimer = setTimeout(hide, 15000)
+    }
+  }, 55)
+}
 
 function show() { card.classList.add('show') }
 function hide() { card.classList.remove('show') }
@@ -444,6 +503,7 @@ function renderResult(ld) {
 }
 
 function renderManualPreview(ld) {
+  _revealLd = ld
   phColl.style.display = 'none'
   phRes.classList.add('on')
 
@@ -516,6 +576,7 @@ function connect() {
         else if (s.status === 'manual_running' && s.ladder?.ladderData) renderResult(s.ladder.ladderData)
         else if (s.status === 'idle') hide()
       }
+      if (msg.type === 'game:ladder:reveal') revealSinglePath(msg.data?.ladderData ?? _revealLd, msg.data?.revealIdx)
       if (msg.type === 'ping') ws.send(JSON.stringify({type:'pong'}))
     } catch {}
   }
@@ -2019,9 +2080,9 @@ html,body{background:transparent !important;overflow:hidden;font-family:'Noto Sa
 .sp{color:#FFD700;font-size:34px;line-height:1;text-shadow:0 0 10px rgba(255,215,0,0.8),0 0 24px rgba(255,215,0,0.4);animation:spA 2s ease-in-out infinite;display:inline-block}
 .sp2{color:#FFD700;font-size:22px;line-height:1;text-shadow:0 0 7px rgba(255,215,0,0.7);animation:spA 2.5s ease-in-out infinite reverse;display:inline-block;align-self:flex-end;margin-bottom:18px}
 @keyframes spA{0%,100%{transform:rotate(0deg) scale(1)}50%{transform:rotate(22deg) scale(1.2)}}
-.title{display:flex;align-items:baseline}
-.ty{font-size:64px;font-weight:900;color:#FFD700;-webkit-text-stroke:4px #2a0060;text-shadow:4px 4px 0 #2a0060,-1px -1px 0 #2a0060,0 0 24px rgba(255,215,0,0.5);line-height:1}
-.tw{font-size:64px;font-weight:900;color:#FFFFFF;-webkit-text-stroke:4px #2a0060;text-shadow:4px 4px 0 #2a0060,-1px -1px 0 #2a0060;line-height:1}
+.title{display:flex;align-items:baseline;gap:4px}
+.ty{font-size:62px;font-weight:900;color:#FFD700;text-shadow:2px 2px 0 rgba(42,0,96,0.9),0 0 20px rgba(255,215,0,0.6);line-height:1;letter-spacing:-1px}
+.tw{font-size:62px;font-weight:900;color:#FFFFFF;text-shadow:2px 2px 0 rgba(42,0,96,0.9);line-height:1;letter-spacing:-1px}
 .msp{position:absolute;color:#FFD700;text-shadow:0 0 5px rgba(255,215,0,0.9);animation:mspA 1.6s ease-in-out infinite}
 @keyframes mspA{0%,100%{opacity:0.35;transform:scale(1)}50%{opacity:1;transform:scale(1.35)}}
 /* Scratch wrap */
