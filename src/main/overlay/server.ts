@@ -562,7 +562,7 @@ function renderManualPreview(ld) {
     Object.entries(attrs).forEach(([k,v]) => el.setAttribute(k,v)); return el
   }
 
-  // Rails only (no rungs shown)
+  // Rails
   for (let c = 0; c < cols; c++) {
     svgEl.appendChild(mkEl('line', {
       x1: xp(c), y1: PAD_T, x2: xp(c), y2: PAD_T + rows * ROW_H,
@@ -571,6 +571,15 @@ function renderManualPreview(ld) {
     svgEl.appendChild(mkEl('circle', { cx: xp(c), cy: PAD_T, r: 5, fill: '#333' }))
     svgEl.appendChild(mkEl('circle', { cx: xp(c), cy: PAD_T + rows * ROW_H, r: 5, fill: '#333' }))
   }
+
+  // Rungs (가로줄 표시)
+  ld.rungs.forEach(rg => {
+    svgEl.appendChild(mkEl('line', {
+      x1: xp(rg.leftCol), y1: PAD_T + rg.row * ROW_H,
+      x2: xp(rg.leftCol + 1), y2: PAD_T + rg.row * ROW_H,
+      stroke: '#333', 'stroke-width': 3, 'stroke-linecap': 'round'
+    }))
+  })
 
   // Name pills (top)
   ld.order.forEach((name, c) => {
@@ -592,12 +601,6 @@ function renderManualPreview(ld) {
     const t = mkEl('text', { x: xp(c), y: py+18, 'text-anchor':'middle', 'font-size': 15, 'font-weight': 900, fill: col, 'font-family': 'Noto Sans KR, sans-serif' })
     t.textContent = '?'; g.appendChild(t); svgEl.appendChild(g)
   })
-
-  // Frosted cover over rung area
-  svgEl.appendChild(mkEl('rect', {
-    x: PAD_X - 12, y: PAD_T, width: W - (PAD_X - 12) * 2, height: rows * ROW_H,
-    fill: 'rgba(254,252,240,0.82)', rx: 6
-  }))
 
   resList.innerHTML = ''
   show()
