@@ -321,7 +321,8 @@ function revealSinglePath(ld, idx) {
   if (!ld) return
   const cols = ld.cols, rows = ld.rows
   const COL_W = Math.min(120, Math.floor(760 / Math.max(cols - 1, 1)))
-  const ROW_H = 30, PAD_X = 50, PAD_T = 52
+  const PAD_X = 50, PAD_T = 52
+  const ROW_H = Math.max(16, Math.min(30, Math.floor(380 / Math.max(1, rows))))
   const xp = c => PAD_X + c * COL_W
   const mkEl = (tag, attrs) => {
     const el = document.createElementNS('http://www.w3.org/2000/svg', tag)
@@ -394,7 +395,8 @@ function renderResult(ld) {
 
   const cols = ld.cols, rows = ld.rows
   const COL_W = Math.min(120, Math.floor(760 / Math.max(cols - 1, 1)))
-  const ROW_H = 30, PAD_X = 50, PAD_T = 52, PAD_B = 48
+  const PAD_X = 50, PAD_T = 52, PAD_B = 48
+  const ROW_H = Math.max(16, Math.min(30, Math.floor((480 - PAD_T - PAD_B) / Math.max(1, rows))))
   const W = PAD_X * 2 + (cols - 1) * COL_W
   const H = PAD_T + rows * ROW_H + PAD_B
   svgEl.setAttribute('viewBox', '0 0 ' + W + ' ' + H)
@@ -509,7 +511,8 @@ function renderManualPreview(ld) {
 
   const cols = ld.cols, rows = ld.rows
   const COL_W = Math.min(120, Math.floor(760 / Math.max(cols - 1, 1)))
-  const ROW_H = 30, PAD_X = 50, PAD_T = 52, PAD_B = 48
+  const PAD_X = 50, PAD_T = 52, PAD_B = 48
+  const ROW_H = Math.max(16, Math.min(30, Math.floor((480 - PAD_T - PAD_B) / Math.max(1, rows))))
   const W = PAD_X * 2 + (cols - 1) * COL_W
   const H = PAD_T + rows * ROW_H + PAD_B
   svgEl.setAttribute('viewBox', '0 0 ' + W + ' ' + H)
@@ -778,9 +781,13 @@ function drawWheel(items, angle) {
     const mid = start + sweep / 2
     const lx = cx + Math.cos(mid) * segR * 0.62, ly = cy + Math.sin(mid) * segR * 0.62
     ctx.save(); ctx.translate(lx, ly); ctx.rotate(mid + Math.PI / 2)
-    ctx.fillStyle = DARK[i % DARK.length]; ctx.font = '800 15px "Noto Sans KR",sans-serif'
+    // 호 길이에 맞게 폰트 크기 동적 계산
+    const arcLen = sweep * segR * 0.62
+    const label  = item.name.length > 5 ? item.name.slice(0,4)+'…' : item.name
+    const fs     = Math.min(15, Math.max(8, Math.floor(arcLen / (label.length * 1.15 + 1))))
+    ctx.fillStyle = DARK[i % DARK.length]; ctx.font = '800 ' + fs + 'px "Noto Sans KR",sans-serif'
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.fillText(item.name.length > 5 ? item.name.slice(0,4)+'…' : item.name, 0, 0)
+    ctx.fillText(label, 0, 0)
     ctx.restore(); start += sweep
   })
 
@@ -1573,6 +1580,7 @@ const BOSS_SETTINGS_HTML = (port: number) => `<!DOCTYPE html>
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-top:10px">
       <button class="copy-btn" style="margin:0" onclick="loadFromSheets()">시트에서 불러오기</button>
+      <a class="copy-btn" style="margin:0;text-decoration:none" href="https://docs.google.com/spreadsheets/d/1izSTb3yqAJLuAamKVXwxTpo8-7H1JBVJDW8hSkil-Eg/edit" target="_blank">📊 스프레드시트 열기</a>
       <span id="sheetLoadStatus" style="font-size:12px;color:#6e7681"></span>
     </div>
   </div>
