@@ -6,6 +6,43 @@ import { app } from 'electron'
 import { loadSettings, patchSettings } from '../store/settings'
 import type { GameResult, GameState } from '../games/engine'
 
+const GS_BOSS_URL = 'https://script.google.com/macros/s/AKfycbybNbyhO7Lc9kM7FEKbWAwgctr1Xc3Cq9kSwzMymnyV-8NFuzaujCcyCZ4ru75KsLXt/exec'
+
+async function autoLoadBossFromSheets(): Promise<void> {
+  try {
+    const res = await fetch(GS_BOSS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'getSettings' })
+    })
+    if (!res.ok) return
+    const j = await res.json() as { ok: boolean; settings?: Record<string, unknown>; imageUrls?: Record<string, string> }
+    if (!j.ok || !j.settings) return
+
+    patchSettings({ games: { boss: j.settings } })
+
+    if (j.imageUrls) {
+      const dataDir = join(app.getPath('userData'), 'data')
+      if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true })
+      const EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp']
+      for (const [phase, url] of Object.entries(j.imageUrls)) {
+        if (!url) continue
+        try {
+          const ir = await fetch(url as string)
+          if (!ir.ok) continue
+          const buf = Buffer.from(await ir.arrayBuffer())
+          const ct  = ir.headers.get('content-type') ?? 'image/png'
+          const ext = ct.includes('jpeg') || ct.includes('jpg') ? 'jpg'
+                    : ct.includes('gif') ? 'gif' : ct.includes('webp') ? 'webp' : 'png'
+          const imgBase = join(dataDir, `boss-image-${phase}`)
+          EXTS.forEach(e => { try { unlinkSync(`${imgBase}.${e}`) } catch {} })
+          writeFileSync(`${imgBase}.${ext}`, buf)
+        } catch {}
+      }
+    }
+  } catch {}
+}
+
 // ── Quiz overlay ──────────────────────────────────────────────────────────────
 
 const QUIZ_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
@@ -3136,7 +3173,9 @@ export class OverlayServer {
       ws.on('error', () => this.clients.delete(ws))
     })
 
-    this.httpServer.listen(port, '127.0.0.1')
+    this.httpServer.listen(port, '127.0.0.1', () => {
+      autoLoadBossFromSheets().catch(() => {})
+    })
   }
 
   broadcast(type: string, data: unknown) {
