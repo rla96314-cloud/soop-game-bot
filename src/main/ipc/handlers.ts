@@ -209,9 +209,10 @@ export function registerIpcHandlers(win: BrowserWindow) {
     send('weflab:result', text)
     const s = loadSettings()
     if (!s.weflab.enabled) return
-    const matched = s.weflab.triggers.some(t =>
-      t.keyword && text.toLowerCase().includes(t.keyword.toLowerCase())
-    )
+    const validTriggers = s.weflab.triggers.filter(t => t.keyword)
+    // 트리거가 없으면 모든 결과에 반응, 있으면 키워드 포함 여부 검사
+    const matched = validTriggers.length === 0
+      || validTriggers.some(t => text.toLowerCase().includes(t.keyword.toLowerCase()))
     if (matched) gameEngine.trigger('roulette', 'weflab', 0)
   })
   weflabWatcher.on('loaded', () => send('weflab:loaded'))

@@ -125,14 +125,24 @@ export class WeflabWatcher extends EventEmitter {
     try {
       const text: string = await this.win.webContents.executeJavaScript(`
         (() => {
-          const el = document.querySelector('.roulette.result') ||
-                     document.querySelector('[class*="roulette"][class*="result"]') ||
-                     document.querySelector('.roulette-result');
+          const el = document.querySelector('p.text.roulette.result') ||
+                     document.querySelector('.roulette.result') ||
+                     document.querySelector('[class*="roulette"][class*="result"]');
           return el ? el.textContent.trim() : '';
         })()
       `)
 
-      if (!text || text === this.lastResult) return
+      if (!text) {
+        // 결과 요소가 사라지면 lastResult 초기화 → 같은 결과가 다음에 또 와도 감지
+        if (this.lastResult) this.lastResult = ''
+        if (this.pendingText) {
+          this.pendingText = ''
+          if (this.settleTimer) { clearTimeout(this.settleTimer); this.settleTimer = null }
+        }
+        return
+      }
+
+      if (text === this.lastResult) return
 
       if (text !== this.pendingText) {
         this.pendingText = text

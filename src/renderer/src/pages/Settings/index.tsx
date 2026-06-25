@@ -254,7 +254,7 @@ export default function Settings() {
         </div>
 
         <div className={styles.field}>
-          <label>트리거 키워드 (결과에 포함 시 게임 자동 발동)</label>
+          <label>트리거 키워드 (비워두면 모든 결과에 발동)</label>
           <div className={styles.rwTriggerList}>
             {triggers.map((t, i) => (
               <div key={i} className={styles.rwTriggerRow}>
