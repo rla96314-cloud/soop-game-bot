@@ -1814,12 +1814,12 @@ async function loadFromSheets() {
       for (const [phase, url] of Object.entries(j.imageUrls)) {
         if (!url) continue
         try {
-          const ir = await fetch(url as string)
+          const ir = await fetch(url)
           if (!ir.ok) continue
           const blob = await ir.blob()
-          const dataUrl = await new Promise<string>(resolve => {
+          const dataUrl = await new Promise(resolve => {
             const rd = new FileReader()
-            rd.onload = e => resolve(e.target!.result as string)
+            rd.onload = e => resolve(e.target.result)
             rd.readAsDataURL(blob)
           })
           await fetch('/api/boss-image/'+phase, {
@@ -2000,15 +2000,15 @@ async function doSave() {
       try {
         // 현재 저장된 이미지를 base64로 변환해서 Drive에 함께 업로드
         st.textContent = '이미지 동기화 중...'
-        const images: Record<string, string> = {}
+        const images = {}
         for (const phase of ['phase1','phase2','success']) {
           try {
             const ir = await fetch('/api/boss-image/'+phase)
             if (ir.ok) {
               const blob = await ir.blob()
-              images[phase] = await new Promise<string>(resolve => {
+              images[phase] = await new Promise(resolve => {
                 const rd = new FileReader()
-                rd.onload = e => resolve(e.target!.result as string)
+                rd.onload = e => resolve(e.target.result)
                 rd.readAsDataURL(blob)
               })
             }
