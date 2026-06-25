@@ -2,8 +2,8 @@ const http = require('http')
 const fs   = require('fs')
 const path = require('path')
 
-const PORT         = 4081
-const DATA_DIR     = '/app/data'
+const PORT          = 4081
+const DATA_DIR      = '/app/data'
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json')
 
 // ── 영구 설정 저장/로드 ──────────────────────────────────────────
@@ -21,9 +21,29 @@ function saveSettingsFile(data) {
   } catch (e) { console.error('settings save error:', e) }
 }
 
-const storedSettings = loadSettingsFile()  // channelId → settings object
+const storedSettings = loadSettingsFile()  // channelId → settings object  (+ '__shared__' key)
 const states         = new Map()           // channelId → latest HP state
 const commands       = new Map()           // channelId → pending command
+
+// ── 공유 보스 설정 (영구 저장) ────────────────────────────────────
+const DEFAULT_SHARED_SETTINGS = {
+  bossName:         '공유 보스',
+  maxHp:            1000000,
+  damagePerDot:     100,
+  critEnabled:      true,
+  critChance:       0.15,
+  critMultiplier:   2,
+  phase2HpPercent:  50,
+  balloonThreshold: 100,
+  lootItems:        [],
+  imageUrls:        { phase1: '', phase2: '', success: '' },
+}
+let sharedBossSettings = { ...DEFAULT_SHARED_SETTINGS, ...(storedSettings['__shared__'] || {}) }
+
+function saveSharedSettings() {
+  storedSettings['__shared__'] = { ...sharedBossSettings }
+  saveSettingsFile(storedSettings)
+}
 
 // ── 공유 보스 상태 ───────────────────────────────────────────────
 const sharedBoss = {
@@ -31,12 +51,12 @@ const sharedBoss = {
   maxHp:        0,
   currentHp:    0,
   bossName:     '공유 보스',
-  participants: {},  // `${channelId}/${username}` → { totalDamage, attackCount, critCount, channelId, username }
+  participants: {},
   startedAt:    null,
 }
 
 function allChannels() {
-  const set = new Set([...states.keys(), ...Object.keys(storedSettings)])
+  const set = new Set([...states.keys(), ...Object.keys(storedSettings).filter(k => k !== '__shared__')])
   return [...set]
 }
 
@@ -108,23 +128,54 @@ const server = http.createServer((req, res) => {
     return
   }
 
+  // ── 공유 보스 설정: 조회 ────────────────────────────────────────
+  if (method === 'GET' && url === '/shared-boss/settings') {
+    json(200, { ok: true, settings: sharedBossSettings })
+    return
+  }
+
+  // ── 공유 보스 설정: 저장 ────────────────────────────────────────
+  if (method === 'POST' && url === '/shared-boss/settings') {
+    body().then(data => {
+      if (!data) return json(400, { ok: false })
+      sharedBossSettings = { ...DEFAULT_SHARED_SETTINGS, ...sharedBossSettings, ...data }
+      saveSharedSettings()
+      // 켜져 있는 모든 채널에 설정 동기화
+      for (const ch of allChannels()) {
+        commands.set(ch, { type: 'update-settings', settings: sharedBossSettings })
+      }
+      json(200, { ok: true, settings: sharedBossSettings })
+    })
+    return
+  }
+
   // ── 공유 보스: 시작 (idempotent) ────────────────────────────────
   if (method === 'POST' && url === '/shared-boss/start') {
     body().then(data => {
       if (!sharedBoss.alive) {
-        // 새 레이드 시작
-        const maxHp = Number(data?.maxHp) || 100000
-        sharedBoss.alive         = true
-        sharedBoss.maxHp         = maxHp
-        sharedBoss.currentHp     = maxHp
-        sharedBoss.bossName      = data?.bossName || '공유 보스'
-        sharedBoss.participants  = {}
-        sharedBoss.startedAt     = Date.now()
-        // 모든 채널에 start-boss 명령 전송
-        for (const ch of allChannels()) commands.set(ch, { type: 'start-boss' })
+        // 전달된 설정이 있으면 먼저 저장
+        if (data && Object.keys(data).length > 0) {
+          sharedBossSettings = { ...DEFAULT_SHARED_SETTINGS, ...sharedBossSettings, ...data }
+          saveSharedSettings()
+        }
+        const maxHp = sharedBossSettings.maxHp || 1000000
+        sharedBoss.alive        = true
+        sharedBoss.maxHp        = maxHp
+        sharedBoss.currentHp    = maxHp
+        sharedBoss.bossName     = sharedBossSettings.bossName || '공유 보스'
+        sharedBoss.participants = {}
+        sharedBoss.startedAt    = Date.now()
+        // 모든 채널에 설정 동기화 + 시작 명령
+        for (const ch of allChannels()) {
+          commands.set(ch, { type: 'update-settings', settings: sharedBossSettings })
+        }
+        setTimeout(() => {
+          for (const ch of allChannels()) {
+            if (!commands.has(ch)) commands.set(ch, { type: 'start-boss' })
+          }
+        }, 50)
         json(200, { ok: true, started: true, currentHp: sharedBoss.currentHp, maxHp: sharedBoss.maxHp })
       } else {
-        // 이미 진행중 — 현재 상태 반환 (채널 join)
         json(200, { ok: true, started: false, currentHp: sharedBoss.currentHp, maxHp: sharedBoss.maxHp, alive: true })
       }
     })
@@ -244,7 +295,7 @@ h1{font-size:15px;color:#58a6ff;font-weight:700}
 
 /* 공유 보스 카드 */
 .shared-boss-card{background:#161b22;border:2px solid #1f6feb;border-radius:12px;padding:18px 20px;margin-bottom:18px}
-.shared-boss-title{font-size:13px;font-weight:700;color:#58a6ff;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.shared-boss-title{font-size:12px;font-weight:700;color:#58a6ff;margin-bottom:12px;display:flex;align-items:center;gap:8px}
 .shared-boss-name{font-size:20px;font-weight:800;margin-bottom:10px}
 .pct{font-size:28px;font-weight:800;margin-bottom:4px}
 .pct.hi{color:#f85149}.pct.md{color:#f0883e}.pct.lo{color:#3fb950}
@@ -252,9 +303,10 @@ h1{font-size:15px;color:#58a6ff;font-weight:700}
 .bar{height:100%;border-radius:4px;transition:width .5s}
 .bar.hi{background:linear-gradient(90deg,#f85149,#da3633)}.bar.md{background:linear-gradient(90deg,#f0883e,#d29922)}.bar.lo{background:linear-gradient(90deg,#3fb950,#2ea043)}
 .hp-txt{font-size:13px;color:#8b949e;margin-bottom:10px}.hp-txt b{color:#e6edf3;font-size:15px}
-.shared-btns{display:flex;gap:8px;margin-bottom:12px}
-.btn{padding:7px 18px;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit}
+.shared-btns{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.btn{padding:7px 16px;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit;white-space:nowrap}
 .btn-start{background:#238636;color:#fff}.btn-start:hover{background:#2ea043}
+.btn-cfg{background:#1f6feb;color:#fff}.btn-cfg:hover{background:#388bfd}
 .btn-reset{background:#21262d;color:#8b949e;border:1px solid #30363d}.btn-reset:hover{color:#e6edf3}
 .btn:disabled{opacity:.35;cursor:not-allowed}
 
@@ -278,7 +330,7 @@ h1{font-size:15px;color:#58a6ff;font-weight:700}
 .b-run{color:#58a6ff;background:#0d2137}
 .b-result{color:#f0883e;background:#3a2010}
 
-/* 설정 탭 */
+/* 채널별 설정 탭 */
 .cfg-toolbar{display:flex;gap:8px;margin-bottom:14px;align-items:center}
 .btn-add-ch{padding:6px 14px;background:#1f6feb;border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
 .btn-add-ch:hover{background:#388bfd}
@@ -302,6 +354,33 @@ h1{font-size:15px;color:#58a6ff;font-weight:700}
 .btn-loot-add{background:none;border:1px solid #30363d;color:#8b949e;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;font-family:inherit;margin-top:2px}.btn-loot-add:hover{color:#e6edf3}
 .btn-save{width:100%;margin-top:12px;padding:8px;background:#1f6feb;border:none;border-radius:6px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}.btn-save:hover{background:#388bfd}
 .save-st{font-size:11px;text-align:center;height:16px;margin-top:4px}
+
+/* ── 공유 보스 설정 모달 ── */
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:100;align-items:center;justify-content:center}
+.modal-backdrop.open{display:flex}
+.modal{background:#161b22;border:1px solid #30363d;border-radius:14px;width:540px;max-width:95vw;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.6)}
+.modal-head{padding:16px 20px;border-bottom:1px solid #21262d;display:flex;align-items:center;justify-content:space-between;flex:none}
+.modal-head h2{font-size:15px;font-weight:700;color:#e6edf3}
+.modal-close{background:none;border:none;color:#484f58;cursor:pointer;font-size:20px;line-height:1;padding:0 4px}.modal-close:hover{color:#e6edf3}
+.modal-body{padding:20px;overflow-y:auto;flex:1}
+.modal-section{font-size:11px;font-weight:700;color:#58a6ff;letter-spacing:.06em;text-transform:uppercase;margin:16px 0 8px;padding-bottom:5px;border-bottom:1px solid #21262d}
+.modal-section:first-child{margin-top:0}
+.mrow{display:flex;gap:8px;margin-bottom:10px;align-items:center}
+.mrow label{width:116px;flex:none;font-size:12px;color:#8b949e}
+.minput{flex:1;background:#21262d;border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:6px 10px;font-size:13px;font-family:inherit}
+.minput:focus{outline:none;border-color:#58a6ff}
+.mcheck{width:16px;height:16px;cursor:pointer;accent-color:#58a6ff;flex:none}
+.munit{font-size:11px;color:#8b949e;white-space:nowrap}
+.modal-footer{padding:14px 20px;border-top:1px solid #21262d;display:flex;gap:8px;flex:none}
+.btn-modal-save{flex:1;padding:9px;background:#21262d;border:1px solid #30363d;border-radius:8px;color:#c9d1d9;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}.btn-modal-save:hover{color:#e6edf3;border-color:#58a6ff}
+.btn-modal-start{flex:2;padding:9px;background:#238636;border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}.btn-modal-start:hover{background:#2ea043}
+.modal-status{font-size:11px;color:#8b949e;text-align:center;min-height:16px;margin-top:8px}
+
+/* 전리품 (모달) */
+.mloot-row{display:flex;gap:6px;margin-bottom:6px;align-items:center}
+.mloot-num{font-size:11px;color:#484f58;width:20px;flex:none;text-align:center}
+.mloot-del{background:none;border:none;color:#f85149;cursor:pointer;font-size:15px;padding:0 3px;line-height:1}
+.btn-mloot-add{background:none;border:1px solid #30363d;color:#8b949e;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:11px;font-family:inherit}.btn-mloot-add:hover{color:#e6edf3}
 </style>
 </head>
 <body>
@@ -309,18 +388,64 @@ h1{font-size:15px;color:#58a6ff;font-weight:700}
   <h1>보스전 모니터</h1>
   <div class="tabs">
     <button class="tab active" onclick="switchTab('hp')">공유 보스</button>
-    <button class="tab" onclick="switchTab('cfg')">보스 설정</button>
+    <button class="tab" onclick="switchTab('cfg')">채널별 설정</button>
   </div>
   <span id="ts"></span>
 </header>
 
+<!-- ── 공유 보스 설정 모달 ── -->
+<div class="modal-backdrop" id="modal-backdrop" onclick="onBackdropClick(event)">
+  <div class="modal" id="modal">
+    <div class="modal-head">
+      <h2>공유 보스 레이드 설정</h2>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-section">기본 정보</div>
+      <div class="mrow"><label>보스 이름</label><input class="minput" id="m_name" placeholder="공유 보스"></div>
+      <div class="mrow"><label>최대 HP</label><input class="minput" type="number" id="m_maxhp" min="1"><span class="munit">HP</span></div>
+
+      <div class="modal-section">전투 설정</div>
+      <div class="mrow"><label>주사위 데미지</label><input class="minput" type="number" id="m_dmg" min="1"><span class="munit">× 주사위눈 (1~12)</span></div>
+      <div class="mrow"><label>별풍선 트리거</label><input class="minput" type="number" id="m_thr" min="1"><span class="munit">개</span></div>
+      <div class="mrow"><label>페이즈2 전환</label><input class="minput" type="number" id="m_ph2" min="1" max="99" style="max-width:70px"><span class="munit">% 이하</span></div>
+
+      <div class="modal-section">크리티컬</div>
+      <div class="mrow">
+        <label>크리티컬 활성화</label>
+        <input type="checkbox" class="mcheck" id="m_crit">
+      </div>
+      <div class="mrow" id="m_crit_rows">
+        <label>확률 / 배율</label>
+        <input class="minput" type="number" id="m_critp" min="1" max="99" style="max-width:60px">
+        <span class="munit">%</span>
+        <input class="minput" type="number" id="m_critm" min="1" style="max-width:60px;margin-left:8px">
+        <span class="munit">배</span>
+      </div>
+
+      <div class="modal-section">이미지 URL</div>
+      <div style="font-size:11px;color:#484f58;margin-bottom:10px">이미지 직접 링크(URL)를 입력하면 설정 저장 시 전 채널 앱에 자동 적용됩니다</div>
+      <div class="mrow"><label>Phase 1 (일반)</label><input class="minput" id="m_img1" placeholder="https://..."></div>
+      <div class="mrow"><label>Phase 2 (위기)</label><input class="minput" id="m_img2" placeholder="https://..."></div>
+      <div class="mrow"><label>처치 성공</label><input class="minput" id="m_imgs" placeholder="https://..."></div>
+
+      <div class="modal-section">전리품</div>
+      <div id="m_loot_list"></div>
+      <button class="btn-mloot-add" onclick="addModalLoot()">+ 전리품 추가</button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-modal-save" onclick="saveModalSettings()">설정만 저장</button>
+      <button class="btn-modal-start" id="m_start_btn" onclick="saveAndStart()">저장 후 레이드 시작</button>
+    </div>
+    <div class="modal-status" id="m_status"></div>
+  </div>
+</div>
+
 <div id="panel-hp" class="panel active">
-  <!-- 공유 보스 카드 -->
   <div class="shared-boss-card" id="shared-card">
     <div class="shared-boss-title">공유 보스 HP (전 채널 합산)</div>
-    <div id="shared-content"><div class="empty">레이드를 시작해 주세요</div></div>
+    <div id="shared-content"><div class="empty" style="padding:8px 0">로딩 중...</div></div>
   </div>
-  <!-- 채널별 상태 -->
   <div class="ch-section-title" id="ch-label"></div>
   <div id="hp-grid" class="grid"></div>
 </div>
@@ -333,10 +458,11 @@ h1{font-size:15px;color:#58a6ff;font-weight:700}
 </div>
 
 <script>
-let currentTab = 'hp'
-let latestData = {}
+let currentTab   = 'hp'
+let latestData   = {}
 let latestShared = { alive: false, maxHp: 0, currentHp: 0, bossName: '공유 보스', participants: {} }
-const lootState = {}
+let modalLoot    = []
+const lootState  = {}
 
 function switchTab(t) {
   currentTab = t
@@ -351,14 +477,122 @@ const num = n => (n||0).toLocaleString()
 function cls(p){return p>50?'hi':p>25?'md':'lo'}
 function pct(cur,max){return max>0?Math.round(cur/max*100):0}
 
-/* ── 공유 보스 렌더 ── */
+/* ────────────────────────────────────────────────
+   모달: 설정 창
+───────────────────────────────────────────────── */
+async function openModal() {
+  const r = await fetch('/shared-boss/settings').then(r=>r.json()).catch(()=>({ok:false}))
+  const s = r.settings || {}
+  document.getElementById('m_name').value  = s.bossName || '공유 보스'
+  document.getElementById('m_maxhp').value = s.maxHp    || 1000000
+  document.getElementById('m_dmg').value   = s.damagePerDot || 100
+  document.getElementById('m_thr').value   = s.balloonThreshold || 100
+  document.getElementById('m_ph2').value   = s.phase2HpPercent || 50
+  document.getElementById('m_crit').checked= s.critEnabled !== false
+  document.getElementById('m_critp').value = Math.round((s.critChance||0.15)*100)
+  document.getElementById('m_critm').value = s.critMultiplier || 2
+  const imgs = s.imageUrls || {}
+  document.getElementById('m_img1').value = imgs.phase1  || ''
+  document.getElementById('m_img2').value = imgs.phase2  || ''
+  document.getElementById('m_imgs').value = imgs.success || ''
+  modalLoot = (s.lootItems || []).map(x=>({...x}))
+  renderModalLoot()
+  const alive = latestShared?.alive
+  document.getElementById('m_start_btn').disabled = !!alive
+  document.getElementById('m_start_btn').title = alive ? '레이드 진행 중에는 시작할 수 없습니다' : ''
+  document.getElementById('m_status').textContent = ''
+  document.getElementById('modal-backdrop').classList.add('open')
+}
+
+function closeModal() {
+  document.getElementById('modal-backdrop').classList.remove('open')
+}
+function onBackdropClick(e) {
+  if (e.target === document.getElementById('modal-backdrop')) closeModal()
+}
+
+function renderModalLoot() {
+  const el = document.getElementById('m_loot_list')
+  el.innerHTML = modalLoot.map((item,i)=>
+    \`<div class="mloot-row">
+      <span class="mloot-num">\${i+1}</span>
+      <input class="minput" placeholder="상품명" style="flex:1.2" value="\${esc(item.name||'')}" oninput="modalLoot[\${i}].name=this.value">
+      <input class="minput" placeholder="설명 (선택)" value="\${esc(item.description||'')}" oninput="modalLoot[\${i}].description=this.value">
+      <button class="mloot-del" onclick="modalLoot.splice(\${i},1);renderModalLoot()">×</button>
+    </div>\`
+  ).join('')
+}
+function addModalLoot() {
+  modalLoot.push({ name:'', description:'' })
+  renderModalLoot()
+}
+
+function collectModalSettings() {
+  return {
+    bossName:         document.getElementById('m_name').value.trim()  || '공유 보스',
+    maxHp:            Number(document.getElementById('m_maxhp').value) || 1000000,
+    damagePerDot:     Number(document.getElementById('m_dmg').value)   || 100,
+    balloonThreshold: Number(document.getElementById('m_thr').value)   || 100,
+    phase2HpPercent:  Number(document.getElementById('m_ph2').value)   || 50,
+    critEnabled:      document.getElementById('m_crit').checked,
+    critChance:       (Number(document.getElementById('m_critp').value)||15) / 100,
+    critMultiplier:   Number(document.getElementById('m_critm').value) || 2,
+    lootItems:        modalLoot.filter(x => x.name.trim()),
+    imageUrls: {
+      phase1:  document.getElementById('m_img1').value.trim(),
+      phase2:  document.getElementById('m_img2').value.trim(),
+      success: document.getElementById('m_imgs').value.trim(),
+    },
+  }
+}
+
+async function saveModalSettings() {
+  const st = document.getElementById('m_status')
+  st.style.color = '#8b949e'; st.textContent = '저장 중...'
+  try {
+    await fetch('/shared-boss/settings', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(collectModalSettings()),
+    })
+    st.style.color = '#3fb950'; st.textContent = '저장 완료 ✓'
+    setTimeout(() => { st.textContent = '' }, 2500)
+  } catch {
+    st.style.color = '#f85149'; st.textContent = '저장 실패'
+  }
+}
+
+async function saveAndStart() {
+  const st = document.getElementById('m_status')
+  st.style.color = '#8b949e'; st.textContent = '레이드 시작 중...'
+  try {
+    const settings = collectModalSettings()
+    await fetch('/shared-boss/start', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(settings),
+    })
+    st.style.color = '#3fb950'; st.textContent = '레이드 시작! 전 채널에 명령 전송됨'
+    setTimeout(() => { closeModal() }, 1200)
+  } catch {
+    st.style.color = '#f85149'; st.textContent = '시작 실패'
+  }
+}
+
+/* ────────────────────────────────────────────────
+   공유 보스 렌더
+───────────────────────────────────────────────── */
 function renderSharedBoss(boss) {
   const el = document.getElementById('shared-content')
+  const btnArea = \`<div class="shared-btns">
+    <button class="btn btn-cfg" onclick="openModal()">레이드 설정</button>
+    <button class="btn btn-start" \${boss.alive?'disabled':''} onclick="quickStart()">▶ 레이드 시작</button>
+    \${boss.alive||boss.startedAt ? \`<button class="btn btn-reset" onclick="sharedReset()">↺ 초기화</button>\` : ''}
+  </div>\`
+
   if (!boss.alive && !boss.startedAt) {
-    el.innerHTML = '<div class="empty" style="padding:12px 0">레이드를 시작해 주세요</div>'
-    + '<div class="shared-btns"><button class="btn btn-start" onclick="sharedStart()">▶ 레이드 시작 (전체)</button></div>'
+    el.innerHTML = \`<div style="color:#484f58;font-size:12px;margin-bottom:12px">대기 중 — 레이드를 시작하거나 설정을 변경해 주세요</div>\` + btnArea
     return
   }
+
   const p   = pct(boss.currentHp, boss.maxHp)
   const c   = cls(p)
   const pts = Object.entries(boss.participants || {})
@@ -372,11 +606,8 @@ function renderSharedBoss(boss) {
       <div class="pct \${c}">\${p}%</div>
       <div class="bar-bg"><div class="bar \${c}" style="width:\${p}%"></div></div>
       <div class="hp-txt"><b>\${num(boss.currentHp)}</b> / \${num(boss.maxHp)}</div>
-    \` : \`<div class="hp-txt" style="color:#f85149;margin-bottom:10px">보스 처치!</div>\`}
-    <div class="shared-btns">
-      <button class="btn btn-start" \${boss.alive?'disabled':''} onclick="sharedStart()">▶ 레이드 시작</button>
-      <button class="btn btn-reset" onclick="sharedReset()">↺ 초기화</button>
-    </div>
+    \` : \`<div class="hp-txt" style="color:#f85149;font-weight:700;margin-bottom:10px;font-size:16px">보스 처치!</div>\`}
+    \${btnArea}
     \${pts.length ? \`<table class="dmg-table">
       <tr><th>#</th><th>채널</th><th>참여자</th><th>데미지</th><th>기여</th><th>공격</th><th>크리</th></tr>
       \${pts.slice(0,15).map((r,i)=>{
@@ -388,7 +619,6 @@ function renderSharedBoss(boss) {
   \`
 }
 
-/* ── 채널 상태 그리드 ── */
 function renderChannels(data) {
   const entries = Object.entries(data)
   const grid  = document.getElementById('hp-grid')
@@ -402,42 +632,19 @@ function renderChannels(data) {
     const result  = online && s.status==='showing_result'
     const badgeCls= !online?'b-offline':running?'b-run':result?'b-result':'b-online'
     const badgeTxt= !online?'오프라인':running?'진행중':result?'결과표시':'대기중'
-
     return \`<div class="card\${!online?' offline':''}">
       <div class="card-head">
         <span class="card-ch">\${esc(ch)}</span>
         <span class="badge \${badgeCls}">\${badgeTxt}</span>
       </div>
       <div style="font-size:12px;color:#c9d1d9;margin-top:2px">\${esc(s.bossName||s.settings?.bossName||'보스')}</div>
-      \${online ? \`<div style="font-size:11px;color:#484f58;margin-top:4px">최근 업데이트: \${new Date(s.updatedAt).toLocaleTimeString('ko-KR')}</div>\` : ''}
+      \${online ? \`<div style="font-size:11px;color:#484f58;margin-top:4px">\${new Date(s.updatedAt).toLocaleTimeString('ko-KR')}</div>\` : ''}
     </div>\`
   }).join('')
 }
 
-/* ── 공유 보스 제어 ── */
-async function sharedStart() {
-  const r = await fetch('/shared-boss').then(r=>r.json())
-  const boss = r.boss || {}
-  const maxHp = boss.alive ? boss.maxHp : (
-    (() => {
-      const chs = Object.keys(latestData)
-      if (chs.length === 0) return 100000
-      const s = latestData[chs[0]]
-      return s.settings?.maxHp || s.maxHp || 100000
-    })()
-  )
-  const bossName = boss.alive ? boss.bossName : (
-    (() => {
-      const chs = Object.keys(latestData)
-      if (chs.length === 0) return '공유 보스'
-      const s = latestData[chs[0]]
-      return s.settings?.bossName || s.bossName || '공유 보스'
-    })()
-  )
-  await fetch('/shared-boss/start', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ maxHp, bossName })
-  })
+async function quickStart() {
+  await fetch('/shared-boss/start', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' })
 }
 
 async function sharedReset() {
@@ -445,12 +652,12 @@ async function sharedReset() {
   await fetch('/shared-boss/reset', { method:'POST' })
 }
 
-/* ── 설정 탭 ── */
+/* ── 채널별 설정 탭 ── */
 function renderCfg() {
   const data = latestData
   const chSet = new Set([...Object.keys(data)])
   fetch('/boss-settings').then(r=>r.json()).then(j=>{
-    if (j.settings) Object.keys(j.settings).forEach(k=>chSet.add(k))
+    if (j.settings) Object.keys(j.settings).filter(k=>k!=='__shared__').forEach(k=>chSet.add(k))
     const entries = [...chSet].map(ch => [ch, {
       ...(data[ch]||{}),
       settings: j.settings?.[ch] || data[ch]?.settings || {},

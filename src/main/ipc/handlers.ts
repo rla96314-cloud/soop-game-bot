@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow, shell } from 'electron'
+import { ipcMain, BrowserWindow, shell, app } from 'electron'
 import { gameEngine, type GameId } from '../games/engine'
 import { soopClient }              from '../soop/client'
 import { overlayServer }           from '../overlay/server'
@@ -7,8 +7,30 @@ import { verifyUser, fetchAllowlist }               from '../auth/allowlist'
 import { openSoopLoginWindow }                      from '../auth/soopLogin'
 import { fetchTodaySchedule }                       from '../schedule/fetcher'
 import { weflabWatcher }                            from '../weflab/watcher'
+import { existsSync, mkdirSync, writeFileSync, unlinkSync } from 'fs'
+import { join } from 'path'
 
 const BOSS_HP_SERVER = 'http://100.89.116.107:4081'
+const EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp']
+
+async function downloadBossImages(imageUrls: Record<string, string>) {
+  const dataDir = join(app.getPath('userData'), 'data')
+  if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true })
+  for (const [phase, url] of Object.entries(imageUrls)) {
+    if (!url || typeof url !== 'string') continue
+    try {
+      const ir  = await fetch(url)
+      if (!ir.ok) continue
+      const buf = Buffer.from(await ir.arrayBuffer())
+      const ct  = ir.headers.get('content-type') ?? 'image/png'
+      const ext = ct.includes('jpeg') || ct.includes('jpg') ? 'jpg'
+                : ct.includes('gif') ? 'gif' : ct.includes('webp') ? 'webp' : 'png'
+      const base = join(dataDir, `boss-image-${phase}`)
+      EXTS.forEach(e => { try { unlinkSync(`${base}.${e}`) } catch {} })
+      writeFileSync(`${base}.${ext}`, buf)
+    } catch {}
+  }
+}
 
 export function registerIpcHandlers(win: BrowserWindow) {
   const send = (ch: string, ...args: unknown[]) => {
@@ -61,7 +83,11 @@ export function registerIpcHandlers(win: BrowserWindow) {
     } else if (cmd.type === 'reset-boss') {
       gameEngine.resetBoss()
     } else if (cmd.type === 'update-settings') {
-      const next = patchSettings({ games: { boss: cmd.settings as Record<string, unknown> } })
+      const s    = cmd.settings as Record<string, unknown>
+      const urls = s.imageUrls as Record<string, string> | undefined
+      if (urls) downloadBossImages(urls).catch(() => {})
+      const { imageUrls: _drop, ...bossOnly } = s
+      const next = patchSettings({ games: { boss: bossOnly } })
       gameEngine.updateSettings(next)
     } else if (cmd.type === 'sync-boss-hp') {
       gameEngine.setSharedBossHp(cmd.currentHp as number, cmd.alive as boolean)
