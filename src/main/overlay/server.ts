@@ -2722,71 +2722,169 @@ const BOSS_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{background:transparent !important;overflow:hidden;font-family:'Noto Sans KR',sans-serif}
 
-  /* Boss image */
-  #boss-img-wrap{position:fixed;right:60px;top:50%;transform:translateY(-50%);opacity:0;transition:opacity .6s ease;pointer-events:none}
+  /* ── 보스 이미지 ── */
+  #boss-img-wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .6s}
   #boss-img-wrap.show{opacity:1}
-  #boss-img{max-width:420px;max-height:600px;object-fit:contain;filter:drop-shadow(0 8px 32px rgba(239,68,68,0.4))}
-  #boss-img.p2{filter:drop-shadow(0 8px 40px rgba(239,100,68,0.6)) brightness(0.85) saturate(1.3)}
-  #boss-img.success{filter:drop-shadow(0 8px 40px rgba(245,158,11,0.7)) brightness(1.1) saturate(1.2);animation:successPulse 1.5s ease-in-out infinite}
-  @keyframes successPulse{0%,100%{filter:drop-shadow(0 8px 40px rgba(245,158,11,0.7)) brightness(1.1)}50%{filter:drop-shadow(0 12px 60px rgba(245,158,11,1)) brightness(1.25)}}
+  #boss-img{max-width:100vw;max-height:100vh;width:100%;height:100%;object-fit:cover;object-position:center}
+  #boss-img.p2{filter:brightness(0.88) saturate(1.3) hue-rotate(-10deg)}
+  #boss-img.success{animation:successPulse 1.8s ease-in-out infinite}
+  @keyframes successPulse{0%,100%{filter:brightness(1.05) saturate(1.1)}50%{filter:brightness(1.18) saturate(1.3)}}
 
-  /* HUD */
-  #boss-hud{position:fixed;top:40px;left:40px;width:480px;background:rgba(10,6,28,0.88);border:2px solid rgba(239,68,68,0.55);border-radius:20px;padding:18px 22px;backdrop-filter:blur(16px);box-shadow:0 8px 32px rgba(239,68,68,0.25);opacity:0;transform:translateX(-60px);transition:opacity .5s,transform .5s}
-  #boss-hud.show{opacity:1;transform:translateX(0)}
-  .bname-row{display:flex;align-items:center;gap:10px;margin-bottom:12px}
-  .bskull{font-size:20px}
-  .bname{font-size:18px;font-weight:900;color:#fff;letter-spacing:-.02em}
-  .hplabel{margin-left:auto;font-size:11px;font-weight:800;color:rgba(239,68,68,0.8);letter-spacing:.1em}
-  .hpnums{font-size:12px;font-weight:700;color:rgba(255,255,255,0.6);margin-bottom:7px;text-align:right}
-  .hpbg{height:16px;background:rgba(255,255,255,0.08);border-radius:8px;overflow:hidden}
-  .hpfill{height:100%;border-radius:8px;background:linear-gradient(90deg,#EF4444,#F97316);box-shadow:0 0 12px rgba(239,68,68,0.5);transition:width .6s cubic-bezier(0.4,0,0.2,1)}
-  .hpfill.p2{background:linear-gradient(90deg,#b91c1c,#EF4444)}
-  .parts{margin-top:12px;display:flex;flex-direction:column;gap:4px}
-  .prow{display:flex;align-items:center;gap:8px;font-size:11px;color:rgba(255,255,255,0.65)}
-  .pname{font-weight:700;color:#fff;min-width:80px}.pdmg{margin-left:auto;font-weight:800;color:#F97316}.pcrit{font-size:10px;color:#FBBF24}
+  /* ── RPG HP바 (상단 중앙) ── */
+  #boss-hud{
+    position:fixed;top:22px;left:50%;transform:translateX(-50%);
+    width:min(900px,88vw);
+    opacity:0;transition:opacity .5s,transform .5s;
+    transform:translateX(-50%) translateY(-28px);
+    pointer-events:none;
+  }
+  #boss-hud.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
-  /* Dice popup */
+  /* 보스 이름 */
+  #boss-name-row{
+    text-align:center;margin-bottom:6px;
+    font-size:17px;font-weight:900;color:#F5D060;
+    letter-spacing:.06em;
+    text-shadow:0 0 18px rgba(200,140,0,.9),0 2px 4px rgba(0,0,0,.8);
+  }
+
+  /* 골드 프레임 바깥 */
+  .hp-frame-outer{
+    position:relative;
+    padding:5px;
+    border-radius:12px;
+    background:linear-gradient(180deg,#F5E070 0%,#C8860A 30%,#E8B020 50%,#C8860A 70%,#A06010 100%);
+    box-shadow:0 0 0 2px #5A3800,0 6px 28px rgba(180,120,0,.6),0 0 60px rgba(180,110,0,.25);
+  }
+
+  /* 실버 안쪽 테두리 */
+  .hp-frame-inner{
+    padding:3px;
+    border-radius:8px;
+    background:linear-gradient(180deg,#999 0%,#666 40%,#888 60%,#555 100%);
+  }
+
+  /* 바 배경 */
+  .hp-bar-bg{
+    height:42px;border-radius:6px;
+    background:linear-gradient(180deg,#180404 0%,#0e0202 100%);
+    overflow:hidden;position:relative;
+  }
+
+  /* HP 채움 */
+  #hp-fill{
+    height:100%;width:100%;
+    background:linear-gradient(180deg,
+      #FF9090 0%,#FF2020 15%,
+      #CC0000 45%,#AA0000 50%,
+      #CC0000 55%,#FF2020 85%,
+      #FF9090 100%
+    );
+    border-radius:6px;
+    position:relative;
+    transition:width .8s cubic-bezier(.4,0,.2,1);
+    box-shadow:inset 0 1px 0 rgba(255,180,180,.35);
+  }
+  #hp-fill::after{
+    content:'';position:absolute;top:0;left:0;right:0;height:42%;
+    background:linear-gradient(180deg,rgba(255,200,200,.28),transparent);
+    border-radius:6px 6px 0 0;
+  }
+  #hp-fill.p2{
+    background:linear-gradient(180deg,
+      #FF7060 0%,#DD1010 15%,
+      #990000 45%,#770000 50%,
+      #990000 55%,#DD1010 85%,
+      #FF7060 100%
+    );
+  }
+
+  /* HP 숫자 (바 위에 겹침) */
+  #hp-nums{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:15px;font-weight:900;color:rgba(255,255,255,.92);
+    text-shadow:0 1px 4px rgba(0,0,0,.9),0 0 12px rgba(0,0,0,.7);
+    letter-spacing:.02em;pointer-events:none;
+  }
+
+  /* 코너 장식 (4-포인트 스타) */
+  .corner{position:absolute;width:36px;height:36px;pointer-events:none}
+  .corner svg{width:100%;height:100%}
+  .corner.tl{top:-14px;left:-14px}
+  .corner.tr{top:-14px;right:-14px}
+  .corner.bl{bottom:-14px;left:-14px}
+  .corner.br{bottom:-14px;right:-14px}
+  .corner-top-mid{position:absolute;top:-18px;left:50%;transform:translateX(-50%);width:28px;height:28px;pointer-events:none}
+  .corner-top-mid svg{width:100%;height:100%}
+
+  /* 참여자 바 (HP바 바로 아래) */
+  #parts{
+    display:flex;flex-wrap:wrap;gap:6px 14px;
+    margin-top:10px;padding:0 4px;
+    justify-content:center;
+  }
+  .prow{
+    display:flex;align-items:center;gap:5px;
+    font-size:12px;font-weight:700;
+    color:rgba(255,255,255,.85);
+    text-shadow:0 1px 4px rgba(0,0,0,.9);
+  }
+  .pname{color:#F5D060}
+  .pdmg{color:#FF8080;margin-left:2px}
+  .pcrit{font-size:10px;color:#FFD700}
+
+  /* ── 주사위 팝업 ── */
   #dice-popup{position:fixed;bottom:70px;left:50%;transform:translateX(-50%) translateY(80px);opacity:0;transition:opacity .3s,transform .35s cubic-bezier(0.34,1.56,0.64,1);text-align:center;pointer-events:none}
   #dice-popup.show{opacity:1;transform:translateX(-50%) translateY(0)}
   .dice-face{width:80px;height:80px;margin:0 auto 6px;background:rgba(10,6,28,0.95);border:3px solid rgba(239,68,68,0.7);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:38px;font-weight:900;color:#fff;box-shadow:0 8px 30px rgba(239,68,68,0.35)}
   .dice-face.spin{animation:diceSpin .9s cubic-bezier(0.25,0.46,0.45,0.94) forwards}
   @keyframes diceSpin{0%{transform:rotateX(0) rotateY(0)}50%{transform:rotateX(540deg) rotateY(270deg)}100%{transform:rotateX(720deg) rotateY(360deg)}}
-  .dice-user{font-size:13px;font-weight:700;color:rgba(255,255,255,0.7);margin-bottom:6px}
+  .dice-user{font-size:13px;font-weight:700;color:rgba(255,255,255,0.9);text-shadow:0 1px 4px rgba(0,0,0,.8);margin-bottom:6px}
 
-  /* Defeat */
-  #defeat-screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);opacity:0;pointer-events:none;transition:opacity .6s}
+  /* ── 처치 오버레이 ── */
+  #defeat-screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.65);opacity:0;pointer-events:none;transition:opacity .6s}
   #defeat-screen.show{opacity:1}
-  .defeat-title{font-size:72px;font-weight:900;color:#fff;text-shadow:0 0 40px #F59E0B;letter-spacing:-.04em;animation:defeatBounce .6s cubic-bezier(0.34,1.56,0.64,1)}
+  .defeat-title{font-size:72px;font-weight:900;color:#fff;text-shadow:0 0 40px #F59E0B,0 4px 8px rgba(0,0,0,.8);letter-spacing:-.04em;animation:defeatBounce .6s cubic-bezier(0.34,1.56,0.64,1)}
   @keyframes defeatBounce{from{transform:scale(0.4);opacity:0}to{transform:scale(1);opacity:1}}
-  .defeat-sub{font-size:20px;color:rgba(255,255,255,0.7);margin-top:12px;font-weight:700}
+  .defeat-sub{font-size:20px;color:rgba(255,255,255,0.8);margin-top:12px;font-weight:700;text-shadow:0 2px 6px rgba(0,0,0,.8)}
 </style>
 </head>
 <body>
 
-<!-- Boss image (right side) -->
+<!-- 보스 이미지 (배경 전체) -->
 <div id="boss-img-wrap">
   <img id="boss-img" alt="">
 </div>
 
-<!-- HUD (left side) -->
+<!-- RPG HP바 (상단 중앙) -->
 <div id="boss-hud">
-  <div class="bname-row">
-    <span class="bskull">&#x1F480;</span>
-    <span class="bname" id="boss-name">보스</span>
-    <span class="hplabel">BOSS HP</span>
+  <div id="boss-name-row">보스</div>
+  <div class="hp-frame-outer">
+    <!-- 코너 4-포인트 스타 -->
+    <div class="corner tl"><svg viewBox="-20 -20 40 40"><path d="M0,-17 L4,-4 L17,0 L4,4 L0,17 L-4,4 L-17,0 L-4,-4 Z" fill="#F5D060" stroke="#8B5E00" stroke-width="1.5"/></svg></div>
+    <div class="corner tr"><svg viewBox="-20 -20 40 40"><path d="M0,-17 L4,-4 L17,0 L4,4 L0,17 L-4,4 L-17,0 L-4,-4 Z" fill="#F5D060" stroke="#8B5E00" stroke-width="1.5"/></svg></div>
+    <div class="corner bl"><svg viewBox="-20 -20 40 40"><path d="M0,-17 L4,-4 L17,0 L4,4 L0,17 L-4,4 L-17,0 L-4,-4 Z" fill="#F5D060" stroke="#8B5E00" stroke-width="1.5"/></svg></div>
+    <div class="corner br"><svg viewBox="-20 -20 40 40"><path d="M0,-17 L4,-4 L17,0 L4,4 L0,17 L-4,4 L-17,0 L-4,-4 Z" fill="#F5D060" stroke="#8B5E00" stroke-width="1.5"/></svg></div>
+    <!-- 상단 중앙 다이아몬드 -->
+    <div class="corner-top-mid"><svg viewBox="-16 -16 32 32"><path d="M0,-14 L5,-5 L14,0 L5,5 L0,14 L-5,5 L-14,0 L-5,-5 Z" fill="#FFE890" stroke="#8B5E00" stroke-width="1.2"/><circle r="3.5" fill="#FFF0A0"/></svg></div>
+
+    <div class="hp-frame-inner">
+      <div class="hp-bar-bg">
+        <div id="hp-fill" style="width:100%"></div>
+        <div id="hp-nums">-- / --</div>
+      </div>
+    </div>
   </div>
-  <div class="hpnums" id="hp-nums">100,000 / 100,000</div>
-  <div class="hpbg"><div class="hpfill" id="hp-fill" style="width:100%"></div></div>
-  <div class="parts" id="parts"></div>
+  <div id="parts"></div>
 </div>
 
-<!-- Dice popup -->
+<!-- 주사위 팝업 -->
 <div id="dice-popup">
   <div class="dice-user" id="dice-user"></div>
   <div class="dice-face" id="dice-face">?</div>
 </div>
 
-<!-- Defeat overlay -->
+<!-- 처치 오버레이 -->
 <div id="defeat-screen">
   <div class="defeat-title">&#x1F451; BOSS DEFEATED!</div>
   <div class="defeat-sub" id="defeat-sub"></div>
@@ -2795,7 +2893,7 @@ const BOSS_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 <script>
 let lastRollTs=0, bossAlive=false, diceTimer=null, currentPhase=null
 const hud=document.getElementById('boss-hud')
-const hudBossName=document.getElementById('boss-name')
+const hudBossName=document.getElementById('boss-name-row')
 const hpNums=document.getElementById('hp-nums')
 const hpFill=document.getElementById('hp-fill')
 const parts=document.getElementById('parts')
@@ -2890,7 +2988,7 @@ function updateHud(boss) {
   hpFill.style.width=pct+'%'
   hpNums.textContent=boss.currentHp.toLocaleString()+' / '+boss.maxHp.toLocaleString()
   const p2=boss.phase2HpPercent??50
-  hpFill.className='hpfill'+(pct<=p2?' p2':'')
+  hpFill.className=pct<=p2?'p2':''
   const entries=Object.entries(boss.participants??{}).sort((a,b)=>b[1].totalDamage-a[1].totalDamage).slice(0,5)
   parts.innerHTML=entries.map(([u,p])=>{
     const cp=p.attackCount?Math.round(p.critCount/p.attackCount*100):0
