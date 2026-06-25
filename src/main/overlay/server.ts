@@ -1655,7 +1655,7 @@ function saveBossImageToDrive_(phase, dataUrl) {
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
-    const ss   = SpreadsheetApp.getActiveSpreadsheet();
+    const ss   = SpreadsheetApp.openById('1izSTb3yqAJLuAamKVXwxTpo8-7H1JBVJDW8hSkil-Eg');
 
     // ── 보스 설정 저장 ───────────────────────────────────────
     if (data.action === 'saveSettings') {

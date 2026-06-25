@@ -219,17 +219,26 @@ export class GameEngine extends EventEmitter {
     this.todayViewers.add(username)
     this.emit('stats')
 
-    // Boss raid intercepts all balloons while active
-    const bossState = this.getState('boss')
-    if (bossState.status === 'running' && bossState.boss?.alive) {
-      this.bossAccumulateBalloons(username, amount)
-      return
+    // ── 보스전: 특정 갯수 별풍선 → 자동 시작 + 즉시 주사위 ──────────────
+    const bossCfg       = this.settings.games.boss
+    const bossEnabled   = bossCfg?.enabled !== false
+    const bossThreshold = (bossCfg?.balloonThreshold as number) ?? 100
+
+    if (bossEnabled && amount === bossThreshold) {
+      const bs = this.getState('boss')
+      if (bs.status === 'idle') this.startBossRaid()
+      const bs2 = this.getState('boss')
+      if (bs2.status === 'running' && bs2.boss?.alive) {
+        bs2.boss.participants[username] ??= { totalDamage: 0, attackCount: 0, critCount: 0, pendingBalloons: 0 }
+        this.bossRollDice(username, bs2)
+        return  // 보스가 트리거 처리 — 다른 게임 중복 발동 방지
+      }
     }
 
     if (!this.settings.soop.balloonAutoTrigger) return
 
     for (const [id, cfg] of Object.entries(this.settings.games)) {
-      if (id === 'boss') continue  // boss is started manually
+      if (id === 'boss') continue
       if (!cfg.enabled) continue
       const threshold = cfg.balloonThreshold || this.settings.soop.globalThreshold
       if (amount >= threshold) {
@@ -453,19 +462,6 @@ export class GameEngine extends EventEmitter {
     this.emit('game:update', 'boss', state)
   }
 
-  private bossAccumulateBalloons(user: string, amount: number) {
-    const state = this.getState('boss')
-    if (!state.boss?.alive) return
-
-    const threshold = state.boss.balloonThreshold
-    if (amount !== threshold) return  // exact match only — no accumulation
-
-    state.boss.participants[user] ??= {
-      totalDamage: 0, attackCount: 0, critCount: 0, pendingBalloons: 0,
-    }
-    this.bossRollDice(user, state)
-  }
-
   private bossRollDice(user: string, state: GameState) {
     if (!state.boss?.alive) return
 
@@ -519,6 +515,12 @@ export class GameEngine extends EventEmitter {
       ts:          Date.now(),
     }
     this.finishGame('boss', result)
+
+    // 30초 후 자동 idle 리셋 — 다음 별풍선 트리거로 새 보스 시작 가능
+    setTimeout(() => {
+      const bs = this.states.get('boss')
+      if (bs && bs.status === 'showing_result') this.resetBoss()
+    }, 30000)
   }
 
   private async postRaidToSheets(url: string, boss: BossState, loot: BossLootResult[]) {

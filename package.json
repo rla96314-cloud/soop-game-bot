@@ -1,6 +1,6 @@
 {
   "name": "soop-game-bot",
-  "version": "1.5.32",
+  "version": "1.5.33",
   "description": "SOOP 스트리머용 게임봇 대시보드",
   "main": "out/main/index.js",
   "author": "rla96314@gmail.com",

@@ -25,10 +25,12 @@ function saveBossImageToDrive_(phase, dataUrl) {
   return 'https://drive.google.com/uc?export=view&id=' + file.getId();
 }
 
+const SHEET_ID = '1izSTb3yqAJLuAamKVXwxTpo8-7H1JBVJDW8hSkil-Eg';
+
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
-    const ss   = SpreadsheetApp.getActiveSpreadsheet();
+    const ss   = SpreadsheetApp.openById(SHEET_ID);
 
     // ── 보스 설정 저장 ───────────────────────────────────────
     if (data.action === 'saveSettings') {
