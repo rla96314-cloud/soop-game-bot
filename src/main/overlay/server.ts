@@ -3081,6 +3081,11 @@ export class OverlayServer {
   private port = 3939
   private latestBossState: GameState | null = null
   private hpPollTimer: ReturnType<typeof setInterval> | null = null
+  private commandHandler: ((cmd: Record<string, unknown>) => void) | null = null
+
+  setCommandHandler(fn: (cmd: Record<string, unknown>) => void) {
+    this.commandHandler = fn
+  }
 
   start(port = 3939) {
     this.port = port
@@ -3216,7 +3221,7 @@ export class OverlayServer {
           bossName:     boss?.bossName ?? (bossCfg?.bossName as string) ?? '보스',
           currentHp:    boss?.currentHp ?? 0,
           maxHp:        boss?.maxHp ?? (bossCfg?.maxHp as number) ?? 0,
-          participants: Object.keys(boss?.participants ?? {}).length,
+          participants: boss?.participants ?? {},
           settings: {
             maxHp:            (bossCfg?.maxHp as number) ?? 0,
             balloonThreshold: (bossCfg?.balloonThreshold as number) ?? 0,
@@ -3228,7 +3233,14 @@ export class OverlayServer {
             lootItems:        (bossCfg?.lootItems as unknown[]) ?? [],
           },
         }),
-      }).catch(() => {})
+      })
+        .then(r => r.json())
+        .then((j: Record<string, unknown>) => {
+          if (j.command && this.commandHandler) {
+            this.commandHandler(j.command as Record<string, unknown>)
+          }
+        })
+        .catch(() => {})
     }, 1000)
   }
 

@@ -33,6 +33,17 @@ export function registerIpcHandlers(win: BrowserWindow) {
     send('game:update', id, state)
     overlayServer.sendState(state)
   })
+
+  overlayServer.setCommandHandler((cmd) => {
+    if (cmd.type === 'start-boss') {
+      gameEngine.startBossRaid()
+    } else if (cmd.type === 'reset-boss') {
+      gameEngine.resetBoss()
+    } else if (cmd.type === 'update-settings') {
+      const next = patchSettings({ games: { boss: cmd.settings as Record<string, unknown> } })
+      gameEngine.updateSettings(next)
+    }
+  })
   gameEngine.on('game:result', (id, result) => {
     send('game:result', id, result)
     overlayServer.sendResult(result)
