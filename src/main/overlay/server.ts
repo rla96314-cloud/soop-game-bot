@@ -3201,27 +3201,31 @@ export class OverlayServer {
 
     const BOSS_HP_SERVER = 'http://100.89.116.107:4081/boss-hp'
     this.hpPollTimer = setInterval(() => {
-      const bs = this.latestBossState
-      if (!bs || bs.status !== 'running' || !bs.boss?.alive) return
       const settings = loadSettings()
+      const channelId = settings.soop?.channelId ?? 'unknown'
+      const bossCfg = settings.games.boss as Record<string, unknown>
+      const bs = this.latestBossState
+      const boss = bs?.boss
+
       fetch(BOSS_HP_SERVER, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          channelId:    settings.soop?.channelId ?? 'unknown',
-          bossName:     bs.boss.bossName,
-          currentHp:    bs.boss.currentHp,
-          maxHp:        bs.boss.maxHp,
-          participants: Object.keys(bs.boss.participants ?? {}).length,
+          channelId,
+          status:       bs?.status ?? 'idle',
+          bossName:     boss?.bossName ?? (bossCfg?.bossName as string) ?? '보스',
+          currentHp:    boss?.currentHp ?? 0,
+          maxHp:        boss?.maxHp ?? (bossCfg?.maxHp as number) ?? 0,
+          participants: Object.keys(boss?.participants ?? {}).length,
           settings: {
-            maxHp:            bs.boss.maxHp,
-            balloonThreshold: bs.boss.balloonThreshold,
-            damagePerDot:     bs.boss.damagePerDot,
-            critEnabled:      bs.boss.critEnabled,
-            critChance:       bs.boss.critChance,
-            critMultiplier:   bs.boss.critMultiplier,
-            phase2HpPercent:  bs.boss.phase2HpPercent,
-            lootItems:        (settings.games.boss as Record<string, unknown>)?.lootItems ?? [],
+            maxHp:            (bossCfg?.maxHp as number) ?? 0,
+            balloonThreshold: (bossCfg?.balloonThreshold as number) ?? 0,
+            damagePerDot:     (bossCfg?.damagePerDot as number) ?? 0,
+            critEnabled:      (bossCfg?.critEnabled as boolean) ?? false,
+            critChance:       (bossCfg?.critChance as number) ?? 0,
+            critMultiplier:   (bossCfg?.critMultiplier as number) ?? 2,
+            phase2HpPercent:  (bossCfg?.phase2HpPercent as number) ?? 50,
+            lootItems:        (bossCfg?.lootItems as unknown[]) ?? [],
           },
         }),
       }).catch(() => {})

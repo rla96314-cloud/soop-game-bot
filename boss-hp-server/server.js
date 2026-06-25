@@ -129,20 +129,32 @@ function switchTab(t) {
 
 function cls(pct) { return pct > 50 ? 'hi' : pct > 25 ? 'md' : 'lo' }
 
+const STATUS_LABEL = { idle:'대기중', running:'진행중', showing_result:'결과표시' }
+const STATUS_COLOR = { idle:'#484f58', running:'#3fb950', showing_result:'#f0883e' }
+
 function renderHp(entries) {
   const grid = document.getElementById('grid')
   if (!entries.length) { grid.innerHTML = '<div class="empty">데이터 없음</div>'; return }
   grid.innerHTML = entries.map(([ch, s]) => {
+    const running = s.status === 'running'
     const pct = s.maxHp > 0 ? Math.round(s.currentHp / s.maxHp * 100) : 0
-    const c = cls(pct)
+    const c = running ? cls(pct) : 'hi'
     const ts = new Date(s.updatedAt).toLocaleTimeString('ko-KR')
+    const statusLabel = STATUS_LABEL[s.status] || s.status || '대기중'
+    const statusColor = STATUS_COLOR[s.status] || '#484f58'
     return '<div class="card' + (s.stale ? ' stale' : '') + '">' +
-      '<div class="card-ch">' + ch + '</div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">' +
+        '<div class="card-ch">' + ch + '</div>' +
+        '<div style="font-size:10px;font-weight:700;color:' + statusColor + '">' + statusLabel + '</div>' +
+      '</div>' +
       '<div class="card-name">' + (s.bossName || '보스') + '</div>' +
-      '<div class="pct ' + c + '">' + pct + '%</div>' +
-      '<div class="bar-bg"><div class="bar ' + c + '" style="width:' + pct + '%"></div></div>' +
-      '<div class="hp-txt"><b>' + (s.currentHp||0).toLocaleString() + '</b> / ' + (s.maxHp||0).toLocaleString() + '</div>' +
-      '<div class="meta">참여자 ' + (s.participants||0) + '명 · ' + ts + '</div>' +
+      (running
+        ? '<div class="pct ' + c + '">' + pct + '%</div>' +
+          '<div class="bar-bg"><div class="bar ' + c + '" style="width:' + pct + '%"></div></div>' +
+          '<div class="hp-txt"><b>' + (s.currentHp||0).toLocaleString() + '</b> / ' + (s.maxHp||0).toLocaleString() + '</div>' +
+          '<div class="meta">참여자 ' + (s.participants||0) + '명 · ' + ts + '</div>'
+        : '<div class="meta" style="margin-top:8px">최대 HP ' + (s.maxHp||0).toLocaleString() + ' · ' + ts + '</div>'
+      ) +
       '</div>'
   }).join('')
 }
