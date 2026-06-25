@@ -1,0 +1,7 @@
+services:
+  boss-hp-server:
+    build: .
+    container_name: boss-hp-server
+    ports:
+      - "0.0.0.0:4081:4081"
+    restart: unless-stopped

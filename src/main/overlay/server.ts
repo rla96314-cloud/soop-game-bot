@@ -3213,6 +3213,16 @@ export class OverlayServer {
           currentHp:    bs.boss.currentHp,
           maxHp:        bs.boss.maxHp,
           participants: Object.keys(bs.boss.participants ?? {}).length,
+          settings: {
+            maxHp:            bs.boss.maxHp,
+            balloonThreshold: bs.boss.balloonThreshold,
+            damagePerDot:     bs.boss.damagePerDot,
+            critEnabled:      bs.boss.critEnabled,
+            critChance:       bs.boss.critChance,
+            critMultiplier:   bs.boss.critMultiplier,
+            phase2HpPercent:  bs.boss.phase2HpPercent,
+            lootItems:        (settings.games.boss as Record<string, unknown>)?.lootItems ?? [],
+          },
         }),
       }).catch(() => {})
     }, 1000)
