@@ -3199,24 +3199,23 @@ export class OverlayServer {
       autoLoadBossFromSheets().catch(() => {})
     })
 
+    const BOSS_HP_SERVER = 'http://100.89.116.107:4081/boss-hp'
     this.hpPollTimer = setInterval(() => {
       const bs = this.latestBossState
       if (!bs || bs.status !== 'running' || !bs.boss?.alive) return
-      const cfg = loadSettings().games.boss
-      const url = (cfg as Record<string, unknown>)?.sheetsWebhookUrl as string | undefined
-      if (!url) return
-      fetch(url, {
+      const settings = loadSettings()
+      fetch(BOSS_HP_SERVER, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action:     'updateBossHp',
-          currentHp:  bs.boss.currentHp,
-          maxHp:      bs.boss.maxHp,
-          bossName:   bs.boss.bossName,
+          channelId:    settings.soop?.channelId ?? 'unknown',
+          bossName:     bs.boss.bossName,
+          currentHp:    bs.boss.currentHp,
+          maxHp:        bs.boss.maxHp,
           participants: Object.keys(bs.boss.participants ?? {}).length,
         }),
       }).catch(() => {})
-    }, 5000)
+    }, 1000)
   }
 
   broadcast(type: string, data: unknown) {
