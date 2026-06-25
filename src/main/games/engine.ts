@@ -481,11 +481,7 @@ export class GameEngine extends EventEmitter {
 
     state.boss.lastRoll = { user, roll, damage, isCritical, ts: Date.now() }
     this.emit('game:update', 'boss', state)
-
-    if (state.boss.currentHp <= 0) {
-      state.boss.alive = false
-      this.defeatBoss(user, state)
-    }
+    // Defeat is triggered via setSharedBossHp() after server confirms HP reaches 0
   }
 
   private defeatBoss(lastUser: string, state: GameState) {
@@ -584,6 +580,22 @@ export class GameEngine extends EventEmitter {
         contributionRate: (winner.weight / totalWeight) * 100,
       }
     })
+  }
+
+  setSharedBossHp(hp: number, alive: boolean) {
+    const state = this.getState('boss')
+    if (!state.boss || state.status !== 'running') return
+
+    const wasAlive       = state.boss.alive
+    state.boss.currentHp = Math.max(0, hp)
+
+    if (!alive && wasAlive) {
+      state.boss.alive = false
+      this.defeatBoss(state.boss.lastRoll?.user ?? '공동', state)
+      return
+    }
+
+    this.emit('game:update', 'boss', state)
   }
 
   resetBoss() {

@@ -25,6 +25,16 @@ const storedSettings = loadSettingsFile()  // channelId → settings object
 const states         = new Map()           // channelId → latest HP state
 const commands       = new Map()           // channelId → pending command
 
+// ── 공유 보스 상태 ───────────────────────────────────────────────
+const sharedBoss = {
+  alive:        false,
+  maxHp:        0,
+  currentHp:    0,
+  bossName:     '공유 보스',
+  participants: {},  // `${channelId}/${username}` → { totalDamage, attackCount, critCount, channelId, username }
+  startedAt:    null,
+}
+
 function allChannels() {
   const set = new Set([...states.keys(), ...Object.keys(storedSettings)])
   return [...set]
@@ -57,7 +67,6 @@ const server = http.createServer((req, res) => {
       const key  = data.channelId || 'unknown'
       const prev = states.get(key) || {}
       states.set(key, { ...prev, ...data, updatedAt: Date.now() })
-      // 앱이 보낸 settings로 저장 업데이트 (app이 켜진 경우)
       if (data.settings && Object.keys(data.settings).length > 0) {
         storedSettings[key] = { ...(storedSettings[key]||{}), ...data.settings,
           bossName: data.bossName || storedSettings[key]?.bossName }
@@ -65,8 +74,77 @@ const server = http.createServer((req, res) => {
       }
       const cmd = commands.get(key) || null
       if (cmd) commands.delete(key)
-      json(200, { ok: true, command: cmd })
+      json(200, { ok: true, command: cmd, sharedBoss: { currentHp: sharedBoss.currentHp, alive: sharedBoss.alive } })
     })
+    return
+  }
+
+  // ── 공유 보스: 데미지 적용 ──────────────────────────────────────
+  if (method === 'POST' && url === '/boss-attack') {
+    body().then(data => {
+      if (!data) return json(400, { ok: false })
+      if (!sharedBoss.alive) return json(200, { currentHp: 0, alive: false })
+
+      const dmg = Number(data.damage) || 0
+      sharedBoss.currentHp = Math.max(0, sharedBoss.currentHp - dmg)
+
+      const key = `${data.channelId || 'unknown'}/${data.username || '?'}`
+      if (!sharedBoss.participants[key]) {
+        sharedBoss.participants[key] = { totalDamage: 0, attackCount: 0, critCount: 0,
+          channelId: data.channelId || 'unknown', username: data.username || '?' }
+      }
+      const p = sharedBoss.participants[key]
+      p.totalDamage += dmg
+      p.attackCount++
+      if (data.isCrit) p.critCount++
+
+      if (sharedBoss.currentHp <= 0) {
+        sharedBoss.alive     = false
+        sharedBoss.currentHp = 0
+      }
+
+      json(200, { currentHp: sharedBoss.currentHp, alive: sharedBoss.alive })
+    })
+    return
+  }
+
+  // ── 공유 보스: 시작 (idempotent) ────────────────────────────────
+  if (method === 'POST' && url === '/shared-boss/start') {
+    body().then(data => {
+      if (!sharedBoss.alive) {
+        // 새 레이드 시작
+        const maxHp = Number(data?.maxHp) || 100000
+        sharedBoss.alive         = true
+        sharedBoss.maxHp         = maxHp
+        sharedBoss.currentHp     = maxHp
+        sharedBoss.bossName      = data?.bossName || '공유 보스'
+        sharedBoss.participants  = {}
+        sharedBoss.startedAt     = Date.now()
+        // 모든 채널에 start-boss 명령 전송
+        for (const ch of allChannels()) commands.set(ch, { type: 'start-boss' })
+        json(200, { ok: true, started: true, currentHp: sharedBoss.currentHp, maxHp: sharedBoss.maxHp })
+      } else {
+        // 이미 진행중 — 현재 상태 반환 (채널 join)
+        json(200, { ok: true, started: false, currentHp: sharedBoss.currentHp, maxHp: sharedBoss.maxHp, alive: true })
+      }
+    })
+    return
+  }
+
+  // ── 공유 보스: 리셋 ─────────────────────────────────────────────
+  if (method === 'POST' && url === '/shared-boss/reset') {
+    sharedBoss.alive        = false
+    sharedBoss.currentHp    = 0
+    sharedBoss.participants = {}
+    sharedBoss.startedAt    = null
+    for (const ch of allChannels()) commands.set(ch, { type: 'reset-boss' })
+    json(200, { ok: true })
+    return
+  }
+
+  // ── 공유 보스: 상태 조회 ────────────────────────────────────────
+  if (method === 'GET' && url === '/shared-boss') {
+    json(200, { ok: true, boss: sharedBoss })
     return
   }
 
@@ -90,7 +168,6 @@ const server = http.createServer((req, res) => {
       if (!data) return json(400, { ok: false })
       storedSettings[channelId] = { ...(storedSettings[channelId]||{}), ...data }
       saveSettingsFile(storedSettings)
-      // 앱이 켜져 있으면 command로도 즉시 반영
       commands.set(channelId, { type: 'update-settings', settings: data })
       json(200, { ok: true })
     })
@@ -107,7 +184,7 @@ const server = http.createServer((req, res) => {
     return
   }
 
-  // ── 대시보드: 명령 ──────────────────────────────────────────────
+  // ── 대시보드: 채널 명령 ─────────────────────────────────────────
   if (method === 'POST' && url.startsWith('/boss-command/')) {
     const channelId = decodeURIComponent(url.slice('/boss-command/'.length))
     body().then(cmd => {
@@ -163,36 +240,43 @@ h1{font-size:15px;color:#58a6ff;font-weight:700}
 .tab:hover:not(.active){color:#c9d1d9}
 #ts{font-size:11px;color:#484f58;margin-left:auto}
 .panel{display:none;padding:16px 20px}.panel.active{display:block}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
-.card{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:14px}
-.card.offline{border-color:#21262d;opacity:.7}
 .empty{color:#484f58;padding:32px 0}
 
-/* 온라인 뱃지 */
-.card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+/* 공유 보스 카드 */
+.shared-boss-card{background:#161b22;border:2px solid #1f6feb;border-radius:12px;padding:18px 20px;margin-bottom:18px}
+.shared-boss-title{font-size:13px;font-weight:700;color:#58a6ff;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.shared-boss-name{font-size:20px;font-weight:800;margin-bottom:10px}
+.pct{font-size:28px;font-weight:800;margin-bottom:4px}
+.pct.hi{color:#f85149}.pct.md{color:#f0883e}.pct.lo{color:#3fb950}
+.bar-bg{background:#21262d;border-radius:4px;height:10px;overflow:hidden;margin-bottom:8px}
+.bar{height:100%;border-radius:4px;transition:width .5s}
+.bar.hi{background:linear-gradient(90deg,#f85149,#da3633)}.bar.md{background:linear-gradient(90deg,#f0883e,#d29922)}.bar.lo{background:linear-gradient(90deg,#3fb950,#2ea043)}
+.hp-txt{font-size:13px;color:#8b949e;margin-bottom:10px}.hp-txt b{color:#e6edf3;font-size:15px}
+.shared-btns{display:flex;gap:8px;margin-bottom:12px}
+.btn{padding:7px 18px;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit}
+.btn-start{background:#238636;color:#fff}.btn-start:hover{background:#2ea043}
+.btn-reset{background:#21262d;color:#8b949e;border:1px solid #30363d}.btn-reset:hover{color:#e6edf3}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+
+/* 참여자 테이블 */
+.dmg-table{width:100%;border-collapse:collapse;font-size:11px}
+.dmg-table th{color:#8b949e;font-weight:600;padding:4px 6px;border-bottom:1px solid #21262d;text-align:left}
+.dmg-table td{padding:4px 6px;border-bottom:1px solid #0d1117}
+.dmg-table tr:last-child td{border-bottom:none}
+.r1{color:#f1c40f}.r2{color:#95a5a6}.r3{color:#cd6133}
+
+/* 채널 상태 그리드 */
+.ch-section-title{font-size:12px;color:#8b949e;font-weight:600;margin-bottom:10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px}
+.card.offline{border-color:#21262d;opacity:.6}
+.card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
 .card-ch{font-size:11px;color:#8b949e}
 .badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px}
 .b-online{color:#3fb950;background:#1a3a1a}
 .b-offline{color:#484f58;background:#1a1a1a}
 .b-run{color:#58a6ff;background:#0d2137}
 .b-result{color:#f0883e;background:#3a2010}
-.card-name{font-size:14px;font-weight:700;margin-bottom:8px}
-.pct{font-size:22px;font-weight:800;margin-bottom:4px}
-.pct.hi{color:#f85149}.pct.md{color:#f0883e}.pct.lo{color:#3fb950}
-.bar-bg{background:#21262d;border-radius:4px;height:8px;overflow:hidden;margin-bottom:6px}
-.bar{height:100%;border-radius:4px;transition:width .5s}
-.bar.hi{background:linear-gradient(90deg,#f85149,#da3633)}.bar.md{background:linear-gradient(90deg,#f0883e,#d29922)}.bar.lo{background:linear-gradient(90deg,#3fb950,#2ea043)}
-.hp-txt{font-size:12px;color:#8b949e;margin-bottom:6px}.hp-txt b{color:#e6edf3}
-.btns{display:flex;gap:6px;margin-top:8px}
-.btn{flex:1;padding:6px 0;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit}
-.btn-start{background:#238636;color:#fff}.btn-start:hover{background:#2ea043}
-.btn-reset{background:#21262d;color:#8b949e;border:1px solid #30363d}.btn-reset:hover{color:#e6edf3}
-.btn:disabled{opacity:.35;cursor:not-allowed}
-.dmg-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:11px}
-.dmg-table th{color:#8b949e;font-weight:600;padding:4px 6px;border-bottom:1px solid #21262d;text-align:left}
-.dmg-table td{padding:4px 6px;border-bottom:1px solid #0d1117}
-.dmg-table tr:last-child td{border-bottom:none}
-.r1{color:#f1c40f}.r2{color:#95a5a6}.r3{color:#cd6133}
 
 /* 설정 탭 */
 .cfg-toolbar{display:flex;gap:8px;margin-bottom:14px;align-items:center}
@@ -224,14 +308,21 @@ h1{font-size:15px;color:#58a6ff;font-weight:700}
 <header>
   <h1>보스전 모니터</h1>
   <div class="tabs">
-    <button class="tab active" onclick="switchTab('hp')">HP 모니터</button>
+    <button class="tab active" onclick="switchTab('hp')">공유 보스</button>
     <button class="tab" onclick="switchTab('cfg')">보스 설정</button>
   </div>
   <span id="ts"></span>
 </header>
 
 <div id="panel-hp" class="panel active">
-  <div id="hp-grid" class="grid"><div class="empty">앱 실행 후 데이터가 표시됩니다</div></div>
+  <!-- 공유 보스 카드 -->
+  <div class="shared-boss-card" id="shared-card">
+    <div class="shared-boss-title">공유 보스 HP (전 채널 합산)</div>
+    <div id="shared-content"><div class="empty">레이드를 시작해 주세요</div></div>
+  </div>
+  <!-- 채널별 상태 -->
+  <div class="ch-section-title" id="ch-label"></div>
+  <div id="hp-grid" class="grid"></div>
 </div>
 <div id="panel-cfg" class="panel">
   <div class="cfg-toolbar">
@@ -244,7 +335,8 @@ h1{font-size:15px;color:#58a6ff;font-weight:700}
 <script>
 let currentTab = 'hp'
 let latestData = {}
-const lootState = {}   // channelId → [{name,description}]
+let latestShared = { alive: false, maxHp: 0, currentHp: 0, bossName: '공유 보스', participants: {} }
+const lootState = {}
 
 function switchTab(t) {
   currentTab = t
@@ -259,66 +351,104 @@ const num = n => (n||0).toLocaleString()
 function cls(p){return p>50?'hi':p>25?'md':'lo'}
 function pct(cur,max){return max>0?Math.round(cur/max*100):0}
 
-/* ── 명령 전송 ── */
-async function sendCmd(ch, cmd) {
-  await fetch('/boss-command/'+encodeURIComponent(ch), {
-    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(cmd)
-  })
+/* ── 공유 보스 렌더 ── */
+function renderSharedBoss(boss) {
+  const el = document.getElementById('shared-content')
+  if (!boss.alive && !boss.startedAt) {
+    el.innerHTML = '<div class="empty" style="padding:12px 0">레이드를 시작해 주세요</div>'
+    + '<div class="shared-btns"><button class="btn btn-start" onclick="sharedStart()">▶ 레이드 시작 (전체)</button></div>'
+    return
+  }
+  const p   = pct(boss.currentHp, boss.maxHp)
+  const c   = cls(p)
+  const pts = Object.entries(boss.participants || {})
+    .map(([k,v])=>({...v,key:k}))
+    .sort((a,b)=>(b.totalDamage||0)-(a.totalDamage||0))
+  const totDmg = pts.reduce((s,r)=>s+(r.totalDamage||0),0)
+
+  el.innerHTML = \`
+    <div class="shared-boss-name">\${esc(boss.bossName)}</div>
+    \${boss.alive ? \`
+      <div class="pct \${c}">\${p}%</div>
+      <div class="bar-bg"><div class="bar \${c}" style="width:\${p}%"></div></div>
+      <div class="hp-txt"><b>\${num(boss.currentHp)}</b> / \${num(boss.maxHp)}</div>
+    \` : \`<div class="hp-txt" style="color:#f85149;margin-bottom:10px">보스 처치!</div>\`}
+    <div class="shared-btns">
+      <button class="btn btn-start" \${boss.alive?'disabled':''} onclick="sharedStart()">▶ 레이드 시작</button>
+      <button class="btn btn-reset" onclick="sharedReset()">↺ 초기화</button>
+    </div>
+    \${pts.length ? \`<table class="dmg-table">
+      <tr><th>#</th><th>채널</th><th>참여자</th><th>데미지</th><th>기여</th><th>공격</th><th>크리</th></tr>
+      \${pts.slice(0,15).map((r,i)=>{
+        const rCls=i===0?'r1':i===1?'r2':i===2?'r3':''
+        const ct=totDmg>0?Math.round((r.totalDamage||0)/totDmg*100):0
+        return \`<tr><td class="\${rCls}">\${i+1}</td><td style="color:#8b949e">\${esc(r.channelId)}</td><td>\${esc(r.username)}</td><td>\${num(r.totalDamage)}</td><td>\${ct}%</td><td>\${r.attackCount||0}</td><td>\${r.critCount||0}</td></tr>\`
+      }).join('')}
+    </table>\` : ''}
+  \`
 }
 
-/* ── HP 탭 ── */
-function renderHp(data) {
+/* ── 채널 상태 그리드 ── */
+function renderChannels(data) {
   const entries = Object.entries(data)
-  const grid = document.getElementById('hp-grid')
-  if (!entries.length) { grid.innerHTML='<div class="empty">채널이 없습니다 — 보스 설정 탭에서 채널을 추가하세요</div>'; return }
+  const grid  = document.getElementById('hp-grid')
+  const label = document.getElementById('ch-label')
+  if (!entries.length) { grid.innerHTML=''; label.textContent=''; return }
+  label.textContent = \`채널 상태 (\${entries.length}개)\`
 
   grid.innerHTML = entries.map(([ch, s]) => {
     const online  = s.online
     const running = online && s.status==='running'
     const result  = online && s.status==='showing_result'
-    const p       = pct(s.currentHp, s.maxHp)
-    const c       = cls(p)
-    const bName   = s.bossName || s.settings?.bossName || '보스'
-    const mHp     = s.maxHp || s.settings?.maxHp || 0
-    const parts   = (running||result) && s.participants && typeof s.participants==='object' ? s.participants : {}
-    const ranked  = Object.entries(parts).map(([u,d])=>({u,...d})).sort((a,b)=>(b.totalDamage||0)-(a.totalDamage||0))
-    const totDmg  = ranked.reduce((s,r)=>s+(r.totalDamage||0),0)
     const badgeCls= !online?'b-offline':running?'b-run':result?'b-result':'b-online'
     const badgeTxt= !online?'오프라인':running?'진행중':result?'결과표시':'대기중'
-    const ts = s.updatedAt ? new Date(s.updatedAt).toLocaleTimeString('ko-KR') : '-'
 
     return \`<div class="card\${!online?' offline':''}">
       <div class="card-head">
         <span class="card-ch">\${esc(ch)}</span>
         <span class="badge \${badgeCls}">\${badgeTxt}</span>
       </div>
-      <div class="card-name">\${esc(bName)}</div>
-      \${running ? \`
-        <div class="pct \${c}">\${p}%</div>
-        <div class="bar-bg"><div class="bar \${c}" style="width:\${p}%"></div></div>
-        <div class="hp-txt"><b>\${num(s.currentHp)}</b> / \${num(mHp)}</div>
-      \` : \`<div class="hp-txt" style="margin-bottom:6px">최대 HP \${num(mHp)}</div>\`}
-      <div class="btns">
-        <button class="btn btn-start" \${running||!online?'disabled':''} onclick="sendCmd('\${esc(ch)}',{type:'start-boss'})">▶ 레이드 시작</button>
-        <button class="btn btn-reset" \${!online?'disabled':''} onclick="sendCmd('\${esc(ch)}',{type:'reset-boss'})">↺ 초기화</button>
-      </div>
-      \${ranked.length ? \`<table class="dmg-table">
-        <tr><th>#</th><th>참여자</th><th>데미지</th><th>기여</th><th>공격</th><th>크리</th></tr>
-        \${ranked.slice(0,8).map((r,i)=>{
-          const rCls=i===0?'r1':i===1?'r2':i===2?'r3':''
-          const ct=totDmg>0?Math.round((r.totalDamage||0)/totDmg*100):0
-          return \`<tr><td class="\${rCls}">\${i+1}</td><td>\${esc(r.u)}</td><td>\${num(r.totalDamage)}</td><td>\${ct}%</td><td>\${r.attackCount||0}</td><td>\${r.critCount||0}</td></tr>\`
-        }).join('')}
-      </table>\` : \`<div style="font-size:11px;color:#484f58;margin-top:8px">\${ts}</div>\`}
+      <div style="font-size:12px;color:#c9d1d9;margin-top:2px">\${esc(s.bossName||s.settings?.bossName||'보스')}</div>
+      \${online ? \`<div style="font-size:11px;color:#484f58;margin-top:4px">최근 업데이트: \${new Date(s.updatedAt).toLocaleTimeString('ko-KR')}</div>\` : ''}
     </div>\`
   }).join('')
+}
+
+/* ── 공유 보스 제어 ── */
+async function sharedStart() {
+  const r = await fetch('/shared-boss').then(r=>r.json())
+  const boss = r.boss || {}
+  const maxHp = boss.alive ? boss.maxHp : (
+    (() => {
+      const chs = Object.keys(latestData)
+      if (chs.length === 0) return 100000
+      const s = latestData[chs[0]]
+      return s.settings?.maxHp || s.maxHp || 100000
+    })()
+  )
+  const bossName = boss.alive ? boss.bossName : (
+    (() => {
+      const chs = Object.keys(latestData)
+      if (chs.length === 0) return '공유 보스'
+      const s = latestData[chs[0]]
+      return s.settings?.bossName || s.bossName || '공유 보스'
+    })()
+  )
+  await fetch('/shared-boss/start', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ maxHp, bossName })
+  })
+}
+
+async function sharedReset() {
+  if (!confirm('공유 보스를 초기화할까요? 모든 채널에 reset 명령이 전송됩니다.')) return
+  await fetch('/shared-boss/reset', { method:'POST' })
 }
 
 /* ── 설정 탭 ── */
 function renderCfg() {
   const data = latestData
   const chSet = new Set([...Object.keys(data)])
-  // 저장된 설정 기반 채널도 포함 (오프라인)
   fetch('/boss-settings').then(r=>r.json()).then(j=>{
     if (j.settings) Object.keys(j.settings).forEach(k=>chSet.add(k))
     const entries = [...chSet].map(ch => [ch, {
@@ -329,7 +459,6 @@ function renderCfg() {
     const grid = document.getElementById('cfg-grid')
     if (!entries.length) { grid.innerHTML='<div class="empty">채널이 없습니다</div>'; return }
 
-    // 새 채널은 lootState 초기화
     entries.forEach(([ch, s]) => {
       if (!lootState[ch]) lootState[ch] = (s.settings.lootItems||[]).map(x=>({...x}))
     })
@@ -437,9 +566,18 @@ async function delChannel(ch) {
 /* ── 메인 루프 ── */
 async function load() {
   try {
-    const r = await fetch('/boss-hp')
-    latestData = await r.json()
-    renderHp(latestData)
+    const [hpRes, sbRes] = await Promise.all([
+      fetch('/boss-hp'),
+      fetch('/shared-boss'),
+    ])
+    latestData   = await hpRes.json()
+    const sbJson = await sbRes.json()
+    latestShared = sbJson.boss || latestShared
+
+    if (currentTab === 'hp') {
+      renderSharedBoss(latestShared)
+      renderChannels(latestData)
+    }
     document.getElementById('ts').textContent = new Date().toLocaleTimeString('ko-KR')
   } catch {}
 }

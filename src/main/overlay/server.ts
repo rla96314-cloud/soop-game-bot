@@ -3253,6 +3253,10 @@ export class OverlayServer {
           if (j.command && this.commandHandler) {
             this.commandHandler(j.command as Record<string, unknown>)
           }
+          if (j.sharedBoss && this.commandHandler) {
+            const sb = j.sharedBoss as Record<string, unknown>
+            this.commandHandler({ type: 'sync-boss-hp', currentHp: sb.currentHp, alive: sb.alive })
+          }
         })
         .catch(() => {})
     }, 1000)

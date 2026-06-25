@@ -8,10 +8,14 @@ import { openSoopLoginWindow }                      from '../auth/soopLogin'
 import { fetchTodaySchedule }                       from '../schedule/fetcher'
 import { weflabWatcher }                            from '../weflab/watcher'
 
+const BOSS_HP_SERVER = 'http://100.89.116.107:4081'
+
 export function registerIpcHandlers(win: BrowserWindow) {
   const send = (ch: string, ...args: unknown[]) => {
     if (!win.isDestroyed()) win.webContents.send(ch, ...args)
   }
+
+  let lastBossRollTs = 0
 
   // ── SOOP connection ──────────────────────────────────────────────────────
 
@@ -32,6 +36,23 @@ export function registerIpcHandlers(win: BrowserWindow) {
   gameEngine.on('game:update', (id, state) => {
     send('game:update', id, state)
     overlayServer.sendState(state)
+
+    // Shared boss: report damage to server on each new roll
+    if (id === 'boss' && state.boss?.lastRoll && state.boss.lastRoll.ts > lastBossRollTs) {
+      lastBossRollTs = state.boss.lastRoll.ts
+      const roll      = state.boss.lastRoll
+      const channelId = loadSettings().soop?.channelId ?? 'unknown'
+      fetch(`${BOSS_HP_SERVER}/boss-attack`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ channelId, username: roll.user, damage: roll.damage, isCrit: roll.isCritical }),
+      })
+        .then(r => r.json())
+        .then((j: Record<string, unknown>) => {
+          gameEngine.setSharedBossHp(j.currentHp as number, j.alive as boolean)
+        })
+        .catch(() => {})
+    }
   })
 
   overlayServer.setCommandHandler((cmd) => {
@@ -42,6 +63,8 @@ export function registerIpcHandlers(win: BrowserWindow) {
     } else if (cmd.type === 'update-settings') {
       const next = patchSettings({ games: { boss: cmd.settings as Record<string, unknown> } })
       gameEngine.updateSettings(next)
+    } else if (cmd.type === 'sync-boss-hp') {
+      gameEngine.setSharedBossHp(cmd.currentHp as number, cmd.alive as boolean)
     }
   })
   gameEngine.on('game:result', (id, result) => {
@@ -92,8 +115,17 @@ export function registerIpcHandlers(win: BrowserWindow) {
   ipcMain.handle('game:state',   (_, gameId: GameId) => gameEngine.getState(gameId))
   ipcMain.handle('game:all',     ()                   => gameEngine.getAllStates())
   ipcMain.handle('game:history', (_, limit = 50)      => gameEngine.getHistory(limit))
-  ipcMain.handle('boss:start',   ()                   => { gameEngine.startBossRaid(); return { ok: true } })
-  ipcMain.handle('boss:reset',   ()                   => { gameEngine.resetBoss(); return { ok: true } })
+  ipcMain.handle('boss:start', () => {
+    gameEngine.startBossRaid()
+    const cfg = loadSettings().games.boss as Record<string, unknown>
+    fetch(`${BOSS_HP_SERVER}/shared-boss/start`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ maxHp: (cfg?.maxHp as number) ?? 100000, bossName: (cfg?.bossName as string) ?? '보스' }),
+    }).catch(() => {})
+    return { ok: true }
+  })
+  ipcMain.handle('boss:reset', () => { gameEngine.resetBoss(); return { ok: true } })
 
   // Overlay
   ipcMain.handle('overlay:url',       (_, gameId: string)        => overlayServer.getUrl(gameId))
