@@ -3064,7 +3064,7 @@ export class OverlayServer {
     this.port = port
 
     this.httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
-      const url    = req.url ?? '/'
+      const url    = (req.url ?? '/').split('?')[0]  // strip query string
       const method = req.method ?? 'GET'
 
       // ── API: boss settings ────────────────────────────────────────────────
