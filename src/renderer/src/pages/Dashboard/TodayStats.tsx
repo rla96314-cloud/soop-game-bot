@@ -4,12 +4,12 @@ import styles from './TodayStats.module.css'
 
 const GAME_COLORS: Record<string, string> = {
   roulette: '#8B5CF6', ladder: '#3B82F6', boss: '#EC4899',
-  gacha: '#F59E0B', quiz: '#10B981', slot: '#6366F1',
+  quiz: '#10B981', slot: '#6366F1',
   race: '#14B8A6', rps: '#EF4444', fish: '#22D3EE', lottery: '#F97316',
 }
 const GAME_NAMES: Record<string, string> = {
   roulette: '룰렛', ladder: '사다리타기', boss: '보스전',
-  gacha: '뽑기', quiz: '퀴즈', slot: '슬롯머신',
+  quiz: '퀴즈', slot: '슬롯머신',
   race: '경주', rps: '가위바위보', fish: '낚시', lottery: '복권',
 }
 

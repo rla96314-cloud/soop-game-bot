@@ -2111,7 +2111,7 @@ html,body{width:1920px;height:1080px;overflow:hidden;background:#0d1117;font-fam
 .cresult.empty{color:#21262d;font-size:18px}
 .cmeta{font-size:11px;color:#6e7681;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .c-roulette{--accent:#a371f7}.c-ladder{--accent:#58a6ff}.c-boss{--accent:#f85149}
-.c-gacha{--accent:#e3b341}.c-quiz{--accent:#3fb950}.c-slot{--accent:#d2a8ff}
+.c-quiz{--accent:#3fb950}.c-slot{--accent:#d2a8ff}
 .c-race{--accent:#79c0ff}.c-rps{--accent:#f778ba}.c-fish{--accent:#56d364}
 .c-lottery{--accent:#ff9966}.c-number{--accent:#39c5cf}.c-pickboard{--accent:#ff7eb6}
 </style>
@@ -2124,7 +2124,7 @@ html,body{width:1920px;height:1080px;overflow:hidden;background:#0d1117;font-fam
 <div class="grid" id="grid"></div>
 <script>
 const GAMES=[
-  {id:'roulette',name:'룰렛'},{id:'ladder',name:'사다리타기'},{id:'boss',name:'보스전'},{id:'gacha',name:'가챠'},
+  {id:'roulette',name:'룰렛'},{id:'ladder',name:'사다리타기'},{id:'boss',name:'보스전'},
   {id:'quiz',name:'퀴즈'},{id:'slot',name:'슬롯머신'},{id:'race',name:'경주'},{id:'rps',name:'가위바위보'},
   {id:'fish',name:'낚시'},{id:'lottery',name:'행운복권'},{id:'number',name:'숫자추첨'},{id:'pickboard',name:'뽑기판'},
 ]
@@ -2996,7 +2996,7 @@ const OVERLAY_HTML = (gameId: string, theme: string, port: number) => `<!DOCTYPE
 </div>
 <script>
   const GAME_NAMES = {
-    roulette:'룰렛', ladder:'사다리타기', boss:'보스전', gacha:'뽑기',
+    roulette:'룰렛', ladder:'사다리타기', boss:'보스전',
     quiz:'퀴즈', slot:'슬롯머신', race:'경주', rps:'가위바위보',
     fish:'낚시', lottery:'복권', number:'숫자 추첨'
   }

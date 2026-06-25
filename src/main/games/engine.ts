@@ -3,7 +3,7 @@ import type { Settings } from '../store/settings'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type GameId = 'roulette' | 'ladder' | 'boss' | 'gacha' | 'quiz' |
+export type GameId = 'roulette' | 'ladder' | 'boss' | 'quiz' |
                      'slot' | 'race' | 'rps' | 'fish' | 'lottery' | 'number'
 
 export type GameStatus = 'idle' | 'collecting' | 'running' | 'showing_result'
@@ -169,7 +169,7 @@ export class GameEngine extends EventEmitter {
 
   init(settings: Settings) {
     this.settings = settings
-    const ids: GameId[] = ['roulette','ladder','boss','gacha','quiz','slot','race','rps','fish','lottery','number']
+    const ids: GameId[] = ['roulette','ladder','boss','quiz','slot','race','rps','fish','lottery','number']
     for (const id of ids) {
       this.states.set(id, this.makeIdleState(id))
     }
@@ -286,7 +286,7 @@ export class GameEngine extends EventEmitter {
       case 'roulette': this.runRoulette(triggeredBy, balloon); break
       case 'ladder':   this.startLadder(triggeredBy, balloon); break
       case 'boss':     this.startBossRaid(); break
-      case 'gacha':    this.runGacha(triggeredBy, balloon); break
+
       case 'quiz':     this.startQuiz(triggeredBy, balloon); break
       case 'slot':     this.runSlot(triggeredBy, balloon); break
       case 'race':     this.runRace(triggeredBy, balloon); break
@@ -594,30 +594,6 @@ export class GameEngine extends EventEmitter {
     const idle   = this.makeIdleState('boss')
     state.boss   = idle.boss
     this.emit('game:update', 'boss', state)
-  }
-
-  // ── Gacha ─────────────────────────────────────────────────────────────────
-
-  private runGacha(by: string, balloon: number) {
-    const cfg    = this.settings.games.gacha
-    const grades = (cfg?.grades ?? []) as Array<{name:string;probability:number;color:string}>
-
-    const state = this.getState('gacha')
-    state.status = 'running'
-    this.emit('game:update', 'gacha', state)
-
-    setTimeout(() => {
-      const grade  = weightedRandom(grades)
-      const result: GameResult = {
-        gameId:      'gacha',
-        triggeredBy: by,
-        balloon,
-        result:      `${grade.name} 등급 획득!`,
-        detail:      `${by}님이 [${grade.name}] 등급 당첨!`,
-        ts:          Date.now(),
-      }
-      this.finishGame('gacha', result)
-    }, 2000)
   }
 
   // ── Quiz ──────────────────────────────────────────────────────────────────

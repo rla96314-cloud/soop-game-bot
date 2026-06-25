@@ -5,7 +5,6 @@ const GAMES = [
   { id: 'roulette', name: '룰렛',     color: '#8B5CF6' },
   { id: 'ladder',   name: '사다리타기', color: '#3B82F6' },
   { id: 'boss',     name: '보스전',    color: '#EF4444' },
-  { id: 'gacha',    name: '뽑기',     color: '#F59E0B' },
   { id: 'quiz',     name: '퀴즈',     color: '#10B981' },
   { id: 'slot',     name: '슬롯머신',  color: '#8B5CF6' },
   { id: 'race',     name: '경주',     color: '#6366F1' },
@@ -41,16 +40,6 @@ function GameIcon({ id, color }: { id: string; color: string }) {
       <svg viewBox="0 0 44 44" width={44} height={44}>
         <path d="M8 34 L10 16 L18 24 L22 10 L26 24 L34 16 L36 34 Z" {...s} />
         <rect x={8} y={34} width={28} height={5} rx={2.5} {...s} />
-      </svg>
-    )
-    case 'gacha': return (
-      <svg viewBox="0 0 44 44" width={44} height={44}>
-        <rect x={9} y={20} width={26} height={18} rx={3} {...s} />
-        <path d="M14 20 C14 12 30 12 30 20" {...s} />
-        <line x1={22} y1={20} x2={22} y2={38} {...s} />
-        <line x1={14} y1={29} x2={30} y2={29} {...s} />
-        <line x1={22} y1={12} x2={22} y2={6}  {...s} />
-        <path d="M17 6 Q22 3 27 6" {...s} />
       </svg>
     )
     case 'quiz': return (

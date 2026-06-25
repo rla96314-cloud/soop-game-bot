@@ -5,7 +5,6 @@ const GAMES = [
   { id: 'roulette', name: '룰렛',     color: '#8B5CF6' },
   { id: 'ladder',   name: '사다리타기', color: '#3B82F6' },
   { id: 'boss',     name: '보스전',    color: '#EF4444' },
-  { id: 'gacha',    name: '뽑기',     color: '#F59E0B' },
   { id: 'quiz',     name: '퀴즈',     color: '#10B981' },
   { id: 'slot',     name: '슬롯머신',  color: '#6366F1' },
   { id: 'race',     name: '경주',     color: '#6366F1' },

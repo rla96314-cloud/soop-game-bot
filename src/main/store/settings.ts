@@ -3,7 +3,6 @@ import { join } from 'path'
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 
 export interface RouletteItem { name: string; probability: number }
-export interface GachaGrade  { name: string; probability: number; color: string }
 export interface QuizQuestion { question: string; answer: string }
 export interface Prize        { name: string; description: string }
 export interface PickItem     { name: string; description: string; color: string; count: number }
@@ -26,8 +25,6 @@ export interface GameConfig {
   currentHp?:         number
   damagePerBalloon?:  number
   damagePerChat?:     number
-  // gacha
-  grades?: GachaGrade[]
   // pickboard
   pickRows?: number
   pickCols?: number
@@ -104,15 +101,6 @@ const DEFAULTS: Settings = {
         { name: '2등 상품', description: '음료 쿠폰'  },
         { name: '3등 상품', description: '간식 쿠폰'  },
       ] as BossLootItem[],
-    },
-    gacha: {
-      enabled: true, balloonThreshold: 30, chatCommand: '!뽑기',
-      grades: [
-        { name: '레전드', probability:  1, color: '#F59E0B' },
-        { name: '영웅',   probability:  5, color: '#8B5CF6' },
-        { name: '희귀',   probability: 20, color: '#3B82F6' },
-        { name: '일반',   probability: 74, color: '#6B7280' },
-      ],
     },
     pickboard: {
       enabled: true, balloonThreshold: 0, chatCommand: '',

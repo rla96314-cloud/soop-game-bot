@@ -5,7 +5,6 @@ import styles from './Games.module.css'
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface RouletteItem { name: string; probability: number }
-interface GachaGrade   { name: string; probability: number; color: string }
 interface QuizQuestion { question: string; answer: string }
 interface Prize        { name: string; description: string }
 interface PickItem     { name: string; description: string; color: string; count: number }
@@ -132,73 +131,6 @@ function RouletteEditor({ items: init, onSave }: { items: RouletteItem[]; onSave
       ))}
 
       {items.length === 0 && <div className={styles.listEmpty}>항목을 추가하세요</div>}
-    </div>
-  )
-}
-
-/** 뽑기 등급 편집 */
-function GachaEditor({ grades: init, onSave }: { grades: GachaGrade[]; onSave: (v: GachaGrade[]) => void }) {
-  const [grades, setGrades] = useState<GachaGrade[]>(init)
-
-  const commit = (next: GachaGrade[]) => { setGrades(next); onSave(next) }
-
-  const setField = (i: number, key: keyof GachaGrade, val: string | number) => {
-    const next = grades.map((g, idx) => idx === i ? { ...g, [key]: val } : g)
-    setGrades(next)
-    return next
-  }
-
-  const total = grades.reduce((s, g) => s + (g.probability || 0), 0)
-
-  return (
-    <div className={styles.listEditor}>
-      <div className={styles.listHeader}>
-        <span className={styles.listTitle}>등급 설정</span>
-        <span className={`${styles.totalBadge} ${total !== 100 ? styles.totalWarn : ''}`}>
-          합계 {total}%
-        </span>
-        <button
-          className={styles.addBtn}
-          onClick={() => commit([...grades, { name: '새 등급', probability: 5, color: '#6B7280' }])}
-        >
-          + 등급 추가
-        </button>
-      </div>
-
-      <div className={styles.listHead4}>
-        <span style={{ width: 36 }}>색상</span>
-        <span style={{ flex: 1 }}>이름</span>
-        <span style={{ width: 80, textAlign: 'right' }}>확률 (%)</span>
-        <span style={{ width: 32 }} />
-      </div>
-
-      {grades.map((g, i) => (
-        <div key={i} className={styles.listRow}>
-          <input
-            type="color"
-            className={styles.colorInput}
-            value={g.color}
-            onChange={e => commit(setField(i, 'color', e.target.value))}
-          />
-          <input
-            className={styles.listInput}
-            style={{ flex: 1 }}
-            value={g.name}
-            onChange={e => setField(i, 'name', e.target.value)}
-            onBlur={() => onSave(grades)}
-          />
-          <input
-            className={styles.listInput}
-            style={{ width: 80, textAlign: 'right' }}
-            type="number" min={0} max={100}
-            value={g.probability}
-            onChange={e => commit(setField(i, 'probability', Number(e.target.value)))}
-          />
-          <button className={styles.delBtn} onClick={() => commit(grades.filter((_, idx) => idx !== i))}>✕</button>
-        </div>
-      ))}
-
-      {grades.length === 0 && <div className={styles.listEmpty}>등급을 추가하세요</div>}
     </div>
   )
 }
@@ -1868,14 +1800,6 @@ export default function GamesPage({ initialSelected }: { initialSelected?: strin
             key={selected}
             items={(gSettings.items as RouletteItem[]) ?? []}
             onSave={v => saveSetting('items', v)}
-          />
-        )}
-
-        {game.id === 'gacha' && (
-          <GachaEditor
-            key={selected}
-            grades={(gSettings.grades as GachaGrade[]) ?? []}
-            onSave={v => saveSetting('grades', v)}
           />
         )}
 
