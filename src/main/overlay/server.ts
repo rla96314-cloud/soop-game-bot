@@ -1719,6 +1719,23 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    // ── 실시간 HP 업데이트 ───────────────────────────────────
+    if (data.action === 'updateBossHp') {
+      let sheet = ss.getSheetByName('보스 현황');
+      if (!sheet) sheet = ss.insertSheet('보스 현황');
+      const pct = data.maxHp > 0 ? Math.round(data.currentHp / data.maxHp * 100) : 0;
+      sheet.getRange(1,1,4,2).setValues([
+        ['보스',    data.bossName  ?? ''],
+        ['현재 HP', data.currentHp ?? 0],
+        ['최대 HP', data.maxHp    ?? 0],
+        ['HP(%)',   pct + '%'],
+      ]);
+      sheet.getRange(1,1,4,1).setFontWeight('bold');
+      sheet.autoResizeColumns(1,2);
+      return ContentService.createTextOutput(JSON.stringify({ok:true}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     // ── 레이드 기록 (기존 동작) ──────────────────────────────
     const now  = new Date();
     const name = Utilities.formatDate(now, 'Asia/Seoul', 'MM-dd HH:mm') + ' ' + (data.bossName || '보스');
@@ -3062,6 +3079,8 @@ export class OverlayServer {
   private wss: WebSocketServer | null = null
   private clients: Set<WebSocket> = new Set()
   private port = 3939
+  private latestBossState: GameState | null = null
+  private hpPollTimer: ReturnType<typeof setInterval> | null = null
 
   start(port = 3939) {
     this.port = port
@@ -3179,6 +3198,25 @@ export class OverlayServer {
     this.httpServer.listen(port, '127.0.0.1', () => {
       autoLoadBossFromSheets().catch(() => {})
     })
+
+    this.hpPollTimer = setInterval(() => {
+      const bs = this.latestBossState
+      if (!bs || bs.status !== 'running' || !bs.boss?.alive) return
+      const cfg = loadSettings().games.boss
+      const url = (cfg as Record<string, unknown>)?.sheetsWebhookUrl as string | undefined
+      if (!url) return
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action:     'updateBossHp',
+          currentHp:  bs.boss.currentHp,
+          maxHp:      bs.boss.maxHp,
+          bossName:   bs.boss.bossName,
+          participants: Object.keys(bs.boss.participants ?? {}).length,
+        }),
+      }).catch(() => {})
+    }, 5000)
   }
 
   broadcast(type: string, data: unknown) {
@@ -3195,6 +3233,7 @@ export class OverlayServer {
   }
 
   sendState(state: GameState) {
+    if (state.id === 'boss') this.latestBossState = state
     this.broadcast('game:state', state)
   }
 
@@ -3203,6 +3242,7 @@ export class OverlayServer {
   }
 
   stop() {
+    if (this.hpPollTimer) { clearInterval(this.hpPollTimer); this.hpPollTimer = null }
     this.wss?.close()
     this.httpServer?.close()
   }

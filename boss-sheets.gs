@@ -99,6 +99,23 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    // ── 실시간 HP 업데이트 ───────────────────────────────────
+    if (data.action === 'updateBossHp') {
+      let sheet = ss.getSheetByName('보스 현황');
+      if (!sheet) sheet = ss.insertSheet('보스 현황');
+      const pct = data.maxHp > 0 ? Math.round(data.currentHp / data.maxHp * 100) : 0;
+      sheet.getRange(1, 1, 4, 2).setValues([
+        ['보스',       data.bossName    ?? ''],
+        ['현재 HP',    data.currentHp   ?? 0],
+        ['최대 HP',    data.maxHp       ?? 0],
+        ['HP(%)',      pct + '%'],
+      ]);
+      sheet.getRange(1, 1, 4, 1).setFontWeight('bold');
+      sheet.autoResizeColumns(1, 2);
+      return ContentService.createTextOutput(JSON.stringify({ ok: true }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     // ── 레이드 기록 ──────────────────────────────────────────
     const now   = new Date();
     const name  = Utilities.formatDate(now, 'Asia/Seoul', 'MM-dd HH:mm') + ' ' + (data.bossName || '보스');
