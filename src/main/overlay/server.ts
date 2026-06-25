@@ -6,7 +6,20 @@ import { app } from 'electron'
 import { loadSettings, patchSettings } from '../store/settings'
 import type { GameResult, GameState } from '../games/engine'
 
-const GS_BOSS_URL = 'https://script.google.com/macros/s/AKfycbybNbyhO7Lc9kM7FEKbWAwgctr1Xc3Cq9kSwzMymnyV-8NFuzaujCcyCZ4ru75KsLXt/exec'
+const GS_BOSS_URL    = 'https://script.google.com/macros/s/AKfycbybNbyhO7Lc9kM7FEKbWAwgctr1Xc3Cq9kSwzMymnyV-8NFuzaujCcyCZ4ru75KsLXt/exec'
+const BOSS_HP_SERVER = 'http://100.89.116.107:4081'
+
+async function autoLoadBossFromDashboard(): Promise<void> {
+  try {
+    const channelId = loadSettings().soop?.channelId
+    if (!channelId) return
+    const res = await fetch(`${BOSS_HP_SERVER}/boss-settings/${encodeURIComponent(channelId)}`)
+    if (!res.ok) return
+    const j = await res.json() as { ok: boolean; settings?: Record<string, unknown> }
+    if (!j.ok || !j.settings) return
+    patchSettings({ games: { boss: j.settings } })
+  } catch {}
+}
 
 async function autoLoadBossFromSheets(): Promise<void> {
   try {
@@ -3201,6 +3214,7 @@ export class OverlayServer {
     })
 
     this.httpServer.listen(port, '127.0.0.1', () => {
+      autoLoadBossFromDashboard().catch(() => {})
       autoLoadBossFromSheets().catch(() => {})
     })
 

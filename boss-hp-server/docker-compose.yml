@@ -5,3 +5,5 @@ services:
     ports:
       - "0.0.0.0:4081:4081"
     restart: unless-stopped
+    volumes:
+      - /opt/boss-hp-server/data:/app/data
