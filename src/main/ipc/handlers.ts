@@ -7,8 +7,35 @@ import { verifyUser, fetchAllowlist }               from '../auth/allowlist'
 import { openSoopLoginWindow }                      from '../auth/soopLogin'
 import { fetchTodaySchedule }                       from '../schedule/fetcher'
 import { weflabWatcher }                            from '../weflab/watcher'
-import { existsSync, mkdirSync, writeFileSync, unlinkSync } from 'fs'
+import { existsSync, mkdirSync, writeFileSync, unlinkSync, readFileSync } from 'fs'
 import { join } from 'path'
+import { homedir } from 'os'
+
+// ── 팬 DB ────────────────────────────────────────────────────────────────────
+const FAN_DB_PATH = join(homedir(), 'virtual-fan-monitor', 'data', 'fans.json')
+
+interface FanInfo { nick: string; broadcasts: { id: string; name: string; rank: number }[] }
+let fanDB: Record<string, FanInfo> = {}
+
+function loadFanDB() {
+  try {
+    fanDB = JSON.parse(readFileSync(FAN_DB_PATH, 'utf-8'))
+  } catch { fanDB = {} }
+}
+loadFanDB()
+setInterval(loadFanDB, 60_000)
+
+function lookupFan(userId: string, userNick: string): FanInfo | null {
+  const id = userId.toLowerCase()
+  if (fanDB[id]) return fanDB[id]
+  for (const info of Object.values(fanDB)) {
+    if (info.nick && info.nick === userNick) return info
+  }
+  return null
+}
+
+// 세션 내 중복 알림 방지 (채팅+입장 둘 다 잡히는 경우)
+const alertedThisSession = new Set<string>()
 
 const BOSS_HP_SERVER = 'http://100.89.116.107:4081'
 const EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp']
@@ -32,6 +59,22 @@ async function downloadBossImages(imageUrls: Record<string, string>) {
   }
 }
 
+function emitFanAlert(send: (ch: string, ...a: unknown[]) => void, userId: string, userNick: string) {
+  const key = userId.toLowerCase()
+  if (alertedThisSession.has(key)) return
+  const info = lookupFan(userId, userNick)
+  if (!info) return
+  alertedThisSession.add(key)
+  // 5분 후 재감지 허용 (같은 사람이 나갔다 들어올 수 있음)
+  setTimeout(() => alertedThisSession.delete(key), 5 * 60_000)
+  send('soop:fan-alert', {
+    userId,
+    userNick: info.nick || userNick,
+    broadcasts: info.broadcasts.slice(0, 3),
+    ts: Date.now(),
+  })
+}
+
 export function registerIpcHandlers(win: BrowserWindow) {
   const send = (ch: string, ...args: unknown[]) => {
     if (!win.isDestroyed()) win.webContents.send(ch, ...args)
@@ -51,6 +94,12 @@ export function registerIpcHandlers(win: BrowserWindow) {
   soopClient.on('chat', (user, msg) => {
     send('soop:chat', { user, message: msg, ts: Date.now() })
     gameEngine.onChat(user, msg)
+    // 채팅으로 열혈팬 감지 (입장 패킷 보완)
+    emitFanAlert(send, user, user)
+  })
+
+  soopClient.on('enter', (userId: string, userNick: string) => {
+    emitFanAlert(send, userId, userNick)
   })
 
   // ── Game engine ──────────────────────────────────────────────────────────

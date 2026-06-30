@@ -30,6 +30,13 @@ export interface GameStates {
   [gameId: string]: { status: string; [k: string]: unknown }
 }
 
+export interface FanAlertItem {
+  userId:     string
+  userNick:   string
+  broadcasts: { id: string; name: string; rank: number }[]
+  ts:         number
+}
+
 export interface AppCtx {
   connected:  boolean
   simulation: boolean
@@ -38,6 +45,7 @@ export interface AppCtx {
   stats:      Stats
   gameStates: GameStates
   settings:   Record<string, unknown> | null
+  fanAlerts:  FanAlertItem[]
   triggerGame:   (gameId: string) => void
   refreshSettings: () => void
   patchSettings: (patch: unknown) => void
@@ -53,6 +61,7 @@ const defaultCtx: AppCtx = {
   stats:      { todayRuns: 0, todayBalloons: 0, todayViewers: 0 },
   gameStates: {},
   settings:   null,
+  fanAlerts:  [],
   triggerGame:      () => {},
   refreshSettings:  () => {},
   patchSettings:    () => {},
@@ -88,6 +97,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [stats,      setStats]      = useState<Stats>({ todayRuns: 0, todayBalloons: 0, todayViewers: 0 })
   const [gameStates, setGameStates] = useState<GameStates>({})
   const [settings,   setSettings]   = useState<Record<string, unknown> | null>(null)
+  const [fanAlerts,  setFanAlerts]  = useState<FanAlertItem[]>([])
 
   const el = (window as unknown as Record<string, unknown>).electron as Record<string, unknown>
 
@@ -187,6 +197,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       s => setStats(s)
     ))
 
+    off.push((el.onSoopFanAlert as (cb: (e: FanAlertItem) => void) => () => void)(
+      (e) => setFanAlerts(prev => [e, ...prev].slice(0, 20))
+    ))
+
     return () => off.forEach(fn => fn())
   }, [])
 
@@ -211,7 +225,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={{
       connected, simulation,
-      chat, history, stats, gameStates, settings,
+      chat, history, stats, gameStates, settings, fanAlerts,
       triggerGame, refreshSettings, patchSettings,
     }}>
       {children}

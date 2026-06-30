@@ -63,6 +63,7 @@ contextBridge.exposeInMainWorld('electron', {
   onSoopError:        (cb: (err: string) => void)             => on('soop:error',        cb),
   onSoopBalloon:      (cb: (e: SoopBalloonEvent) => void)     => on('soop:balloon',      cb),
   onSoopChat:         (cb: (e: SoopChatEvent) => void)        => on('soop:chat',         cb),
+  onSoopFanAlert:     (cb: (e: FanAlertEvent) => void)        => on('soop:fan-alert',    cb),
   onGameUpdate:       (cb: (id: string, s: unknown) => void)  => on('game:update',       cb),
   onGameResult:       (cb: (id: string, r: unknown) => void)  => on('game:result',       cb),
   onQuizQuestion:     (cb: (q: unknown) => void)              => on('quiz:question',      cb),
@@ -75,3 +76,4 @@ contextBridge.exposeInMainWorld('electron', {
 interface SoopBalloonEvent { user: string; amount: number; ts: number }
 interface SoopChatEvent    { user: string; message: string; ts: number }
 interface StatsSnapshot    { todayRuns: number; todayBalloons: number; todayViewers: number }
+interface FanAlertEvent    { userId: string; userNick: string; broadcasts: { id: string; name: string; rank: number }[]; ts: number }

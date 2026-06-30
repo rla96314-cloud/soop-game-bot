@@ -109,6 +109,10 @@ export class SoopClient extends EventEmitter {
     const data    = raw.slice(12, 12 + len).toString('utf-8')
     const fields  = data.split('\x0c')
 
+    if (process.env.SOOP_DEBUG === '1') {
+      console.log(`[PKT] svc=${service} type=${type} fields=${JSON.stringify(fields.slice(0, 6))}`)
+    }
+
     // SENDMSG (chat)
     if (service === 1 && type === 5) {
       const username = fields[0] ?? '알 수 없음'
@@ -120,6 +124,12 @@ export class SoopClient extends EventEmitter {
       const username = fields[0] ?? '알 수 없음'
       const amount   = parseInt(fields[1] ?? '0', 10) || 0
       if (username && amount) this.emit('balloon', username, amount)
+    }
+    // USER_ENTER (입장) — type 9, field[0]=userId, field[1]=userNick
+    if (service === 1 && type === 9) {
+      const userId   = fields[0] ?? ''
+      const userNick = fields[1] || fields[0] || ''
+      if (userId && userId.length > 1) this.emit('enter', userId, userNick)
     }
   }
 
