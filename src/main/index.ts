@@ -61,12 +61,12 @@ app.whenReady().then(() => {
   // Register IPC
   registerIpcHandlers(win)
 
-  // Auto-connect SOOP (simulation mode by default)
+  // Auto-connect SOOP (실제 연결이 기본 — 시뮬레이션은 명시적으로 켠 경우에만)
   soopClient.connect({
     channelId:  settings.soop.channelId,
     userId:     settings.soop.userId,
     token:      settings.soop.token,
-    simulation: settings.soop.simulationMode !== false,
+    simulation: settings.soop.simulationMode === true,
   })
 
   // Auto-start weflab watcher if previously enabled

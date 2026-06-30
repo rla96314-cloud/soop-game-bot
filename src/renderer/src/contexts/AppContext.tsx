@@ -55,7 +55,7 @@ export interface AppCtx {
 
 const defaultCtx: AppCtx = {
   connected:  false,
-  simulation: true,
+  simulation: false,
   chat:       [],
   history:    [],
   stats:      { todayRuns: 0, todayBalloons: 0, todayViewers: 0 },
@@ -91,7 +91,7 @@ const MAX_HISTORY = 50
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [connected,  setConnected]  = useState(false)
-  const [simulation, setSimulation] = useState(true)
+  const [simulation, setSimulation] = useState(false)
   const [chat,       setChat]       = useState<ChatItem[]>([])
   const [history,    setHistory]    = useState<HistoryItem[]>([])
   const [stats,      setStats]      = useState<Stats>({ todayRuns: 0, todayBalloons: 0, todayViewers: 0 })

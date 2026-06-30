@@ -12,6 +12,8 @@ export interface GameConfig {
   enabled:          boolean
   balloonThreshold: number
   chatCommand:      string
+  // weflab 룰렛 결과 글자가 이 단어를 포함하면 해당 게임 발동 (게임별 설정)
+  weflabKeyword?:   string
   // roulette
   items?:        RouletteItem[]
   spinDuration?: number
@@ -62,7 +64,7 @@ const DEFAULTS: Settings = {
     channelId:          '',
     userId:             '',
     token:              '',
-    simulationMode:     true,
+    simulationMode:     false,
     balloonAutoTrigger: true,
     globalThreshold:    50,
   },

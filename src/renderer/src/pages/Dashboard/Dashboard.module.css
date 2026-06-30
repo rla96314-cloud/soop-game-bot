@@ -27,3 +27,9 @@
   flex-direction: column;
   gap: 14px;
 }
+
+/* 최근 실행기록 / 열혈팬 입장 두 카드를 반반(50/50) 높이로 분할 */
+.colLeft > * {
+  flex: 1 1 0;
+  min-height: 0;
+}

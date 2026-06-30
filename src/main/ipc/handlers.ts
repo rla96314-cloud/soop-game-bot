@@ -258,10 +258,30 @@ export function registerIpcHandlers(win: BrowserWindow) {
     send('weflab:result', text)
     const s = loadSettings()
     if (!s.weflab.enabled) return
+    const lower = text.toLowerCase()
+
+    // ① 게임별 weflab 트리거 단어 매칭 (각 게임 설정에 지정)
+    //    weflab 룰렛 결과 글자에 게임의 트리거 단어가 포함되면 해당 게임 발동
+    const perGameMatched: GameId[] = []
+    let anyKeywordConfigured = false
+    for (const [id, cfg] of Object.entries(s.games)) {
+      const kw = (cfg.weflabKeyword as string | undefined)?.trim()
+      if (!kw) continue
+      anyKeywordConfigured = true
+      if (cfg.enabled === false) continue
+      if (lower.includes(kw.toLowerCase())) perGameMatched.push(id as GameId)
+    }
+    if (perGameMatched.length > 0) {
+      perGameMatched.forEach(id => gameEngine.trigger(id, 'weflab', 0))
+      return
+    }
+    // 게임별 트리거 단어를 하나라도 설정했다면 전역 룰렛 폴백은 끔 (중복 방지)
+    if (anyKeywordConfigured) return
+
+    // ② (구버전 호환) 게임별 단어 미설정 시 — 전역 트리거 키워드로 룰렛만 발동
     const validTriggers = s.weflab.triggers.filter(t => t.keyword)
-    // 트리거가 없으면 모든 결과에 반응, 있으면 키워드 포함 여부 검사
     const matched = validTriggers.length === 0
-      || validTriggers.some(t => text.toLowerCase().includes(t.keyword.toLowerCase()))
+      || validTriggers.some(t => lower.includes(t.keyword.toLowerCase()))
     if (matched) gameEngine.trigger('roulette', 'weflab', 0)
   })
   weflabWatcher.on('loaded', () => send('weflab:loaded'))

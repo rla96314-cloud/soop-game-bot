@@ -42,6 +42,17 @@
   white-space: nowrap;
 }
 
+/* 보스 미설정 → '준비중' 가운데 크게 */
+.prepareWrap {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 14px; text-align: center;
+}
+.prepareText {
+  font-size: 64px; font-weight: 900; letter-spacing: -0.04em;
+  color: var(--text3); opacity: 0.85;
+}
+.prepareHint { font-size: 14px; color: var(--text3); }
+
 .body { display: flex; gap: 20px; padding: 24px 32px; flex: 1; overflow-y: auto; }
 .col  { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
 

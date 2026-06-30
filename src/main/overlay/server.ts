@@ -2847,6 +2847,12 @@ const BOSS_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
   .defeat-title{font-size:72px;font-weight:900;color:#fff;text-shadow:0 0 40px #F59E0B,0 4px 8px rgba(0,0,0,.8);letter-spacing:-.04em;animation:defeatBounce .6s cubic-bezier(0.34,1.56,0.64,1)}
   @keyframes defeatBounce{from{transform:scale(0.4);opacity:0}to{transform:scale(1);opacity:1}}
   .defeat-sub{font-size:20px;color:rgba(255,255,255,0.8);margin-top:12px;font-weight:700;text-shadow:0 2px 6px rgba(0,0,0,.8)}
+
+  /* ── 준비중 (보스 미설정) ── */
+  #prepare-screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .5s}
+  #prepare-screen.show{opacity:1}
+  .prepare-title{font-size:80px;font-weight:900;color:rgba(255,255,255,0.92);text-shadow:0 0 30px rgba(139,92,246,0.6),0 4px 10px rgba(0,0,0,.85);letter-spacing:-.04em}
+  .prepare-sub{font-size:18px;color:rgba(255,255,255,0.6);margin-top:14px;font-weight:600;text-shadow:0 2px 6px rgba(0,0,0,.8)}
 </style>
 </head>
 <body>
@@ -2886,8 +2892,14 @@ const BOSS_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 
 <!-- 처치 오버레이 -->
 <div id="defeat-screen">
-  <div class="defeat-title">&#x1F451; BOSS DEFEATED!</div>
+  <div class="defeat-title">&#x1F451; 토벌 완료!</div>
   <div class="defeat-sub" id="defeat-sub"></div>
+</div>
+
+<!-- 준비중 (보스 미설정) -->
+<div id="prepare-screen">
+  <div class="prepare-title">준비중</div>
+  <div class="prepare-sub">보스를 설정하면 레이드 화면이 표시됩니다</div>
 </div>
 
 <script>
@@ -2902,6 +2914,7 @@ const diceUser=document.getElementById('dice-user')
 const diceFace=document.getElementById('dice-face')
 const defeatScr=document.getElementById('defeat-screen')
 const defeatSub=document.getElementById('defeat-sub')
+const prepareScr=document.getElementById('prepare-screen')
 const bossImgWrap=document.getElementById('boss-img-wrap')
 const bossImg=document.getElementById('boss-img')
 
@@ -3023,9 +3036,27 @@ function connect(){
       if(msg.type==='game:state'&&msg.data?.id==='boss'){
         const s=msg.data, boss=s.boss
         if(!boss) return
-        if(s.status==='running'||s.status==='showing_result') hud.classList.add('show')
-        if(s.status==='idle'){hud.classList.remove('show');defeatScr.classList.remove('show');setPhaseImage(null)}
-        if(s.status==='running'||s.status==='showing_result') updateHud(boss)
+        const configured = boss.enabled !== false
+        // 보스 미설정 → '준비중' 가운데 크게, HUD 숨김
+        if(!configured){
+          hud.classList.remove('show')
+          defeatScr.classList.remove('show')
+          prepareScr.classList.add('show')
+          setPhaseImage(null)
+          bossAlive=boss.alive
+          return
+        }
+        prepareScr.classList.remove('show')
+        // 설정됨 → idle 포함 항상 레이드 HUD 표시
+        if(s.status==='idle'){
+          defeatScr.classList.remove('show')
+          hud.classList.add('show')
+          updateHud(boss)
+          setPhaseImage('phase1')
+        } else {
+          hud.classList.add('show')
+          updateHud(boss)
+        }
         if(boss.lastRoll) showRoll(boss.lastRoll)
         // Phase image
         if(s.status==='showing_result'){

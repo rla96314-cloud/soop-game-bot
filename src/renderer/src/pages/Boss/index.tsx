@@ -74,7 +74,11 @@ export default function BossPage() {
   const parts   = boss?.participants ? Object.entries(boss.participants) : []
   const totalDmg= parts.reduce((s, [, p]) => s + (p as BossParticipant).totalDamage, 0)
 
-  const idleBossName = (gSettings.bossName as string) ?? '보스'
+  // 보스 "설정됨" 판정: 게임이 활성화 + 보스 이름이 있고 + 상태 객체 존재
+  const bossEnabled    = (gSettings.enabled as boolean) !== false
+  const hasBossName    = !!((gSettings.bossName as string) ?? boss?.bossName)
+  const bossConfigured = bossEnabled && hasBossName && !!boss
+  const isDefeated     = status === 'showing_result'
 
   return (
     <div className={styles.page}>
@@ -90,8 +94,16 @@ export default function BossPage() {
         </div>
       </div>
 
-      {/* ── 항상 노출: 현재 보스 HP 미니 바 ── */}
-      {boss && (
+      {/* ── 보스 미설정 → '준비중' 가운데 크게 ── */}
+      {!bossConfigured && (
+        <div className={styles.prepareWrap}>
+          <div className={styles.prepareText}>준비중</div>
+          <div className={styles.prepareHint}>설정에서 보스를 활성화하면 레이드 화면이 표시됩니다</div>
+        </div>
+      )}
+
+      {/* ── 보스 설정됨 → 항상 레이드 HP 미니 바 (처치 화면 제외) ── */}
+      {bossConfigured && boss && !isDefeated && (
         <div className={styles.hpStatusBar}>
           <span className={styles.hpStatusName}>{boss.bossName}</span>
           <div className={styles.hpStatusTrack}>
@@ -101,20 +113,14 @@ export default function BossPage() {
             {boss.currentHp.toLocaleString()} / {boss.maxHp.toLocaleString()}
           </span>
           <span className={styles.hpStatusPct}>{hpPct.toFixed(0)}%</span>
-          {status === 'running' && <span className={styles.hpStatusBadge}>전투 중</span>}
+          {status === 'running'    && <span className={styles.hpStatusBadge}>전투 중</span>}
           {status === 'collecting' && <span className={styles.hpStatusBadge}>주사위 대기</span>}
-          {status === 'showing_result' && <span className={styles.hpStatusBadge} style={{ background: 'rgba(245,158,11,0.2)', color: '#F59E0B' }}>처치!</span>}
+          {status === 'idle'       && <span className={styles.hpStatusBadge} style={{ background: 'rgba(99,102,241,0.15)', color: '#6366F1' }}>레이드 대기</span>}
         </div>
       )}
 
-      {status === 'idle' && (
-        <div className={styles.idleCard}>
-          <div className={styles.idleName}>{idleBossName}</div>
-          <div className={styles.idleHint}>레이드 대기 중</div>
-        </div>
-      )}
-
-      {(status === 'running' || status === 'collecting') && boss && (
+      {/* ── 보스 설정됨 + 처치 전 → 레이드 화면 (idle 포함, 바로 노출) ── */}
+      {bossConfigured && boss && !isDefeated && (
         <div className={styles.body}>
           <div className={styles.col}>
             <section className={styles.section}>
@@ -160,17 +166,18 @@ export default function BossPage() {
                       </div>
                     )
                   })}
-                {parts.length === 0 && <p className={styles.empty}>아직 공격자 없음</p>}
+                {parts.length === 0 && <p className={styles.empty}>별풍선 {boss.balloonThreshold}개로 공격을 시작하세요</p>}
               </div>
             </section>
           </div>
         </div>
       )}
 
-      {status === 'showing_result' && boss && (
+      {/* ── 처치 완료 → '토벌완료' ── */}
+      {bossConfigured && isDefeated && boss && (
         <div className={styles.body}>
           <div className={styles.resultBanner}>
-            <span className={styles.resultTitle}>보스 처치!</span>
+            <span className={styles.resultTitle}>🎉 토벌 완료!</span>
           </div>
           {boss.lootResults && boss.lootResults.length > 0 && (
             <div className={styles.lootGrid}>

@@ -45,6 +45,7 @@ export interface BossLootResult {
 
 export interface BossState {
   alive:            boolean
+  enabled:          boolean
   maxHp:            number
   currentHp:        number
   bossName:         string
@@ -186,6 +187,7 @@ export class GameEngine extends EventEmitter {
       const maxHp = (cfg.maxHp as number) ?? 100000
       state.boss = {
         alive:            true,
+        enabled:          (cfg.enabled          as boolean) !== false,
         maxHp,
         currentHp:        maxHp,
         bossName:         (cfg.bossName         as string)  ?? '보스',
@@ -448,6 +450,7 @@ export class GameEngine extends EventEmitter {
     state.status = 'running'
     state.boss   = {
       alive:            true,
+      enabled:          (cfg?.enabled           as boolean) !== false,
       maxHp,
       currentHp:        maxHp,
       bossName:         (cfg?.bossName          as string)  ?? '보스',

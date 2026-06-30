@@ -1741,6 +1741,15 @@ export default function GamesPage({ initialSelected }: { initialSelected?: strin
             />
           </Field>
 
+          <Field label="weflab 트리거 단어 (룰렛 결과에 포함 시 발동)">
+            <input
+              type="text"
+              placeholder="비워두면 미사용 · 예: 보스"
+              value={(gSettings.weflabKeyword as string) ?? ''}
+              onChange={e => saveSetting('weflabKeyword', e.target.value)}
+            />
+          </Field>
+
 
           {/* Ladder */}
           {game.id === 'ladder' && (<>

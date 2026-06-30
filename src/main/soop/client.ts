@@ -19,16 +19,23 @@ export class SoopClient extends EventEmitter {
   private simInterval: ReturnType<typeof setInterval> | null = null
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private connected   = false
-  private simMode     = true
+  private simMode     = false
 
   // ── Connection ─────────────────────────────────────────────────────────────
 
   connect(opts: { channelId: string; userId: string; token: string; simulation: boolean }) {
     this.disconnect()
-    this.simMode = opts.simulation || !opts.channelId
+    this.simMode = !!opts.simulation
 
     if (this.simMode) {
       this.startSimulation()
+      return
+    }
+
+    // 시뮬레이션이 꺼져 있으면 시뮬레이션으로 폴백하지 않음.
+    // 채널 정보가 없으면 가짜 데이터를 만들지 말고 '연결 끊김' 상태를 유지한다.
+    if (!opts.channelId) {
+      this.emit('disconnected')
       return
     }
 
@@ -81,12 +88,12 @@ export class SoopClient extends EventEmitter {
 
       this.ws.on('error', (err) => {
         this.emit('error', err.message)
-        // Fall back to simulation after connection error
-        this.startSimulation()
+        // 시뮬레이션으로 폴백하지 않음 — 'close' 이벤트가 5초 후 재연결을 처리한다.
       })
     } catch (err) {
       this.emit('error', String(err))
-      this.startSimulation()
+      this.connected = false
+      this.emit('disconnected')
     }
   }
 
