@@ -59,18 +59,27 @@ async function downloadBossImages(imageUrls: Record<string, string>) {
   }
 }
 
-function emitFanAlert(send: (ch: string, ...a: unknown[]) => void, userId: string, userNick: string) {
+function emitFanAlert(
+  send: (ch: string, ...a: unknown[]) => void,
+  userId: string,
+  userNick: string,
+  fanclubTier?: number,
+) {
   const key = userId.toLowerCase()
   if (alertedThisSession.has(key)) return
   const info = lookupFan(userId, userNick)
-  if (!info) return
+  // fans.json에도 없고 SOOP 팬클럽 멤버(fw>=1)도 아니면 무시
+  if (!info && !(fanclubTier && fanclubTier >= 1)) return
   alertedThisSession.add(key)
   // 5분 후 재감지 허용 (같은 사람이 나갔다 들어올 수 있음)
   setTimeout(() => alertedThisSession.delete(key), 5 * 60_000)
+  const broadcasts = info
+    ? info.broadcasts.slice(0, 3)
+    : [{ id: '', name: '팬클럽', rank: fanclubTier ?? 0 }]
   send('soop:fan-alert', {
     userId,
-    userNick: info.nick || userNick,
-    broadcasts: info.broadcasts.slice(0, 3),
+    userNick: info?.nick || userNick,
+    broadcasts,
     ts: Date.now(),
   })
 }
@@ -91,15 +100,20 @@ export function registerIpcHandlers(win: BrowserWindow) {
     send('soop:balloon', { user, amount: amt, ts: Date.now() })
     gameEngine.onBalloon(user, amt)
   })
-  soopClient.on('chat', (user, msg) => {
+  soopClient.on('chat', (user: string, msg: string, userId?: string) => {
     send('soop:chat', { user, message: msg, ts: Date.now() })
     gameEngine.onChat(user, msg)
-    // 채팅으로 열혈팬 감지 (입장 패킷 보완)
-    emitFanAlert(send, user, user)
+    // 채팅으로 열혈팬 감지 — 실제 userId로 우선 조회, 닉으로 보조 조회
+    emitFanAlert(send, userId || user, user)
   })
 
   soopClient.on('enter', (userId: string, userNick: string) => {
     emitFanAlert(send, userId, userNick)
+  })
+
+  // SOOP 팬클럽 멤버(fw>=1) 감지 — 잠수 열혈팬도 포착 (fans.json 없이도)
+  soopClient.on('fanclub', (userId: string, userNick: string, tier: number) => {
+    emitFanAlert(send, userId, userNick, tier)
   })
 
   // ── Game engine ──────────────────────────────────────────────────────────

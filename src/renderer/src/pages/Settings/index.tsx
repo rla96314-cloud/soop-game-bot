@@ -158,15 +158,21 @@ export default function Settings() {
 
         <div className={styles.field}>
           <label>채널 ID</label>
-          <input value={channelId} onChange={e => setChannelId(e.target.value)} placeholder="스트리머 채널 ID" />
+          <input value={channelId} onChange={e => setChannelId(e.target.value)} placeholder="스트리머 채널 ID (방송 주소의 아이디)" />
+          <p className={styles.hint}>
+            채널 ID만 입력하면 방송 중일 때 자동으로 채팅·별풍선을 읽어옵니다. (로그인/토큰 불필요)
+          </p>
         </div>
         <div className={styles.field}>
-          <label>유저 ID</label>
-          <input value={userId} onChange={e => setUserId(e.target.value)} placeholder="SOOP 로그인 ID" />
+          <label>유저 ID <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(선택)</span></label>
+          <input value={userId} onChange={e => setUserId(e.target.value)} placeholder="채팅 읽기에는 불필요" />
         </div>
         <div className={styles.field}>
-          <label>인증 토큰</label>
-          <input type="password" value={token} onChange={e => setToken(e.target.value)} placeholder="채팅 인증 토큰" />
+          <label>인증 토큰 <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(선택)</span></label>
+          <input type="password" value={token} onChange={e => setToken(e.target.value)} placeholder="채팅 읽기에는 불필요 — 비워두세요" />
+          <p className={styles.hint}>
+            채팅을 "읽기"만 하므로 토큰이 필요 없습니다. (메시지 전송 기능은 사용하지 않음)
+          </p>
         </div>
 
         <div className={styles.toggle}>
