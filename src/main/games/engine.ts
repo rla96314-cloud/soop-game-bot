@@ -196,6 +196,7 @@ export class GameEngine extends EventEmitter {
         critEnabled:      (cfg.critEnabled       as boolean) !== false,
         critMultiplier:   (cfg.critMultiplier    as number)  ?? 2,
         balloonThreshold: (cfg.balloonThreshold  as number)  ?? 100,
+        phase2HpPercent:  (cfg.phase2HpPercent   as number)  ?? 50,
         participants:     {},
       }
     }

@@ -119,8 +119,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .then(s => setStats(s))
       .catch(() => {})
 
-    ;(el.gameAll as () => Promise<GameStates>)()
-      .then(s => setGameStates(s))
+    ;(el.gameAll as () => Promise<unknown>)()
+      .then(s => {
+        // game:all returns an array of GameState (each with an `id`);
+        // the app consumes gameStates as a keyed record → key by id.
+        if (Array.isArray(s)) {
+          const keyed: GameStates = {}
+          for (const st of s as Array<{ id?: string } & GameStates[string]>) {
+            if (st && st.id) keyed[st.id] = st
+          }
+          setGameStates(keyed)
+        } else if (s && typeof s === 'object') {
+          setGameStates(s as GameStates)
+        }
+      })
       .catch(() => {})
 
     ;(el.gameHistory as (n: number) => Promise<unknown[]>)(MAX_HISTORY)

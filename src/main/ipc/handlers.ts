@@ -152,6 +152,8 @@ export function registerIpcHandlers(win: BrowserWindow) {
       const { imageUrls: _drop, ...bossOnly } = s
       const next = patchSettings({ games: { boss: bossOnly } })
       gameEngine.updateSettings(next)
+      // 대기 중이면 새 설정으로 보스 idle 상태 재생성 → BR 화면에 즉시 반영
+      if (gameEngine.getState('boss').status === 'idle') gameEngine.resetBoss()
     } else if (cmd.type === 'sync-boss-hp') {
       gameEngine.setSharedBossHp(cmd.currentHp as number, cmd.alive as boolean)
     }

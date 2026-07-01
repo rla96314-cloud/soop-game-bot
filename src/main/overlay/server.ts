@@ -9,6 +9,24 @@ import type { GameResult, GameState } from '../games/engine'
 const GS_BOSS_URL    = 'https://script.google.com/macros/s/AKfycbybNbyhO7Lc9kM7FEKbWAwgctr1Xc3Cq9kSwzMymnyV-8NFuzaujCcyCZ4ru75KsLXt/exec'
 const BOSS_HP_SERVER = 'http://100.89.116.107:4081'
 
+// 원격(대시보드/시트) 보스 설정을 로컬에 반영할 때, 비어있거나 무의미한 값이
+// 운영자가 방금 저장한 로컬 설정을 덮어쓰지 않도록 정리한다.
+// - null / undefined / 빈 문자열 / 빈 배열 키는 제거
+// - 유효한 값이 하나도 없으면 null 반환(적용 스킵)
+function sanitizeRemoteBossSettings(
+  raw: Record<string, unknown> | undefined | null,
+): Record<string, unknown> | null {
+  if (!raw || typeof raw !== 'object') return null
+  const clean: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(raw)) {
+    if (v === null || v === undefined) continue
+    if (typeof v === 'string' && v.trim() === '') continue
+    if (Array.isArray(v) && v.length === 0) continue
+    clean[k] = v
+  }
+  return Object.keys(clean).length > 0 ? clean : null
+}
+
 async function autoLoadBossFromDashboard(): Promise<void> {
   try {
     const channelId = loadSettings().soop?.channelId
@@ -16,8 +34,10 @@ async function autoLoadBossFromDashboard(): Promise<void> {
     const res = await fetch(`${BOSS_HP_SERVER}/boss-settings/${encodeURIComponent(channelId)}`)
     if (!res.ok) return
     const j = await res.json() as { ok: boolean; settings?: Record<string, unknown> }
-    if (!j.ok || !j.settings) return
-    patchSettings({ games: { boss: j.settings } })
+    if (!j.ok) return
+    const clean = sanitizeRemoteBossSettings(j.settings)
+    if (!clean) return   // 원격에 실제 설정이 없으면 로컬 유지
+    patchSettings({ games: { boss: clean } })
   } catch {}
 }
 
@@ -30,9 +50,10 @@ async function autoLoadBossFromSheets(): Promise<void> {
     })
     if (!res.ok) return
     const j = await res.json() as { ok: boolean; settings?: Record<string, unknown>; imageUrls?: Record<string, string> }
-    if (!j.ok || !j.settings) return
+    if (!j.ok) return
 
-    patchSettings({ games: { boss: j.settings } })
+    const clean = sanitizeRemoteBossSettings(j.settings)
+    if (clean) patchSettings({ games: { boss: clean } })
 
     if (j.imageUrls) {
       const dataDir = join(app.getPath('userData'), 'data')
@@ -3250,7 +3271,13 @@ export class OverlayServer {
           req.on('end', () => {
             try {
               const patch = JSON.parse(body)
-              patchSettings({ games: { boss: patch } })
+              // commandHandler 경유 → 파일 저장 + 게임 엔진 갱신 + idle 보스 재생성.
+              // (직접 patchSettings만 하면 실행 중인 엔진에 반영되지 않아 BR에 셋업이 안 뜸)
+              if (this.commandHandler) {
+                this.commandHandler({ type: 'update-settings', settings: patch })
+              } else {
+                patchSettings({ games: { boss: patch } })
+              }
               res.writeHead(200, { 'Content-Type': 'application/json' })
               res.end(JSON.stringify({ ok: true }))
             } catch (e) {
