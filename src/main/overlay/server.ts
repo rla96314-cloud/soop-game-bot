@@ -2046,31 +2046,8 @@ async function doSave() {
     const j = await r.json()
     if (!j.ok) throw new Error(j.error)
 
-    // Sync to Google Sheets if URL is configured
-    if (data.sheetsWebhookUrl) {
-      try {
-        // 현재 저장된 이미지를 base64로 변환해서 Drive에 함께 업로드
-        st.textContent = '이미지 동기화 중...'
-        const images = {}
-        for (const phase of ['phase1','phase2','success']) {
-          try {
-            const ir = await fetch('/api/boss-image/'+phase)
-            if (ir.ok) {
-              const blob = await ir.blob()
-              images[phase] = await new Promise(resolve => {
-                const rd = new FileReader()
-                rd.onload = e => resolve(e.target.result)
-                rd.readAsDataURL(blob)
-              })
-            }
-          } catch { /* 이미지 없으면 스킵 */ }
-        }
-        await fetch(data.sheetsWebhookUrl, {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({action:'saveSettings', settings: data, images})
-        })
-      } catch { /* sheets sync failure is non-fatal */ }
-    }
+    // 구글 시트 동기화는 서버(Node)가 처리한다 — 브라우저에서 직접 호출하면
+    // Apps Script의 CORS 프리플라이트에 막혀 조용히 실패하기 때문.
 
     st.textContent='저장됨 ✓'; st.className='savestatus ok'
   } catch(e) {
@@ -3250,6 +3227,33 @@ export class OverlayServer {
     this.commandHandler = fn
   }
 
+  // 구글 시트로 보스 설정 동기화 — 서버(Node)에서 실행해 브라우저 CORS를 우회한다.
+  // (브라우저 fetch는 Apps Script의 application/json 프리플라이트가 막혀 조용히 실패했음)
+  private async syncBossSettingsToSheet(settings: Record<string, unknown>): Promise<void> {
+    const url = (settings.sheetsWebhookUrl as string | undefined)?.trim()
+    if (!url) return
+    const dataDir = join(app.getPath('userData'), 'data')
+    const EXTS    = ['png', 'jpg', 'jpeg', 'gif', 'webp']
+    const images: Record<string, string> = {}
+    for (const phase of ['phase1', 'phase2', 'success']) {
+      for (const ext of EXTS) {
+        const p = join(dataDir, `boss-image-${phase}.${ext}`)
+        if (existsSync(p)) {
+          const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg'
+                     : ext === 'gif' ? 'image/gif' : ext === 'webp' ? 'image/webp' : 'image/png'
+          images[phase] = `data:${mime};base64,${readFileSync(p).toString('base64')}`
+          break
+        }
+      }
+    }
+    const { imageUrls: _drop, ...cfg } = settings
+    await fetch(url, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ action: 'saveSettings', settings: cfg, images }),
+    })
+  }
+
   start(port = 3939) {
     this.port = port
 
@@ -3278,6 +3282,8 @@ export class OverlayServer {
               } else {
                 patchSettings({ games: { boss: patch } })
               }
+              // 구글 시트 동기화 — 서버에서 (브라우저는 CORS로 막힘)
+              this.syncBossSettingsToSheet(patch).catch(() => {})
               res.writeHead(200, { 'Content-Type': 'application/json' })
               res.end(JSON.stringify({ ok: true }))
             } catch (e) {
