@@ -1121,29 +1121,60 @@ const countEl= document.getElementById('pb-count')
 let currentCells = [], currentRows = 4, currentCols = 5
 let gridGen = 0   // 그리드 재구성 세대 — 재구성 후 이전 공개 타이머 무효화
 
+// 1차: 측정 없이 글자 수·열 수만으로 폰트 크기 결정.
+// OBS(CEF) 등 레이아웃 측정이 불안정한 환경에서도 항상 동일하게 동작한다.
+function calcNameSize(name, cols, hasDesc) {
+  const cellW = Math.max(60, (560 - 28 - 8 * (cols - 1)) / cols)   // 카드 폭 근사 (보드 내부 560px 기준)
+  const len = Math.max(1, String(name).trim().length)
+  const effLen = len <= 2 ? len : Math.ceil(len / 2)               // 두 줄까지 허용 → 유효 글자 수 절반
+  let size = Math.floor((cellW - 14) / Math.max(1, effLen))
+  size = Math.min(34, Math.max(11, size))
+  if (hasDesc) size = Math.min(size, 22)                           // 설명 줄 공간 확보
+  return size
+}
+
+function applyTicketFont(name, desc, size) {
+  name.style.fontSize = size + 'px'
+  if (desc) desc.style.fontSize = Math.max(10, Math.round(size * 0.55)) + 'px'
+}
+
+// 2차(보정): 측정이 가능한 환경에서만 실제 넘침을 검사해 더 줄임
 function fitTicketText(ticket) {
   const name    = ticket.querySelector('.pb-ticket-name')
   const desc    = ticket.querySelector('.pb-ticket-desc')
   const content = ticket.querySelector('.pb-ticket-content')
   if (!name || !content) return
-  // 카드 안쪽 여백을 남기고 폭·높이 둘 다 넘치지 않을 때까지 축소
-  // 시작 크기 34px: 미공개 칸 번호(44px)와 시각적 균형 — 짧은 이름은 크게, 긴 이름은 자동 축소
+  if (!ticket.clientHeight || !name.clientWidth) return   // 측정 불가 → 1차 계산값 유지
   const maxH = ticket.clientHeight - 18
-  let size = 34
-  const apply = (s) => {
-    name.style.fontSize = s + 'px'
-    if (desc) desc.style.fontSize = Math.max(10, Math.round(s * 0.55)) + 'px'
-  }
-  // 요소 자신의 박스보다 텍스트가 넘치는지 검사 (keep-all로 줄바꿈 안 되는 긴 단어 대응)
   const overflowing = () =>
     content.scrollHeight > maxH ||
     name.scrollWidth > name.clientWidth ||
     (desc && desc.scrollWidth > desc.clientWidth)
-  apply(size)
+  let size = parseInt(name.style.fontSize, 10) || 22
   while (size > 10 && overflowing()) {
     size--
-    apply(size)
+    applyTicketFont(name, desc, size)
   }
+}
+
+// 상품 내용 DOM 생성 — 생성 시점에 폰트 크기를 인라인으로 확정
+function makeTicketContent(cell, cols) {
+  const content = document.createElement('div')
+  content.className = 'pb-ticket-content'
+  const name = document.createElement('div')
+  name.className = 'pb-ticket-name'
+  name.textContent = cell.name
+  name.style.color = cell.color || '#333'
+  content.appendChild(name)
+  let desc = null
+  if (cell.description) {
+    desc = document.createElement('div')
+    desc.className = 'pb-ticket-desc'
+    desc.textContent = cell.description
+    content.appendChild(desc)
+  }
+  applyTicketFont(name, desc, calcNameSize(cell.name, cols, !!cell.description))
+  return content
 }
 
 function buildGrid(cells, rows, cols) {
@@ -1170,20 +1201,7 @@ function buildGrid(cells, rows, cols) {
       num.textContent = (i + 1)
       ticket.appendChild(num)
     } else {
-      const content = document.createElement('div')
-      content.className = 'pb-ticket-content'
-      const name = document.createElement('div')
-      name.className = 'pb-ticket-name'
-      name.textContent = cell.name
-      name.style.color = cell.color || '#333'
-      content.appendChild(name)
-      if (cell.description) {
-        const desc = document.createElement('div')
-        desc.className = 'pb-ticket-desc'
-        desc.textContent = cell.description
-        content.appendChild(desc)
-      }
-      ticket.appendChild(content)
+      ticket.appendChild(makeTicketContent(cell, cols))
     }
     ticketWrap.appendChild(ticket)
     grid.appendChild(ticketWrap)
@@ -1223,20 +1241,7 @@ function updateGrid(cells, rows, cols) {
         if (gen !== gridGen) return   // 그 사이 초기화됐으면 무시
         ticket.innerHTML = ''
         ticket.classList.add('revealed')
-        const content = document.createElement('div')
-        content.className = 'pb-ticket-content'
-        const name = document.createElement('div')
-        name.className = 'pb-ticket-name'
-        name.textContent = cell.name
-        name.style.color = cell.color || '#333'
-        content.appendChild(name)
-        if (cell.description) {
-          const desc = document.createElement('div')
-          desc.className = 'pb-ticket-desc'
-          desc.textContent = cell.description
-          content.appendChild(desc)
-        }
-        ticket.appendChild(content)
+        ticket.appendChild(makeTicketContent(cell, currentCols))
         fitTicketText(ticket)
       }, 200)
     }
