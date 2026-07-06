@@ -21,12 +21,13 @@ export default function Settings() {
   const [overlayPort, setOverlayPort] = useState(3939)
 
   // Weflab
-  const [weflabEnabled, setWeflabEnabled] = useState(false)
-  const [weflabUrl,     setWeflabUrl]     = useState('')
-  const [triggers,      setTriggers]      = useState<WeflabTrigger[]>([])
-  const [weflabRunning, setWeflabRunning] = useState(false)
-  const [weflabLog,     setWeflabLog]     = useState<string[]>([])
-  const [urlDirty,      setUrlDirty]      = useState(false)
+  const [weflabEnabled,  setWeflabEnabled]  = useState(false)
+  const [weflabUrl,      setWeflabUrl]      = useState('')
+  const [triggers,       setTriggers]       = useState<WeflabTrigger[]>([])
+  const [balloonTrigger, setBalloonTrigger] = useState(false)
+  const [weflabRunning,  setWeflabRunning]  = useState(false)
+  const [weflabLog,      setWeflabLog]      = useState<string[]>([])
+  const [urlDirty,       setUrlDirty]       = useState(false)
 
   const [saved,        setSaved]        = useState(false)
   const [reconnecting, setReconnecting] = useState(false)
@@ -44,21 +45,32 @@ export default function Settings() {
     setWeflabEnabled(     !!(s.weflab?.enabled         as boolean))
     setWeflabUrl(         (s.weflab?.url               as string)  ?? '')
     setTriggers(          (s.weflab?.triggers          as WeflabTrigger[]) ?? [])
+    setBalloonTrigger(    !!(s.weflab?.balloonTrigger  as boolean))
   }, [settings])
 
   // weflab event listeners
   useEffect(() => {
     const e = el()
-    const offResult = (e.onWeflabResult as (cb: (t: string) => void) => () => void)(
-      (text) => setWeflabLog(l => [`[${new Date().toLocaleTimeString()}] ${text}`, ...l].slice(0, 20))
+    const offResult = (e.onWeflabResult as (cb: (t: string, n: string) => void) => () => void)(
+      (text, nick) => setWeflabLog(l =>
+        [`[${new Date().toLocaleTimeString()}] 룰렛: ${text}${nick ? ` (${nick})` : ''}`, ...l].slice(0, 20))
+    )
+    const offDonation = (e.onWeflabDonation as (cb: (d: { donor: string; balloons: number; amount: number; message: string }) => void) => () => void)(
+      (d) => setWeflabLog(l => {
+        const what = d.balloons > 0 ? `별풍선 ${d.balloons}개` : `${d.amount.toLocaleString()}원`
+        return [`[${new Date().toLocaleTimeString()}] 후원: ${d.donor || '?'} ${what}${d.message ? ` "${d.message}"` : ''}`, ...l].slice(0, 20)
+      })
     )
     const offLoaded = (e.onWeflabLoaded as (cb: () => void) => () => void)(
       () => setWeflabLog(l => [`[${new Date().toLocaleTimeString()}] 페이지 로드 완료`, ...l].slice(0, 20))
     )
+    const offRetrying = (e.onWeflabRetrying as (cb: (m: string) => void) => () => void)(
+      (m) => setWeflabLog(l => [`[재연결] ${m}`, ...l].slice(0, 20))
+    )
     const offError  = (e.onWeflabError  as (cb: (err: string) => void) => () => void)(
       (err) => setWeflabLog(l => [`[오류] ${err}`, ...l].slice(0, 20))
     )
-    return () => { offResult(); offLoaded(); offError() }
+    return () => { offResult(); offDonation(); offLoaded(); offRetrying(); offError() }
   }, [])
 
   // Sync weflab running state on every mount (tab switch 후 정확한 상태 반영)
@@ -79,7 +91,7 @@ export default function Settings() {
         globalThreshold:    Number(globalThreshold),
       },
       overlay: { port: Number(overlayPort) },
-      weflab:  { enabled: weflabEnabled, url: weflabUrl, triggers },
+      weflab:  { enabled: weflabEnabled, url: weflabUrl, triggers, balloonTrigger },
     })
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
@@ -251,6 +263,25 @@ export default function Settings() {
         </div>
         <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>
           활성화하면 프로그램 시작 시 자동으로 감지를 시작합니다
+        </div>
+
+        <div className={styles.toggle} style={{ marginTop: 8 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={balloonTrigger}
+              onChange={() => {
+                const next = !balloonTrigger
+                setBalloonTrigger(next)
+                patchSettings({ weflab: { balloonTrigger: next } } as Parameters<typeof patchSettings>[0])
+              }}
+              disabled={!weflabEnabled}
+            />
+            <span>weflab 후원 별풍선을 게임 트리거로 사용</span>
+          </label>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>
+          위플랩 페이지에서 감지된 별풍선 후원을 SOOP 별풍선과 동일하게 게임 발동에 사용합니다
         </div>
 
         <div className={styles.field}>

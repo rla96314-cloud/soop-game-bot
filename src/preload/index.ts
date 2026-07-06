@@ -68,12 +68,15 @@ contextBridge.exposeInMainWorld('electron', {
   onGameResult:       (cb: (id: string, r: unknown) => void)  => on('game:result',       cb),
   onQuizQuestion:     (cb: (q: unknown) => void)              => on('quiz:question',      cb),
   onStatsUpdate:      (cb: (s: StatsSnapshot) => void)        => on('stats:update',      cb),
-  onWeflabResult:     (cb: (text: string) => void)            => on('weflab:result',     cb),
+  onWeflabResult:     (cb: (text: string, nick: string) => void) => on('weflab:result',   cb),
+  onWeflabDonation:   (cb: (d: WeflabDonationEvent) => void)  => on('weflab:donation',   cb),
   onWeflabLoaded:     (cb: () => void)                        => on('weflab:loaded',     cb),
+  onWeflabRetrying:   (cb: (m: string) => void)               => on('weflab:retrying',   cb),
   onWeflabError:      (cb: (e: string) => void)               => on('weflab:error',      cb),
 })
 
 interface SoopBalloonEvent { user: string; amount: number; ts: number }
+interface WeflabDonationEvent { donor: string; balloons: number; amount: number; message: string; event: string; ts: number }
 interface SoopChatEvent    { user: string; message: string; ts: number }
 interface StatsSnapshot    { todayRuns: number; todayBalloons: number; todayViewers: number }
 interface FanAlertEvent    { userId: string; userNick: string; broadcasts: { id: string; name: string; rank: number }[]; ts: number }

@@ -254,18 +254,26 @@ export function registerIpcHandlers(win: BrowserWindow) {
   })
 
   // weflab
-  weflabWatcher.on('result', (text: string) => {
-    send('weflab:result', text)
+  weflabWatcher.on('result', (text: string, nick: string) => {
+    send('weflab:result', text, nick)
     const s = loadSettings()
     if (!s.weflab.enabled) return
     const validTriggers = s.weflab.triggers.filter(t => t.keyword)
     // 트리거가 없으면 모든 결과에 반응, 있으면 키워드 포함 여부 검사
     const matched = validTriggers.length === 0
       || validTriggers.some(t => text.toLowerCase().includes(t.keyword.toLowerCase()))
-    if (matched) gameEngine.trigger('roulette', 'weflab', 0)
+    if (matched) gameEngine.trigger('roulette', nick || 'weflab', 0)
   })
-  weflabWatcher.on('loaded', () => send('weflab:loaded'))
-  weflabWatcher.on('error',  (e: string) => send('weflab:error', e))
+  // 위플랩 후원(socket.io) → 대시보드 표시 + (옵션) 별풍선 게임 트리거
+  weflabWatcher.on('donation', (d: { donor: string; balloons: number; amount: number; message: string; ts: number }) => {
+    send('weflab:donation', d)
+    const s = loadSettings()
+    if (!s.weflab.enabled || !s.weflab.balloonTrigger) return
+    if (d.balloons > 0) gameEngine.onBalloon(d.donor || 'weflab', d.balloons)
+  })
+  weflabWatcher.on('loaded',   ()          => send('weflab:loaded'))
+  weflabWatcher.on('retrying', (m: string) => send('weflab:retrying', m))
+  weflabWatcher.on('error',    (e: string) => send('weflab:error', e))
 
   ipcMain.handle('weflab:start', (_, url: string) => {
     weflabWatcher.start(url)

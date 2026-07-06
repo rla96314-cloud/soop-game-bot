@@ -51,9 +51,10 @@ export interface Settings {
   games:   Record<string, GameConfig>
   overlay: { port: number; theme: string }
   weflab: {
-    enabled:  boolean
-    url:      string
-    triggers: WeflabTrigger[]
+    enabled:        boolean
+    url:            string
+    triggers:       WeflabTrigger[]
+    balloonTrigger: boolean   // 위플랩 후원 별풍선을 SOOP 별풍선처럼 게임 트리거로 사용
   }
 }
 
@@ -137,7 +138,7 @@ const DEFAULTS: Settings = {
     },
   },
   overlay: { port: 3939, theme: 'purple' },
-  weflab:  { enabled: false, url: '', triggers: [] },
+  weflab:  { enabled: false, url: '', triggers: [], balloonTrigger: false },
 }
 
 function getPath() {
