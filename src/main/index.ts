@@ -31,6 +31,16 @@ function createWindow(): BrowserWindow {
     win.webContents.setZoomFactor(scale / 100)
   })
 
+  // 메인 창을 닫으면 앱 완전 종료.
+  // 위플랩 감시용 숨김 창이 남아 있으면 window-all-closed가 발생하지 않아
+  // 프로세스가 백그라운드에 계속 살아있게 되는 문제 방지.
+  win.on('closed', () => {
+    soopClient.disconnect()
+    weflabWatcher.stop()
+    overlayServer.stop()
+    app.quit()
+  })
+
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
     return { action: 'deny' }

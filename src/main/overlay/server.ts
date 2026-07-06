@@ -1041,10 +1041,12 @@ const PICKBOARD_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
     user-select: none;
   }
 
-  /* Number label (unrevealed) */
+  /* Number label (unrevealed) — 칸 가운데 크게 */
   .pb-ticket-num {
-    position: absolute; bottom: 6px; right: 8px;
-    font-size: 10px; color: rgba(0,0,0,0.25); font-weight: 700;
+    position: relative; z-index: 2;
+    font-size: 44px; font-weight: 900; line-height: 1;
+    color: rgba(30, 40, 70, 0.55);
+    text-shadow: 0 2px 0 rgba(255,255,255,0.55);
   }
 
   /* Revealed ticket */
