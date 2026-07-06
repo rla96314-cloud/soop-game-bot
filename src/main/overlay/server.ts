@@ -1110,6 +1110,7 @@ const wrap   = document.getElementById('pb-wrap')
 const grid   = document.getElementById('pb-grid')
 const countEl= document.getElementById('pb-count')
 let currentCells = [], currentRows = 4, currentCols = 5
+let gridGen = 0   // 그리드 재구성 세대 — 재구성 후 이전 공개 타이머 무효화
 
 function fitTicketText(ticket) {
   const name = ticket.querySelector('.pb-ticket-name')
@@ -1127,6 +1128,7 @@ function fitTicketText(ticket) {
 }
 
 function buildGrid(cells, rows, cols) {
+  gridGen++
   grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)'
   grid.innerHTML = ''
   cells.forEach((cell, i) => {
@@ -1179,8 +1181,13 @@ function buildGrid(cells, rows, cols) {
 function updateGrid(cells, rows, cols) {
   if (cells.length === 0) { wrap.classList.remove('show'); return }
 
+  // 초기화 감지: 공개됐던 칸이 미공개로 돌아가면 전체 재구성
+  // (증분 업데이트는 미공개→공개 전환만 처리하므로 초기화가 반영 안 됨)
+  const resetDetected = currentCells.length === cells.length
+    && cells.some((cell, i) => currentCells[i].revealed && !cell.revealed)
+
   // If grid is fresh (no tickets rendered yet), build from scratch
-  if (currentCells.length !== cells.length || currentRows !== rows || currentCols !== cols) {
+  if (currentCells.length !== cells.length || currentRows !== rows || currentCols !== cols || resetDetected) {
     currentCells = cells; currentRows = rows; currentCols = cols
     buildGrid(cells, rows, cols)
     return
@@ -1192,7 +1199,9 @@ function updateGrid(cells, rows, cols) {
       const ticket = document.getElementById('ticket-' + i)
       if (!ticket) return
       ticket.classList.add('just-revealed')
+      const gen = gridGen
       setTimeout(() => {
+        if (gen !== gridGen) return   // 그 사이 초기화됐으면 무시
         ticket.innerHTML = ''
         ticket.classList.add('revealed')
         const content = document.createElement('div')
