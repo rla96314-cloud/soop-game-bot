@@ -171,14 +171,17 @@ export default function Settings() {
         <div className={styles.field}>
           <label>채널 ID</label>
           <input value={channelId} onChange={e => setChannelId(e.target.value)} placeholder="스트리머 채널 ID" />
+          <p className={styles.hint}>
+            실제 연동에 필수 — 스트리머의 SOOP 아이디 (비어 있으면 시뮬레이션으로 동작). 방송 중이 아니면 30초마다 자동 재확인합니다.
+          </p>
         </div>
         <div className={styles.field}>
-          <label>유저 ID</label>
+          <label>유저 ID (선택)</label>
           <input value={userId} onChange={e => setUserId(e.target.value)} placeholder="SOOP 로그인 ID" />
         </div>
         <div className={styles.field}>
-          <label>인증 토큰</label>
-          <input type="password" value={token} onChange={e => setToken(e.target.value)} placeholder="채팅 인증 토큰" />
+          <label>인증 토큰 (선택)</label>
+          <input type="password" value={token} onChange={e => setToken(e.target.value)} placeholder="채팅 읽기에는 필요 없음" />
         </div>
 
         <div className={styles.toggle}>

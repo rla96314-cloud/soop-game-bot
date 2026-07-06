@@ -4,41 +4,77 @@ import WebSocket from 'ws'
 /**
  * SOOP (구 아프리카TV) 채팅 WebSocket 클라이언트
  *
- * 실제 연결: SOOP 채팅 서버 (wss://chat.sooplive.co.kr:9820)
- * 시뮬레이션: 로컬에서 랜덤 이벤트 생성
+ * 실제 연결 (읽기 전용 게스트 — 채널 ID만 있으면 됨):
+ *   1. player_live_api 로 채팅 서버 정보(CHDOMAIN/CHPT/CHATNO) 조회
+ *   2. wss://{CHDOMAIN}:{CHPT+1}/Websocket/{채널ID} 접속 (subprotocol 'chat')
+ *   3. LOGIN(0001) → JOIN(0002, CHATNO) → PING(0000) 주기 전송
+ *   방송 중이 아니면 30초마다 재확인, 끊기면 5초 후 재접속.
+ *   ※ 연결 실패 시 시뮬레이션으로 폴백하지 않음 (명시적으로 켠 경우만 시뮬레이션)
  *
  * 이벤트:
  *   'connected'            - 연결 성공
  *   'disconnected'         - 연결 끊김
- *   'error'   (err)        - 에러
+ *   'error'   (err)        - 에러/상태 메시지
  *   'balloon' (username, amount) - 별풍선 수신
  *   'chat'    (username, message) - 채팅 메시지
+ *   'enter'   (userId, userNick)  - 시청자 입장
  */
+
+const F   = '\x0c'
+const ESC = '\x1b\t'
+
+// SOOP 채팅 서비스 코드
+const SVC_KEEPALIVE = 0
+const SVC_LOGIN     = 1
+const SVC_JOIN      = 2
+const SVC_CHUSER    = 4   // 입장/퇴장
+const SVC_CHAT      = 5
+const SVC_BALLOON   = 18  // 별풍선
+
+const PING_MS          = 20000
+const OFFLINE_RETRY_MS = 30000
+const RECONNECT_MS     = 5000
+
+interface ChannelInfo { chdomain: string; chpt: number; chatno: string; bjnick: string }
+
+// ESC + SVC(4자리) + 바디길이(6자리) + '00' + 바디
+function makePacket(svc: number, body: string): string {
+  const len = Buffer.byteLength(body, 'utf-8')
+  return ESC + String(svc).padStart(4, '0') + String(len).padStart(6, '0') + '00' + body
+}
+
 export class SoopClient extends EventEmitter {
-  private ws:          WebSocket | null = null
-  private simInterval: ReturnType<typeof setInterval> | null = null
-  private reconnectTimer: ReturnType<typeof setTimeout> | null = null
-  private connected   = false
-  private simMode     = true
+  private ws:             WebSocket | null = null
+  private simInterval:    ReturnType<typeof setInterval> | null = null
+  private reconnectTimer: ReturnType<typeof setTimeout>  | null = null
+  private pingTimer:      ReturnType<typeof setInterval> | null = null
+  private connected  = false
+  private simMode    = true
+  private session    = 0   // connect/disconnect 세대 — 늦게 도착한 비동기 응답 무시용
 
   // ── Connection ─────────────────────────────────────────────────────────────
 
   connect(opts: { channelId: string; userId: string; token: string; simulation: boolean }) {
     this.disconnect()
-    this.simMode = opts.simulation || !opts.channelId
+    const channelId = (opts.channelId ?? '').trim()
+    this.simMode = opts.simulation || !channelId
 
     if (this.simMode) {
+      if (!opts.simulation && !channelId) {
+        this.emit('error', '채널 ID가 비어 있어 시뮬레이션 모드로 시작합니다 — 설정에서 채널 ID를 입력하세요')
+      }
       this.startSimulation()
       return
     }
 
-    this.connectReal(opts)
+    this.connectReal(channelId, this.session)
   }
 
   disconnect() {
-    if (this.simInterval) { clearInterval(this.simInterval);   this.simInterval   = null }
-    if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null }
+    this.session++
+    this._clearTimers()
     if (this.ws) {
+      this.ws.removeAllListeners()
       try { this.ws.close() } catch {}
       this.ws = null
     }
@@ -48,88 +84,156 @@ export class SoopClient extends EventEmitter {
     }
   }
 
-  isConnected() { return this.connected }
+  isConnected()  { return this.connected }
   isSimulation() { return this.simMode }
 
-  // ── Real WebSocket ─────────────────────────────────────────────────────────
+  private _clearTimers() {
+    if (this.simInterval)    { clearInterval(this.simInterval);    this.simInterval    = null }
+    if (this.reconnectTimer) { clearTimeout(this.reconnectTimer);  this.reconnectTimer = null }
+    if (this.pingTimer)      { clearInterval(this.pingTimer);      this.pingTimer      = null }
+  }
 
-  private connectReal(opts: { channelId: string; userId: string; token: string }) {
+  // ── Real connection ─────────────────────────────────────────────────────────
+
+  // 방송 정보 조회 → 방송 중이면 채팅 서버 접속 정보 반환, 아니면 null
+  private async fetchChannelInfo(channelId: string): Promise<ChannelInfo | null> {
+    const res = await fetch(
+      `https://live.sooplive.co.kr/afreeca/player_live_api.php?bjid=${encodeURIComponent(channelId)}`,
+      {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body:    `bid=${encodeURIComponent(channelId)}&type=live&player_type=html5`,
+      },
+    )
+    if (!res.ok) throw new Error(`player_live_api HTTP ${res.status}`)
+    const json = await res.json() as { CHANNEL?: Record<string, unknown> }
+    const ch = json.CHANNEL
+    if (!ch || Number(ch.RESULT) !== 1 || !ch.CHDOMAIN || !ch.CHATNO) return null
+    return {
+      chdomain: String(ch.CHDOMAIN).toLowerCase(),
+      chpt:     Number(ch.CHPT) || 0,
+      chatno:   String(ch.CHATNO),
+      bjnick:   String(ch.BJNICK ?? ''),
+    }
+  }
+
+  private async connectReal(channelId: string, session: number) {
+    let info: ChannelInfo | null = null
     try {
-      // SOOP chat WebSocket endpoint
-      const url = `wss://chat.sooplive.co.kr:9820`
-      this.ws   = new WebSocket(url, { handshakeTimeout: 10000 })
+      info = await this.fetchChannelInfo(channelId)
+    } catch (err) {
+      if (session !== this.session) return
+      this.emit('error', `방송 정보 조회 실패: ${String(err)} — ${OFFLINE_RETRY_MS / 1000}초 후 재시도`)
+      this._scheduleReal(channelId, session, OFFLINE_RETRY_MS)
+      return
+    }
+    if (session !== this.session) return
 
-      this.ws.on('open', () => {
-        // Send login packet
-        // SOOP packet format: service(2B) + type(2B) + reserved(4B) + datalen(4B) + data
-        this.sendPacket(this.ws!, 1, 0,
-          `\x00${opts.channelId}\x0c${opts.userId}\x0c${opts.token}\x0c\x0c`)
-        this.connected = true
-        this.emit('connected')
-      })
+    if (!info) {
+      this.emit('error', `'${channelId}' 채널이 방송 중이 아닙니다 — ${OFFLINE_RETRY_MS / 1000}초마다 재확인`)
+      this._scheduleReal(channelId, session, OFFLINE_RETRY_MS)
+      return
+    }
 
-      this.ws.on('message', (raw: Buffer) => {
-        this.parsePacket(raw)
-      })
+    const url = `wss://${info.chdomain}:${info.chpt + 1}/Websocket/${channelId}`
+    const ws  = new WebSocket(url, ['chat'], { handshakeTimeout: 10000 })
+    this.ws   = ws
 
-      this.ws.on('close', () => {
+    ws.on('open', () => {
+      if (session !== this.session) return
+      ws.send(makePacket(SVC_LOGIN, F.repeat(3) + '16' + F))   // 게스트 로그인
+    })
+
+    ws.on('message', (raw: Buffer) => {
+      if (session !== this.session) return
+      this.parsePacket(raw.toString('utf-8'), ws, info!)
+    })
+
+    ws.on('close', () => {
+      if (session !== this.session) return
+      if (this.pingTimer) { clearInterval(this.pingTimer); this.pingTimer = null }
+      if (this.connected) {
         this.connected = false
         this.emit('disconnected')
-        // Auto-reconnect after 5s
-        this.reconnectTimer = setTimeout(() => this.connectReal(opts), 5000)
-      })
+      }
+      this.emit('error', `연결이 끊겼습니다 — ${RECONNECT_MS / 1000}초 후 재접속`)
+      this._scheduleReal(channelId, session, RECONNECT_MS)
+    })
 
-      this.ws.on('error', (err) => {
-        this.emit('error', err.message)
-        // Fall back to simulation after connection error
-        this.startSimulation()
-      })
-    } catch (err) {
-      this.emit('error', String(err))
-      this.startSimulation()
-    }
+    ws.on('error', (err) => {
+      if (session !== this.session) return
+      this.emit('error', `채팅 서버 오류: ${err.message}`)
+      // close 이벤트가 이어서 재접속을 처리
+    })
   }
 
-  private sendPacket(ws: WebSocket, service: number, type: number, data: string) {
-    const dataBuf = Buffer.from(data, 'utf-8')
-    const header  = Buffer.alloc(12)
-    header.writeUInt16BE(service, 0)
-    header.writeUInt16BE(type,    2)
-    header.writeUInt32BE(0,       4)
-    header.writeUInt32BE(dataBuf.length, 8)
-    const tail = Buffer.from([0x0d, 0x0a])
-    ws.send(Buffer.concat([header, dataBuf, tail]))
+  private _scheduleReal(channelId: string, session: number, delay: number) {
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer)
+    this.reconnectTimer = setTimeout(() => {
+      if (session === this.session) this.connectReal(channelId, session)
+    }, delay)
   }
 
-  private parsePacket(raw: Buffer) {
-    if (raw.length < 12) return
-    const service = raw.readUInt16BE(0)
-    const type    = raw.readUInt16BE(2)
-    const len     = raw.readUInt32BE(8)
-    const data    = raw.slice(12, 12 + len).toString('utf-8')
-    const fields  = data.split('\x0c')
+  private parsePacket(str: string, ws: WebSocket, info: ChannelInfo) {
+    if (str.length < 14) return
+    const svc   = parseInt(str.substring(2, 6), 10)
+    const parts = str.split(F)
 
     if (process.env.SOOP_DEBUG === '1') {
-      console.log(`[PKT] svc=${service} type=${type} fields=${JSON.stringify(fields.slice(0, 6))}`)
+      console.log(`[PKT] svc=${svc} parts=${JSON.stringify(parts.slice(0, 8))}`)
     }
 
-    // SENDMSG (chat)
-    if (service === 1 && type === 5) {
-      const username = fields[0] ?? '알 수 없음'
-      const message  = fields[1] ?? ''
-      if (username && message) this.emit('chat', username, message)
-    }
-    // SENDBALLOON (별풍선)
-    if (service === 1 && type === 18) {
-      const username = fields[0] ?? '알 수 없음'
-      const amount   = parseInt(fields[1] ?? '0', 10) || 0
-      if (username && amount) this.emit('balloon', username, amount)
-    }
-    // USER_ENTER (입장) — type 9, field[0]=userId, field[1]=userNick
-    if (service === 1 && type === 9) {
-      const userId   = fields[0] ?? ''
-      const userNick = fields[1] || fields[0] || ''
-      if (userId && userId.length > 1) this.emit('enter', userId, userNick)
+    switch (svc) {
+      case SVC_LOGIN: {
+        // 로그인 응답 → 채팅방 입장 + 킵얼라이브 시작
+        ws.send(makePacket(SVC_JOIN, F + info.chatno + F.repeat(5)))
+        if (this.pingTimer) clearInterval(this.pingTimer)
+        this.pingTimer = setInterval(() => {
+          try { ws.send(makePacket(SVC_KEEPALIVE, F)) } catch {}
+        }, PING_MS)
+        if (!this.connected) {
+          this.connected = true
+          this.emit('connected')
+        }
+        break
+      }
+
+      case SVC_CHAT: {
+        // parts[1]=메시지, parts[2]=유저ID, parts[6]=닉네임
+        const message = parts[1] ?? ''
+        const userId  = parts[2] ?? ''
+        const nick    = parts[6] || userId
+        if (nick && message) this.emit('chat', nick, message)
+        break
+      }
+
+      case SVC_BALLOON: {
+        // parts[1]=방송자ID, parts[2]=후원자ID, parts[3]=후원자닉, parts[4]=개수
+        const nick  = parts[3] || parts[2] || '알 수 없음'
+        let amount  = parseInt(parts[4] ?? '', 10)
+        if (!isFinite(amount) || amount <= 0) {
+          // 필드 위치가 다른 변형 대비: 후원자 뒤 첫 숫자 필드 사용
+          for (let i = 3; i < Math.min(parts.length, 9); i++) {
+            const n = parseInt(parts[i], 10)
+            if (isFinite(n) && n > 0 && String(n) === parts[i]) { amount = n; break }
+          }
+        }
+        if (amount > 0) this.emit('balloon', nick, amount)
+        break
+      }
+
+      case SVC_CHUSER: {
+        // 입장 알림 — parts[1]='1'(입장), 이후 (유저ID, 닉네임, 플래그) 3개씩 반복
+        // 실측: ["hdr","1","id1","닉1","65540|33554432","id2","닉2","플래그2",...]
+        if (parts[1] === '1') {
+          for (let i = 2; i + 1 < parts.length; i += 3) {
+            const userId = (parts[i] ?? '').replace(/\(\d+\)$/, '')   // "id(2)" 세션 접미사 제거
+            const nick   = parts[i + 1] || userId
+            if (userId && userId.length > 1) this.emit('enter', userId, nick)
+          }
+        }
+        break
+      }
     }
   }
 
