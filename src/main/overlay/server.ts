@@ -1003,16 +1003,19 @@ const PICKBOARD_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
   .pb-title { font-size: 13px; font-weight: 800; color: #3B6AC7; letter-spacing: 0.05em; }
   .pb-count { font-size: 11px; font-weight: 700; color: #7AABDF; }
 
-  /* Grid */
+  /* Grid — 행 높이를 그리드에서 강제 고정 (엔진별 콘텐츠 기반 축소 방지) */
   #pb-grid {
     display: grid;
     gap: 8px;
+    grid-auto-rows: 106px;
+    align-items: stretch;
   }
 
   /* Ticket wrapper (for notch effect) */
   .pb-ticket-wrap {
     position: relative;
     padding-top: 10px;
+    height: 106px;
     min-width: 0;   /* 그리드 아이템이 콘텐츠 폭으로 늘어나는 것 방지 */
   }
   /* Notch circle - same color as inner bg */
@@ -1026,11 +1029,12 @@ const PICKBOARD_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
     z-index: 3;
   }
 
-  /* The ticket card */
+  /* The ticket card — wrap(106px 고정)에서 padding 제외한 96px를 항상 채움 */
   .pb-ticket {
     background: #C8CAD4;
     border-radius: 10px;
-    height: 96px;
+    height: 100%;
+    min-height: 96px;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
     position: relative; overflow: hidden;
@@ -1102,7 +1106,7 @@ const PICKBOARD_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
   <div id="pb-board">
     <div id="pb-inner">
       <div id="pb-title-row">
-        <span class="pb-title">🎯 뽑기판</span>
+        <span class="pb-title">🎯 뽑기판 <span style="font-size:8px;font-weight:400;color:#7AABDF;opacity:0.7">v${app.getVersion()}</span></span>
         <span class="pb-count" id="pb-count">0 / 0 오픈</span>
       </div>
       <div id="pb-grid"></div>
