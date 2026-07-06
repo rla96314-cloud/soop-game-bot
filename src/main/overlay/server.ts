@@ -1121,40 +1121,34 @@ const countEl= document.getElementById('pb-count')
 let currentCells = [], currentRows = 4, currentCols = 5
 let gridGen = 0   // 그리드 재구성 세대 — 재구성 후 이전 공개 타이머 무효화
 
-// 1차: 측정 없이 글자 수·열 수만으로 폰트 크기 결정.
+// 1차: 측정 없이 글자 폭 가중치만으로 폰트 크기 결정.
 // OBS(CEF) 등 레이아웃 측정이 불안정한 환경에서도 항상 동일하게 동작한다.
+// 카드 폭은 100px 고정(buildGrid)이므로 계산이 실제와 항상 일치.
+function textUnits(s) {
+  let u = 0
+  for (const ch of String(s)) u += /[\\u0020-\\u00FF]/.test(ch) ? 0.55 : 1   // 영문·숫자·기호는 한글의 절반 폭
+  return Math.max(1, u)
+}
 function calcNameSize(name, cols, hasDesc) {
-  const cellW = Math.max(60, (560 - 28 - 8 * (cols - 1)) / cols)   // 카드 폭 근사 (보드 내부 560px 기준)
-  const len = Math.max(1, String(name).trim().length)
-  const effLen = len <= 2 ? len : Math.ceil(len / 2)               // 두 줄까지 허용 → 유효 글자 수 절반
-  let size = Math.floor((cellW - 14) / Math.max(1, effLen))
-  size = Math.min(34, Math.max(11, size))
-  if (hasDesc) size = Math.min(size, 22)                           // 설명 줄 공간 확보
-  return size
+  const avail = 86                                   // 카드 100px - 안쪽 여백
+  const units = textUnits(String(name).trim())
+  // 줄 수별 폰트 높이 상한 (카드 96px, 설명 줄 유무 반영)
+  const capsNoDesc = [0, 55, 27, 18]
+  const capsDesc   = [0, 33, 17, 13]
+  const caps = hasDesc ? capsDesc : capsNoDesc
+  // 1~3줄 각각 "폭에 들어가는 최대 크기 vs 높이 상한"을 따져 가장 큰 조합 선택
+  let best = 10
+  for (let lines = 1; lines <= 3; lines++) {
+    const sizeW = Math.floor(avail / Math.max(1, units / lines))
+    const cand  = Math.min(sizeW, caps[lines], 34)
+    if (cand > best) best = cand
+  }
+  return best
 }
 
 function applyTicketFont(name, desc, size) {
   name.style.fontSize = size + 'px'
   if (desc) desc.style.fontSize = Math.max(10, Math.round(size * 0.55)) + 'px'
-}
-
-// 2차(보정): 측정이 가능한 환경에서만 실제 넘침을 검사해 더 줄임
-function fitTicketText(ticket) {
-  const name    = ticket.querySelector('.pb-ticket-name')
-  const desc    = ticket.querySelector('.pb-ticket-desc')
-  const content = ticket.querySelector('.pb-ticket-content')
-  if (!name || !content) return
-  if (!ticket.clientHeight || !name.clientWidth) return   // 측정 불가 → 1차 계산값 유지
-  const maxH = ticket.clientHeight - 18
-  const overflowing = () =>
-    content.scrollHeight > maxH ||
-    name.scrollWidth > name.clientWidth ||
-    (desc && desc.scrollWidth > desc.clientWidth)
-  let size = parseInt(name.style.fontSize, 10) || 22
-  while (size > 10 && overflowing()) {
-    size--
-    applyTicketFont(name, desc, size)
-  }
 }
 
 // 상품 내용 DOM 생성 — 생성 시점에 폰트 크기를 인라인으로 확정
@@ -1179,8 +1173,8 @@ function makeTicketContent(cell, cols) {
 
 function buildGrid(cells, rows, cols) {
   gridGen++
-  // minmax(0,1fr): 1fr의 최소폭은 콘텐츠 크기라서 긴 상품명이 열을 밀어 늘림 → 0으로 고정해 균등 분할
-  grid.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(0, 1fr))'
+  // 카드 폭 100px 완전 고정 — 콘텐츠가 열/보드 폭을 절대 못 늘림 (폰트 계산과 항상 일치)
+  grid.style.gridTemplateColumns = 'repeat(' + cols + ', 100px)'
   grid.innerHTML = ''
   cells.forEach((cell, i) => {
     const ticketWrap = document.createElement('div')
@@ -1206,9 +1200,6 @@ function buildGrid(cells, rows, cols) {
     ticketWrap.appendChild(ticket)
     grid.appendChild(ticketWrap)
   })
-  // DOM 삽입 직후 레이아웃은 동기적으로 읽을 수 있음 — rAF는 백그라운드 탭에서 지연될 수 있어 직접 호출
-  document.querySelectorAll('.pb-ticket.revealed').forEach(fitTicketText)
-
   const revealed = cells.filter(c => c.revealed).length
   countEl.textContent = revealed + ' / ' + cells.length + ' 오픈'
   if (cells.length > 0) wrap.classList.add('show')
@@ -1242,7 +1233,6 @@ function updateGrid(cells, rows, cols) {
         ticket.innerHTML = ''
         ticket.classList.add('revealed')
         ticket.appendChild(makeTicketContent(cell, currentCols))
-        fitTicketText(ticket)
       }, 200)
     }
   })
