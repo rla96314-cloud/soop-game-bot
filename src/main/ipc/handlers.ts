@@ -87,6 +87,11 @@ export function registerIpcHandlers(win: BrowserWindow) {
   soopClient.on('connected',    ()           => send('soop:connected'))
   soopClient.on('disconnected', ()           => send('soop:disconnected'))
   soopClient.on('error',        (err)        => send('soop:error', err))
+  soopClient.on('standby',      (msg)        => send('soop:standby', msg))
+  // 닉네임 입력을 채널 아이디로 해석했으면 설정에 반영해 다음 시작부터 바로 연결
+  soopClient.on('resolved',     (id: string) => {
+    patchSettings({ soop: { channelId: id } } as Parameters<typeof patchSettings>[0])
+  })
   soopClient.on('balloon',      (user, amt)  => {
     send('soop:balloon', { user, amount: amt, ts: Date.now() })
     gameEngine.onBalloon(user, amt)

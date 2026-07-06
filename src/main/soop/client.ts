@@ -14,7 +14,9 @@ import WebSocket from 'ws'
  * 이벤트:
  *   'connected'            - 연결 성공
  *   'disconnected'         - 연결 끊김
- *   'error'   (err)        - 에러/상태 메시지
+ *   'standby' (msg)        - 방송 대기/재접속 중 (오프라인 등)
+ *   'resolved' (id)        - 닉네임 입력을 채널 아이디로 자동 변환함
+ *   'error'   (err)        - 에러 메시지
  *   'balloon' (username, amount) - 별풍선 수신
  *   'chat'    (username, message) - 채팅 메시지
  *   'enter'   (userId, userNick)  - 시청자 입장
@@ -51,6 +53,7 @@ export class SoopClient extends EventEmitter {
   private connected  = false
   private simMode    = true
   private session    = 0   // connect/disconnect 세대 — 늦게 도착한 비동기 응답 무시용
+  private resolvedId: string | null = null   // 닉네임 입력 시 자동 해석된 채널 아이디
 
   // ── Connection ─────────────────────────────────────────────────────────────
 
@@ -67,6 +70,7 @@ export class SoopClient extends EventEmitter {
       return
     }
 
+    this.resolvedId = null
     this.connectReal(channelId, this.session)
   }
 
@@ -117,25 +121,63 @@ export class SoopClient extends EventEmitter {
     }
   }
 
+  // 닉네임/스테이션명 입력 대비: SOOP 검색 API로 채널 아이디 해석
+  private async resolveByNick(keyword: string): Promise<string | null> {
+    try {
+      const res = await fetch(
+        `https://sch.sooplive.co.kr/api.php?m=bjSearch&v=1.0&c=UTF-8&szKeyword=${encodeURIComponent(keyword)}&nPageNo=1&nListCnt=5`,
+        { headers: { 'User-Agent': 'Mozilla/5.0' } },
+      )
+      if (!res.ok) return null
+      const json = await res.json() as { DATA?: Array<Record<string, unknown>> }
+      const list = json.DATA ?? []
+      if (!list.length) return null
+      const kw = keyword.toLowerCase()
+      const exact = list.find(d =>
+        String(d.user_nick ?? '').toLowerCase() === kw ||
+        String(d.user_id   ?? '').toLowerCase() === kw)
+      const id = String((exact ?? list[0]).user_id ?? '')
+      return id || null
+    } catch { return null }
+  }
+
   private async connectReal(channelId: string, session: number) {
+    let bj = this.resolvedId ?? channelId
     let info: ChannelInfo | null = null
     try {
-      info = await this.fetchChannelInfo(channelId)
+      info = await this.fetchChannelInfo(bj)
     } catch (err) {
       if (session !== this.session) return
-      this.emit('error', `방송 정보 조회 실패: ${String(err)} — ${OFFLINE_RETRY_MS / 1000}초 후 재시도`)
+      this.emit('error', `방송 정보 조회 실패: ${String(err)}`)
+      this.emit('standby', `방송 정보 조회 실패 — ${OFFLINE_RETRY_MS / 1000}초 후 재시도`)
       this._scheduleReal(channelId, session, OFFLINE_RETRY_MS)
       return
     }
     if (session !== this.session) return
 
+    // 방송 정보가 없으면 입력값이 닉네임일 수 있음 → 아이디 해석 후 1회 재시도
+    if (!info && !this.resolvedId) {
+      const found = await this.resolveByNick(channelId)
+      if (session !== this.session) return
+      if (found) {
+        this.resolvedId = found
+        if (found.toLowerCase() !== channelId.toLowerCase()) {
+          this.emit('error', `'${channelId}'은(는) 닉네임입니다 — 채널 아이디 '${found}'(으)로 연결합니다`)
+          this.emit('resolved', found)
+        }
+        bj = found
+        try { info = await this.fetchChannelInfo(found) } catch {}
+        if (session !== this.session) return
+      }
+    }
+
     if (!info) {
-      this.emit('error', `'${channelId}' 채널이 방송 중이 아닙니다 — ${OFFLINE_RETRY_MS / 1000}초마다 재확인`)
+      this.emit('standby', `'${bj}' 방송 대기 중 — ${OFFLINE_RETRY_MS / 1000}초마다 재확인`)
       this._scheduleReal(channelId, session, OFFLINE_RETRY_MS)
       return
     }
 
-    const url = `wss://${info.chdomain}:${info.chpt + 1}/Websocket/${channelId}`
+    const url = `wss://${info.chdomain}:${info.chpt + 1}/Websocket/${bj}`
     const ws  = new WebSocket(url, ['chat'], { handshakeTimeout: 10000 })
     this.ws   = ws
 
@@ -156,7 +198,7 @@ export class SoopClient extends EventEmitter {
         this.connected = false
         this.emit('disconnected')
       }
-      this.emit('error', `연결이 끊겼습니다 — ${RECONNECT_MS / 1000}초 후 재접속`)
+      this.emit('standby', `연결이 끊겼습니다 — ${RECONNECT_MS / 1000}초 후 재접속`)
       this._scheduleReal(channelId, session, RECONNECT_MS)
     })
 

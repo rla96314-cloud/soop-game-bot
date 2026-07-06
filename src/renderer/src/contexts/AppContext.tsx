@@ -40,6 +40,7 @@ export interface FanAlertItem {
 export interface AppCtx {
   connected:  boolean
   simulation: boolean
+  standby:    string | null   // 방송 대기/재접속 상태 메시지 (실연동 모드에서 오프라인일 때)
   chat:       ChatItem[]
   history:    HistoryItem[]
   stats:      Stats
@@ -56,6 +57,7 @@ export interface AppCtx {
 const defaultCtx: AppCtx = {
   connected:  false,
   simulation: true,
+  standby:    null,
   chat:       [],
   history:    [],
   stats:      { todayRuns: 0, todayBalloons: 0, todayViewers: 0 },
@@ -92,6 +94,7 @@ const MAX_HISTORY = 50
 export function AppProvider({ children }: { children: ReactNode }) {
   const [connected,  setConnected]  = useState(false)
   const [simulation, setSimulation] = useState(true)
+  const [standby,    setStandby]    = useState<string | null>(null)
   const [chat,       setChat]       = useState<ChatItem[]>([])
   const [history,    setHistory]    = useState<HistoryItem[]>([])
   const [stats,      setStats]      = useState<Stats>({ todayRuns: 0, todayBalloons: 0, todayViewers: 0 })
@@ -143,6 +146,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     off.push((el.onSoopConnected as (cb: () => void) => () => void)(() => {
       setConnected(true)
+      setStandby(null)
       ;(el.soopStatus as () => Promise<{ connected: boolean; simulation: boolean }>)()
         .then(s => setSimulation(s.simulation))
         .catch(() => {})
@@ -151,6 +155,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     off.push((el.onSoopDisconnected as (cb: () => void) => () => void)(() => {
       setConnected(false)
     }))
+
+    off.push((el.onSoopStandby as (cb: (msg: string) => void) => () => void)(
+      msg => { setConnected(false); setStandby(msg) }
+    ))
 
     off.push((el.onSoopBalloon as (cb: (e: { user: string; amount: number; ts: number }) => void) => () => void)(
       ({ user, amount, ts }) => {
@@ -224,7 +232,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <Ctx.Provider value={{
-      connected, simulation,
+      connected, simulation, standby,
       chat, history, stats, gameStates, settings, fanAlerts,
       triggerGame, refreshSettings, patchSettings,
     }}>

@@ -16,7 +16,7 @@ const GAMES = [
 ]
 
 export default function StatsHeader() {
-  const { connected, simulation, stats, triggerGame, gameStates } = useApp()
+  const { connected, simulation, standby, stats, triggerGame, gameStates } = useApp()
   const [menuOpen, setMenuOpen] = useState(false)
   const btnRef  = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -60,9 +60,9 @@ export default function StatsHeader() {
         </div>
         <div>
           <div className={styles.connLabel}>SOOP 연동 상태</div>
-          <div className={styles.connStatus}>
-            <span className={styles.dot} style={{ background: connected ? '#10B981' : '#EF4444' }} />
-            {connected ? (simulation ? '시뮬레이션 중' : '연결됨') : '연결 끊김'}
+          <div className={styles.connStatus} title={!connected && standby ? standby : undefined}>
+            <span className={styles.dot} style={{ background: connected ? '#10B981' : (standby ? '#F59E0B' : '#EF4444') }} />
+            {connected ? (simulation ? '시뮬레이션 중' : '연결됨') : (standby ? '방송 대기 중' : '연결 끊김')}
           </div>
         </div>
       </div>
