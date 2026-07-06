@@ -207,7 +207,8 @@ const QUIZ_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
         if (msg.type === 'ping') ws.send(JSON.stringify({type:'pong'}))
       } catch {}
     }
-    ws.onclose = () => setTimeout(connect, 2000)
+    ws.onopen  = () => { if (window.__wsDown) location.reload() }  // 서버 재시작(앱 업데이트) → 새 코드 로드
+  ws.onclose = () => { window.__wsDown = true; setTimeout(connect, 2000) }
   }
   connect()
 <\/script>
@@ -636,7 +637,8 @@ function connect() {
       if (msg.type === 'ping') ws.send(JSON.stringify({type:'pong'}))
     } catch {}
   }
-  ws.onclose = () => setTimeout(connect, 2000)
+  ws.onopen  = () => { if (window.__wsDown) location.reload() }  // 서버 재시작(앱 업데이트) → 새 코드 로드
+  ws.onclose = () => { window.__wsDown = true; setTimeout(connect, 2000) }
 }
 connect()
 <\/script>
@@ -948,7 +950,8 @@ function connect() {
       if (msg.type === 'ping') ws.send(JSON.stringify({type:'pong'}))
     } catch {}
   }
-  ws.onclose = () => setTimeout(connect, 2000)
+  ws.onopen  = () => { if (window.__wsDown) location.reload() }  // 서버 재시작(앱 업데이트) → 새 코드 로드
+  ws.onclose = () => { window.__wsDown = true; setTimeout(connect, 2000) }
 }
 connect()
 <\/script>
@@ -1239,7 +1242,8 @@ function connect() {
       if (msg.type === 'ping') ws.send(JSON.stringify({type:'pong'}))
     } catch {}
   }
-  ws.onclose = () => setTimeout(connect, 2000)
+  ws.onopen  = () => { if (window.__wsDown) location.reload() }  // 서버 재시작(앱 업데이트) → 새 코드 로드
+  ws.onclose = () => { window.__wsDown = true; setTimeout(connect, 2000) }
 }
 connect()
 <\/script>
@@ -1405,7 +1409,8 @@ function connect(){
       if(msg.type==='ping')ws.send(JSON.stringify({type:'pong'}))
     }catch{}
   }
-  ws.onclose=()=>setTimeout(connect,2000)
+  ws.onopen=()=>{ if(window.__wsDown) location.reload() }
+  ws.onclose=()=>{ window.__wsDown=true; setTimeout(connect,2000) }
 }
 connect()
 <\/script>
@@ -2208,7 +2213,8 @@ function connect(){
       if(msg.type==='ping')ws.send(JSON.stringify({type:'pong'}))
     }catch{}
   }
-  ws.onclose=()=>setTimeout(connect,2000)
+  ws.onopen=()=>{ if(window.__wsDown) location.reload() }
+  ws.onclose=()=>{ window.__wsDown=true; setTimeout(connect,2000) }
 }
 connect()
 <\/script>
@@ -2437,7 +2443,8 @@ function connect(){
       if(msg.type==='ping')ws.send(JSON.stringify({type:'pong'}))
     }catch{}
   }
-  ws.onclose=()=>setTimeout(connect,2000)
+  ws.onopen=()=>{ if(window.__wsDown) location.reload() }
+  ws.onclose=()=>{ window.__wsDown=true; setTimeout(connect,2000) }
 }
 connect()
 <\/script>
@@ -2717,7 +2724,8 @@ function connect() {
       if (msg.type === 'ping') ws.send(JSON.stringify({type:'pong'}))
     } catch {}
   }
-  ws.onclose = () => setTimeout(connect, 2000)
+  ws.onopen  = () => { if (window.__wsDown) location.reload() }  // 서버 재시작(앱 업데이트) → 새 코드 로드
+  ws.onclose = () => { window.__wsDown = true; setTimeout(connect, 2000) }
 }
 connect()
 <\/script>
@@ -3057,7 +3065,8 @@ function connect(){
       if(msg.type==='ping') ws.send(JSON.stringify({type:'pong'}))
     }catch{}
   }
-  ws.onclose=()=>setTimeout(connect,2000)
+  ws.onopen=()=>{ if(window.__wsDown) location.reload() }
+  ws.onclose=()=>{ window.__wsDown=true; setTimeout(connect,2000) }
 }
 connect()
 <\/script>
@@ -3189,7 +3198,8 @@ const OVERLAY_HTML = (gameId: string, theme: string, port: number) => `<!DOCTYPE
         if (msg.type === 'ping') ws.send(JSON.stringify({type:'pong'}))
       } catch {}
     }
-    ws.onclose = () => setTimeout(connect, 2000)
+    ws.onopen  = () => { if (window.__wsDown) location.reload() }  // 서버 재시작(앱 업데이트) → 새 코드 로드
+  ws.onclose = () => { window.__wsDown = true; setTimeout(connect, 2000) }
   }
   connect()
 <\/script>
@@ -3291,14 +3301,14 @@ export class OverlayServer {
 
       // ── Boss settings page ────────────────────────────────────────────────
       if (url === '/boss-settings') {
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
         res.end(BOSS_SETTINGS_HTML(port))
         return
       }
 
       // ── Overlay pages ─────────────────────────────────────────────────────
       const gameId = url.replace('/overlay/', '').split('?')[0] || 'roulette'
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
       let html: string
       if      (gameId === 'quiz')      html = QUIZ_OVERLAY_HTML(port)
       else if (gameId === 'ladder')    html = LADDER_OVERLAY_HTML(port)
