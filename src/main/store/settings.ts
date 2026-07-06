@@ -50,6 +50,8 @@ export interface Settings {
   }
   games:   Record<string, GameConfig>
   overlay: { port: number; theme: string }
+  ui:      { scale: number }   // 전체 UI 배율(%) — 90~130
+
   weflab: {
     enabled:        boolean
     url:            string
@@ -138,6 +140,7 @@ const DEFAULTS: Settings = {
     },
   },
   overlay: { port: 3939, theme: 'purple' },
+  ui:      { scale: 110 },
   weflab:  { enabled: false, url: '', triggers: [], balloonTrigger: false },
 }
 
@@ -155,6 +158,7 @@ export function loadSettings(): Settings {
       ...raw,
       soop:    { ...DEFAULTS.soop,    ...(raw.soop    ?? {}) },
       overlay: { ...DEFAULTS.overlay, ...(raw.overlay ?? {}) },
+      ui:      { ...DEFAULTS.ui,      ...(raw.ui      ?? {}) },
       weflab:  { ...DEFAULTS.weflab,  ...(raw.weflab  ?? {}) },
       games: Object.fromEntries(
         Object.keys(DEFAULTS.games).map(k => [
@@ -178,6 +182,7 @@ export function patchSettings(patch: Partial<Settings>): Settings {
     ...patch,
     soop:    { ...current.soop,    ...(patch.soop    ?? {}) },
     overlay: { ...current.overlay, ...(patch.overlay ?? {}) },
+    ui:      { ...current.ui,      ...(patch.ui      ?? {}) },
     weflab:  { ...current.weflab,  ...(patch.weflab  ?? {}) },
     games:   {
       ...current.games,

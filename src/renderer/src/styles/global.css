@@ -20,13 +20,13 @@
   --border:  #E9E4FD;
   --border2: #D6CFFA;
 
-  /* Text */
-  --text:   #1E1B4B;
-  --text2:  #4C4880;
-  --text-2: #4C4880;
-  --text3:  #7B78A8;
-  --text-3: #7B78A8;
-  --muted:  #A09DC4;
+  /* Text — 가시성: 보조 텍스트 대비 상향 */
+  --text:   #1A1740;
+  --text2:  #423E78;
+  --text-2: #423E78;
+  --text3:  #67649A;
+  --text-3: #67649A;
+  --muted:  #8E8BB8;
 
   /* Semantic */
   --gold:  #F59E0B;

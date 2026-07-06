@@ -25,6 +25,12 @@ function createWindow(): BrowserWindow {
 
   win.on('ready-to-show', () => win.show())
 
+  // UI 배율 적용 (페이지 로드마다 재적용 — 새로고침/HMR 대비)
+  win.webContents.on('did-finish-load', () => {
+    const scale = loadSettings().ui?.scale ?? 100
+    win.webContents.setZoomFactor(scale / 100)
+  })
+
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
     return { action: 'deny' }

@@ -237,15 +237,20 @@ export class GameEngine extends EventEmitter {
 
     if (!this.settings.soop.balloonAutoTrigger) return
 
+    // 조건을 만족하는 게임 중 임계값이 가장 높은(가장 구체적인) 게임 하나만 발동.
+    // 순서대로 첫 게임을 고르면 목록 맨 앞의 룰렛이 모든 후원을 독식함.
+    // 진행 중(idle 아님)인 게임은 건너뛰어 다음 후보가 발동되게 한다.
+    let best: { id: GameId; threshold: number } | null = null
     for (const [id, cfg] of Object.entries(this.settings.games)) {
       if (id === 'boss') continue
       if (!cfg.enabled) continue
+      if (this.getState(id as GameId).status !== 'idle') continue
       const threshold = cfg.balloonThreshold || this.settings.soop.globalThreshold
-      if (amount >= threshold) {
-        this.trigger(id as GameId, username, amount)
-        break
+      if (amount >= threshold && (!best || threshold > best.threshold)) {
+        best = { id: id as GameId, threshold }
       }
     }
+    if (best) this.trigger(best.id, username, amount)
   }
 
   onChat(username: string, message: string) {

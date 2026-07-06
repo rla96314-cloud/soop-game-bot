@@ -167,6 +167,10 @@ export function registerIpcHandlers(win: BrowserWindow) {
   ipcMain.handle('settings:set', (_, patch) => {
     const next = patchSettings(patch)
     gameEngine.updateSettings(next)
+    // UI 배율 즉시 반영
+    if (!win.isDestroyed()) {
+      win.webContents.setZoomFactor((next.ui?.scale ?? 100) / 100)
+    }
     return next
   })
 

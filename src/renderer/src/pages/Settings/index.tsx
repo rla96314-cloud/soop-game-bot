@@ -20,6 +20,9 @@ export default function Settings() {
   // Overlay
   const [overlayPort, setOverlayPort] = useState(3939)
 
+  // UI
+  const [uiScale, setUiScale] = useState(110)
+
   // Weflab
   const [weflabEnabled,  setWeflabEnabled]  = useState(false)
   const [weflabUrl,      setWeflabUrl]      = useState('')
@@ -42,6 +45,7 @@ export default function Settings() {
     setBalloonAutoTrigger((s.soop?.balloonAutoTrigger  as boolean) !== false)
     setGlobalThreshold(   (s.soop?.globalThreshold     as number)  ?? 50)
     setOverlayPort(       (s.overlay?.port             as number)  ?? 3939)
+    setUiScale(           (s.ui?.scale                 as number)  ?? 110)
     setWeflabEnabled(     !!(s.weflab?.enabled         as boolean))
     setWeflabUrl(         (s.weflab?.url               as string)  ?? '')
     setTriggers(          (s.weflab?.triggers          as WeflabTrigger[]) ?? [])
@@ -209,6 +213,35 @@ export default function Settings() {
           <p className={styles.hint}>
             이 수량 미만의 별풍선은 게임 트리거로 인식하지 않습니다.
           </p>
+        </div>
+      </section>
+
+      {/* 화면 */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>화면</h2>
+        <div className={styles.field}>
+          <label>UI 배율 (텍스트·인터페이스 크기)</label>
+          <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+            {[90, 100, 110, 120, 130].map(pct => (
+              <button
+                key={pct}
+                onClick={() => {
+                  setUiScale(pct)
+                  patchSettings({ ui: { scale: pct } } as Parameters<typeof patchSettings>[0])
+                }}
+                style={{
+                  padding: '7px 14px',
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  border: `1.5px solid ${uiScale === pct ? 'var(--p500)' : 'var(--border2)'}`,
+                  background: uiScale === pct ? 'var(--p500)' : 'var(--surface)',
+                  color: uiScale === pct ? '#fff' : 'var(--text2)',
+                }}
+              >{pct}%</button>
+            ))}
+          </div>
+          <p className={styles.hint}>선택 즉시 적용됩니다. 글자가 작게 느껴지면 110~120%를 권장합니다.</p>
         </div>
       </section>
 
