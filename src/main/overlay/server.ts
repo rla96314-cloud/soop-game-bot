@@ -1013,6 +1013,7 @@ const PICKBOARD_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
   .pb-ticket-wrap {
     position: relative;
     padding-top: 10px;
+    min-width: 0;   /* 그리드 아이템이 콘텐츠 폭으로 늘어나는 것 방지 */
   }
   /* Notch circle - same color as inner bg */
   .pb-ticket-wrap::before {
@@ -1074,11 +1075,11 @@ const PICKBOARD_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
   }
   .pb-ticket-name {
     font-size: 22px; font-weight: 900; line-height: 1.2;
-    word-break: keep-all; width: 100%;
+    word-break: keep-all; overflow-wrap: anywhere; width: 100%;
   }
   .pb-ticket-desc {
     font-size: 13px; color: rgba(0,0,0,0.5); line-height: 1.2;
-    word-break: keep-all; width: 100%;
+    word-break: keep-all; overflow-wrap: anywhere; width: 100%;
   }
 
   /* Highlight animation for just-revealed */
@@ -1116,23 +1117,33 @@ let currentCells = [], currentRows = 4, currentCols = 5
 let gridGen = 0   // 그리드 재구성 세대 — 재구성 후 이전 공개 타이머 무효화
 
 function fitTicketText(ticket) {
-  const name = ticket.querySelector('.pb-ticket-name')
-  const desc = ticket.querySelector('.pb-ticket-desc')
-  if (!name) return
-  const maxH = ticket.clientHeight - 16
+  const name    = ticket.querySelector('.pb-ticket-name')
+  const desc    = ticket.querySelector('.pb-ticket-desc')
+  const content = ticket.querySelector('.pb-ticket-content')
+  if (!name || !content) return
+  // 카드 안쪽 여백을 남기고 폭·높이 둘 다 넘치지 않을 때까지 축소
+  const maxH = ticket.clientHeight - 18
   let size = 26
-  name.style.fontSize = size + 'px'
-  if (desc) desc.style.fontSize = Math.max(11, Math.round(size * 0.58)) + 'px'
-  while (size > 11 && ticket.querySelector('.pb-ticket-content').scrollHeight > maxH) {
+  const apply = (s) => {
+    name.style.fontSize = s + 'px'
+    if (desc) desc.style.fontSize = Math.max(10, Math.round(s * 0.55)) + 'px'
+  }
+  // 요소 자신의 박스보다 텍스트가 넘치는지 검사 (keep-all로 줄바꿈 안 되는 긴 단어 대응)
+  const overflowing = () =>
+    content.scrollHeight > maxH ||
+    name.scrollWidth > name.clientWidth ||
+    (desc && desc.scrollWidth > desc.clientWidth)
+  apply(size)
+  while (size > 10 && overflowing()) {
     size--
-    name.style.fontSize = size + 'px'
-    if (desc) desc.style.fontSize = Math.max(11, Math.round(size * 0.58)) + 'px'
+    apply(size)
   }
 }
 
 function buildGrid(cells, rows, cols) {
   gridGen++
-  grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)'
+  // minmax(0,1fr): 1fr의 최소폭은 콘텐츠 크기라서 긴 상품명이 열을 밀어 늘림 → 0으로 고정해 균등 분할
+  grid.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(0, 1fr))'
   grid.innerHTML = ''
   cells.forEach((cell, i) => {
     const ticketWrap = document.createElement('div')
@@ -1171,9 +1182,8 @@ function buildGrid(cells, rows, cols) {
     ticketWrap.appendChild(ticket)
     grid.appendChild(ticketWrap)
   })
-  requestAnimationFrame(() => {
-    document.querySelectorAll('.pb-ticket.revealed').forEach(fitTicketText)
-  })
+  // DOM 삽입 직후 레이아웃은 동기적으로 읽을 수 있음 — rAF는 백그라운드 탭에서 지연될 수 있어 직접 호출
+  document.querySelectorAll('.pb-ticket.revealed').forEach(fitTicketText)
 
   const revealed = cells.filter(c => c.revealed).length
   countEl.textContent = revealed + ' / ' + cells.length + ' 오픈'
@@ -1221,7 +1231,7 @@ function updateGrid(cells, rows, cols) {
           content.appendChild(desc)
         }
         ticket.appendChild(content)
-        requestAnimationFrame(() => fitTicketText(ticket))
+        fitTicketText(ticket)
       }, 200)
     }
   })
