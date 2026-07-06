@@ -1053,9 +1053,10 @@ const PICKBOARD_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
     text-shadow: 0 2px 0 rgba(255,255,255,0.55);
   }
 
-  /* Revealed ticket */
+  /* Revealed ticket — 연한 배경에 묻히지 않게 테두리로 카드 윤곽 유지 */
   .pb-ticket.revealed {
     background: #fff;
+    border: 2px solid #B9CCEE;
     box-shadow: 0 4px 16px rgba(0,0,0,0.12);
   }
   .pb-ticket.revealed .pb-ticket-star { display: none; }
@@ -1122,8 +1123,9 @@ function fitTicketText(ticket) {
   const content = ticket.querySelector('.pb-ticket-content')
   if (!name || !content) return
   // 카드 안쪽 여백을 남기고 폭·높이 둘 다 넘치지 않을 때까지 축소
+  // 시작 크기 34px: 미공개 칸 번호(44px)와 시각적 균형 — 짧은 이름은 크게, 긴 이름은 자동 축소
   const maxH = ticket.clientHeight - 18
-  let size = 26
+  let size = 34
   const apply = (s) => {
     name.style.fontSize = s + 'px'
     if (desc) desc.style.fontSize = Math.max(10, Math.round(s * 0.55)) + 'px'
