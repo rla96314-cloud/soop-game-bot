@@ -221,7 +221,7 @@ const LADDER_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@700&family=Noto+Sans+KR:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { background: transparent !important; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
@@ -230,119 +230,136 @@ const LADDER_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
     position: fixed; top: 50%; left: 50%;
     transform: translate(-50%,-50%) scale(0.88); opacity: 0;
     width: 900px;
-    background: #FEFCF0;
-    border: 7px solid #2B5CE6;
-    border-radius: 26px;
-    padding: 7px;
-    box-shadow: 0 20px 60px rgba(43,92,230,0.28), 0 0 0 2px rgba(43,92,230,0.12);
     transition: transform 0.55s cubic-bezier(0.34,1.56,0.64,1), opacity 0.35s;
   }
   #card.show { transform: translate(-50%,-50%) scale(1); opacity: 1; }
 
-  .inner {
-    border: 3px dashed #6A9EF5;
-    border-radius: 20px;
-    padding: 20px 26px 18px;
-    background: #FEFCF0;
-    min-height: 540px;
-    display: flex; flex-direction: column;
+  /* 공책 종이 배경 */
+  .paper {
+    position: relative;
+    background: #fefce8;
+    border: 2px solid #bbb;
+    border-radius: 3px;
+    box-shadow: 3px 3px 0 #bbb, 6px 6px 0 #ccc, 0 18px 52px rgba(0,0,0,0.26);
+    padding: 14px 24px 20px 60px;
+    overflow: hidden;
+    min-height: 400px;
   }
 
-  /* Title */
-  .title-area { text-align: center; margin-bottom: 6px; }
-  .game-title { font-size: 46px; font-weight: 900; letter-spacing: -0.01em; line-height: 1.1; }
-  .tc1{color:#F95959}.tc2{color:#F5C000}.tc3{color:#5BC95B}
-  .tc4{color:#3B8FF5}.tc5{color:#B760F0}.tc6{color:#F5A623}.tc7{color:#5BC95B}
-
-  .subtitle {
-    display: inline-block; background: #5B87EE; color: #fff;
-    border-radius: 20px; padding: 5px 22px;
-    font-size: 14px; font-weight: 700; margin-bottom: 14px;
+  /* 수평 줄 */
+  .paper::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+      to bottom, transparent 0, transparent 27px, #b8d4f5 27px, #b8d4f5 28px
+    );
+    background-position: 0 58px;
+    pointer-events: none; z-index: 0;
   }
 
-  /* Collecting */
-  .header-row { display: flex; align-items: flex-end; gap: 12px; margin-bottom: 6px; }
-
-  .flag-post { display: flex; flex-direction: column; align-items: flex-start; flex-shrink: 0; }
-  .flag-fabric {
-    background: #5B87EE; color: #fff; font-size: 12px; font-weight: 900;
-    padding: 4px 10px; border-radius: 5px; margin-bottom: 0;
-    position: relative; white-space: nowrap;
+  /* 빨간 세로 마진선 */
+  .paper::after {
+    content: '';
+    position: absolute; left: 50px; top: 0; bottom: 0; width: 2px;
+    background: linear-gradient(to bottom, transparent 0, #f9aaaa 36px, #f9aaaa 100%);
+    pointer-events: none; z-index: 0;
   }
-  .flag-fabric::after {
-    content: ''; position: absolute; right: -8px; top: 50%;
-    transform: translateY(-50%);
-    border: 6px solid transparent; border-left-color: #5B87EE;
-  }
-  .flag-stick { width: 3px; height: 38px; background: #555; border-radius: 2px; margin-top: 1px; }
 
-  .chips-wrap { flex: 1; display: flex; flex-wrap: wrap; gap: 7px; align-items: center; min-height: 42px; }
+  .inner { position: relative; z-index: 1; }
+
+  /* 제목 */
+  .title {
+    font-family: 'Gaegu', cursive;
+    font-size: 56px; font-weight: 700; color: #1a1a1a;
+    text-align: center; line-height: 1.0; margin-bottom: 0;
+  }
+  .title-wave { text-align: center; margin-bottom: 10px; }
+  .title-wave svg { display: inline-block; }
+
+  /* 모집 단계 */
+  .speech-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .speech-bubble {
+    position: relative;
+    background: #fff; border: 2px solid #333; border-radius: 10px;
+    padding: 7px 16px; font-size: 14px; font-weight: 800; color: #222;
+    box-shadow: 1px 2px 0 rgba(0,0,0,0.10);
+  }
+  .speech-bubble::before {
+    content: '';
+    position: absolute; left: -11px; top: 9px;
+    border: 6px solid transparent; border-right-color: #333;
+  }
+  .speech-bubble::after {
+    content: '';
+    position: absolute; left: -8px; top: 10px;
+    border: 5px solid transparent; border-right-color: #fff;
+  }
+  .count-badge {
+    background: #fff; border: 2px solid #444; border-radius: 6px;
+    padding: 4px 10px; font-size: 13px; font-weight: 900; color: #222;
+    box-shadow: 1px 2px 0 rgba(0,0,0,0.08); white-space: nowrap;
+  }
+  .chips-wrap { display: flex; flex-wrap: wrap; gap: 7px; min-height: 36px; margin: 4px 0 6px; }
   .chip {
-    padding: 5px 14px; border-radius: 20px; border: 2.5px solid;
-    font-size: 13px; font-weight: 800; background: #fff; white-space: nowrap;
+    background: #fff; border: 2px solid #333; border-radius: 5px;
+    padding: 3px 12px; font-size: 13px; font-weight: 800; color: #111;
+    box-shadow: 1px 1px 0 rgba(0,0,0,0.08);
   }
-  .count-lbl { font-size: 12px; color: #6B7280; font-weight: 700; flex-shrink: 0; }
+  .timer-wrap { height: 5px; background: #e0e0e0; border-radius: 3px; overflow: hidden; margin: 6px 0 8px; }
+  .timer-fill { height: 100%; background: #e05555; border-radius: 3px; transition: width 0.9s linear; }
+  .wait-hint {
+    font-family: 'Gaegu', cursive; font-size: 22px; color: #aaa;
+    padding: 10px 0; text-align: center;
+  }
 
-  .timer-wrap { height: 5px; background: #E5E7EB; border-radius: 3px; overflow: hidden; margin: 7px 0 10px; }
-  .timer-fill { height: 100%; background: #5B87EE; border-radius: 3px; transition: width 0.9s linear; }
-
-  .wait-hint { text-align: center; font-size: 13px; color: #9CA3AF; font-weight: 700; padding: 16px 0; flex: 1; display: flex; align-items: center; justify-content: center; }
-
-  /* Result */
-  #phase-result { display: none; flex: 1; flex-direction: column; }
+  /* 결과 단계 */
+  #phase-result { display: none; flex-direction: column; }
   #phase-result.on { display: flex; }
   #lsvg { width: 100%; display: block; }
-
-  .res-list { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+  .res-list { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; }
   .res-row {
     display: flex; align-items: center; gap: 10px;
-    padding: 7px 14px; border-radius: 10px;
-    background: #fff; border: 2.5px solid;
-    font-size: 13px;
+    padding: 5px 10px; font-size: 13px; font-weight: 800; color: #111;
+    border-bottom: 1px solid #ddd;
   }
-  .res-user  { font-weight: 800; }
-  .res-arrow { color: #9CA3AF; }
-  .res-prize { font-weight: 800; color: #374151; margin-left: auto; }
+  .res-row:last-child { border-bottom: none; }
+  .res-arrow { font-family: 'Gaegu', cursive; font-size: 18px; color: #c00; }
+  .res-prize { margin-left: auto; }
 </style>
 </head>
 <body>
 <div id="card">
-  <div class="inner">
-    <div class="title-area">
-      <div class="game-title">
-        <span class="tc1">사</span><span class="tc2">다</span><span class="tc3">리</span>&thinsp;
-        <span class="tc4">타</span><span class="tc5">기</span>&thinsp;
-        <span class="tc6">게</span><span class="tc7">임</span>
+  <div class="paper">
+    <div class="inner">
+      <div class="title">사다리게임!</div>
+      <div class="title-wave">
+        <svg width="270" height="14" viewBox="0 0 270 14">
+          <path d="M0,7 Q27,2 54,7 Q81,12 108,7 Q135,2 162,7 Q189,12 216,7 Q243,2 270,7"
+            fill="none" stroke="#666" stroke-width="2" opacity="0.6"/>
+        </svg>
       </div>
-    </div>
-    <div style="text-align:center;margin-bottom:14px">
-      <span class="subtitle">출발! 선을 따라 내려가서 결과를 확인해 보세요!</span>
-    </div>
 
-    <!-- Collecting -->
-    <div id="phase-collecting">
-      <div class="header-row">
-        <div class="flag-post">
-          <div class="flag-fabric">출발!</div>
-          <div class="flag-stick"></div>
+      <!-- 모집 단계 -->
+      <div id="phase-collecting">
+        <div class="speech-row">
+          <div class="speech-bubble">채팅에서 <strong>!참가</strong>를 입력해 주세요</div>
+          <div class="count-badge" id="count-lbl">0/0명</div>
         </div>
         <div class="chips-wrap" id="chips"></div>
-        <span class="count-lbl" id="count-lbl"></span>
+        <div class="timer-wrap"><div class="timer-fill" id="tfill" style="width:100%"></div></div>
+        <div class="wait-hint" id="wait-hint">참가자를 기다리는 중...</div>
       </div>
-      <div class="timer-wrap"><div class="timer-fill" id="tfill" style="width:100%"></div></div>
-      <div class="wait-hint" id="wait-hint">참가자 모집 중... 채팅에서 명령어를 입력하세요!</div>
-    </div>
 
-    <!-- Result -->
-    <div id="phase-result">
-      <svg id="lsvg" viewBox="0 0 800 300"></svg>
-      <div class="res-list" id="res-list"></div>
+      <!-- 결과 단계 -->
+      <div id="phase-result">
+        <svg id="lsvg" viewBox="0 0 800 300"></svg>
+        <div class="res-list" id="res-list"></div>
+      </div>
     </div>
   </div>
 </div>
 <script>
-const COLORS = ['#F95959','#F5C000','#5BC95B','#3B8FF5','#B760F0','#F5A623','#14B8A6','#EC4899']
-const BGTINT = ['#FFF0F0','#FFFDE0','#F0FFF0','#EFF7FF','#F9F0FF','#FFF7ED','#EDFCFC','#FFF0F7']
+const PEN = ['#cc2200','#1155cc','#116611','#775500','#551177','#116688','#884411','#446611']
 
 const card    = document.getElementById('card')
 const chips   = document.getElementById('chips')
@@ -354,7 +371,12 @@ const phRes   = document.getElementById('phase-result')
 const svgEl   = document.getElementById('lsvg')
 const resList = document.getElementById('res-list')
 let hideTimer = null
-let _revealLd = null   // 수동 모드 현재 ladderData 저장
+let _revealLd = null
+
+function _mkSvgEl(tag, attrs) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag)
+  Object.entries(attrs).forEach(([k,v]) => el.setAttribute(k,v)); return el
+}
 
 function _orthoPts(cols, upTo, rows, COL_W, PAD_X, PAD_T, ROW_H) {
   const xp = c => PAD_X + c * COL_W
@@ -368,6 +390,46 @@ function _orthoPts(cols, upTo, rows, COL_W, PAD_X, PAD_T, ROW_H) {
   return pts.join(' ')
 }
 
+function _buildGrid(ld) {
+  const cols = ld.cols, rows = ld.rows
+  const COL_W = Math.min(120, Math.floor(760 / Math.max(cols - 1, 1)))
+  const PAD_X = 50, PAD_T = 52, PAD_B = 48
+  const ROW_H = Math.max(16, Math.min(30, Math.floor((480 - PAD_T - PAD_B) / Math.max(1, rows))))
+  const W = PAD_X * 2 + (cols - 1) * COL_W
+  const H = PAD_T + rows * ROW_H + PAD_B
+  svgEl.setAttribute('viewBox', '0 0 ' + W + ' ' + H)
+  svgEl.style.height = H + 'px'
+  svgEl.innerHTML = ''
+  const xp = c => PAD_X + c * COL_W
+
+  // 손그림 흔들림 필터
+  const defs = _mkSvgEl('defs', {})
+  const filt = _mkSvgEl('filter', {id:'rough',x:'-4%',y:'-4%',width:'108%',height:'108%'})
+  const turb = _mkSvgEl('feTurbulence', {type:'fractalNoise',baseFrequency:'0.04 0.02',numOctaves:'2',result:'n',seed:'7'})
+  const disp = _mkSvgEl('feDisplacementMap', {in:'SourceGraphic',in2:'n',scale:'1.6',xChannelSelector:'R',yChannelSelector:'G'})
+  filt.appendChild(turb); filt.appendChild(disp); defs.appendChild(filt)
+  svgEl.appendChild(defs)
+
+  // 수직선 (사다리 기둥)
+  for (let c = 0; c < cols; c++) {
+    svgEl.appendChild(_mkSvgEl('line', {
+      x1: xp(c), y1: PAD_T, x2: xp(c), y2: PAD_T + rows * ROW_H,
+      stroke: '#222', 'stroke-width': 2.5, 'stroke-linecap': 'round', filter:'url(#rough)'
+    }))
+  }
+
+  // 수평선 (가로 발판)
+  ld.rungs.forEach(rg => {
+    svgEl.appendChild(_mkSvgEl('line', {
+      x1: xp(rg.leftCol), y1: PAD_T + rg.row * ROW_H,
+      x2: xp(rg.leftCol+1), y2: PAD_T + rg.row * ROW_H,
+      stroke: '#222', 'stroke-width': 2, 'stroke-linecap': 'round', filter:'url(#rough)'
+    }))
+  })
+
+  return { cols, rows, COL_W, PAD_X, PAD_T, PAD_B, ROW_H, W, H, xp }
+}
+
 function revealSinglePath(ld, idx) {
   if (!ld) return
   const cols = ld.cols, rows = ld.rows
@@ -375,19 +437,15 @@ function revealSinglePath(ld, idx) {
   const PAD_X = 50, PAD_T = 52
   const ROW_H = Math.max(16, Math.min(30, Math.floor(380 / Math.max(1, rows))))
   const xp = c => PAD_X + c * COL_W
-  const mkEl = (tag, attrs) => {
-    const el = document.createElementNS('http://www.w3.org/2000/svg', tag)
-    Object.entries(attrs).forEach(([k,v]) => el.setAttribute(k,v)); return el
-  }
   const path = ld.paths[idx]; if (!path) return
-  const color = COLORS[idx % COLORS.length]
+  const penColor = PEN[idx % PEN.length]
 
-  const pl = mkEl('polyline', { fill:'none', stroke: color,
+  const pl = _mkSvgEl('polyline', { fill:'none', stroke: penColor,
     'stroke-width': 3.5, 'stroke-opacity': 0.9,
     'stroke-linecap': 'round', 'stroke-linejoin': 'round',
     points: xp(path.cols[0]) + ',' + PAD_T })
   svgEl.appendChild(pl)
-  const dot = mkEl('circle', { r: 6, fill: color, cx: xp(path.cols[0]), cy: PAD_T, stroke:'#fff', 'stroke-width': 2 })
+  const dot = _mkSvgEl('circle', { r: 6, fill: penColor, cx: xp(path.cols[0]), cy: PAD_T, stroke:'#fff', 'stroke-width': 2 })
   svgEl.appendChild(dot)
 
   let step = 0
@@ -401,12 +459,10 @@ function revealSinglePath(ld, idx) {
       clearInterval(tick)
       const res = ld.results[idx]
       if (res) {
-        const col = COLORS[res.startCol % COLORS.length], bg = BGTINT[res.startCol % BGTINT.length]
         const row = document.createElement('div')
         row.className = 'res-row'
-        row.style.borderColor = col; row.style.background = bg
-        row.innerHTML = '<span class="res-user" style="color:' + col + '">' + res.user + '</span>' +
-          '<span class="res-arrow">→</span><span class="res-prize">' + res.prize + '</span>'
+        row.innerHTML = '<span class="res-user" style="color:' + penColor + '">' + res.user + '</span>' +
+          '<span class="res-arrow"> → </span><span class="res-prize">' + res.prize + '</span>'
         resList.appendChild(row)
       }
       if (hideTimer) clearTimeout(hideTimer)
@@ -421,19 +477,16 @@ function hide() { card.classList.remove('show') }
 function renderCollecting(ladder) {
   phColl.style.display = ''
   phRes.classList.remove('on')
-
   cntLbl.textContent = ladder.participants.length + '/' + ladder.maxSlots + '명'
   const pct = Math.max(0, Math.min(100, ((ladder.deadline - Date.now()) / 30000) * 100))
   tfill.style.width = pct + '%'
-
   chips.innerHTML = ''
   ladder.participants.forEach((p, i) => {
     const c = document.createElement('span')
     c.className = 'chip'
     c.textContent = p
-    c.style.color       = COLORS[i % COLORS.length]
-    c.style.borderColor = COLORS[i % COLORS.length]
-    c.style.background  = BGTINT[i % BGTINT.length]
+    c.style.color = PEN[i % PEN.length]
+    c.style.borderColor = PEN[i % PEN.length]
     chips.appendChild(c)
   })
   waitHint.style.display = ladder.participants.length === 0 ? '' : 'none'
@@ -444,87 +497,58 @@ function renderResult(ld) {
   phColl.style.display = 'none'
   phRes.classList.add('on')
 
-  const cols = ld.cols, rows = ld.rows
-  const COL_W = Math.min(120, Math.floor(760 / Math.max(cols - 1, 1)))
-  const PAD_X = 50, PAD_T = 52, PAD_B = 48
-  const ROW_H = Math.max(16, Math.min(30, Math.floor((480 - PAD_T - PAD_B) / Math.max(1, rows))))
-  const W = PAD_X * 2 + (cols - 1) * COL_W
-  const H = PAD_T + rows * ROW_H + PAD_B
-  svgEl.setAttribute('viewBox', '0 0 ' + W + ' ' + H)
-  svgEl.style.height = H + 'px'
-  svgEl.innerHTML = ''
+  const layout = _buildGrid(ld)
+  const { rows, PAD_T, ROW_H, xp } = layout
 
-  const xp = c => PAD_X + c * COL_W
-  const mkEl = (tag, attrs) => {
-    const el = document.createElementNS('http://www.w3.org/2000/svg', tag)
-    Object.entries(attrs).forEach(([k,v]) => el.setAttribute(k,v)); return el
-  }
-
-  // Rails
-  for (let c = 0; c < cols; c++) {
-    svgEl.appendChild(mkEl('line', {
-      x1: xp(c), y1: PAD_T, x2: xp(c), y2: PAD_T + rows * ROW_H,
-      stroke: '#333', 'stroke-width': 3.5, 'stroke-linecap': 'round'
-    }))
-    svgEl.appendChild(mkEl('circle', { cx: xp(c), cy: PAD_T, r: 5, fill: '#333' }))
-    svgEl.appendChild(mkEl('circle', { cx: xp(c), cy: PAD_T + rows * ROW_H, r: 5, fill: '#333' }))
-  }
-
-  // Rungs
-  ld.rungs.forEach(rg => {
-    svgEl.appendChild(mkEl('line', {
-      x1: xp(rg.leftCol), y1: PAD_T + rg.row * ROW_H,
-      x2: xp(rg.leftCol + 1), y2: PAD_T + rg.row * ROW_H,
-      stroke: '#333', 'stroke-width': 3, 'stroke-linecap': 'round'
-    }))
-  })
-
-  // Name pills (top)
+  // 이름 박스 (상단)
   ld.order.forEach((name, c) => {
-    const col = COLORS[c % COLORS.length], bg = BGTINT[c % BGTINT.length]
     const label = name.length > 5 ? name.slice(0,4)+'…' : name
-    const tw = Math.max(38, label.length * 10 + 18)
-    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g')
-    g.appendChild(mkEl('rect', { x: xp(c)-tw/2, y: 4, width: tw, height: 26, rx: 13, fill: bg, stroke: col, 'stroke-width': 2.5 }))
-    const t = mkEl('text', { x: xp(c), y: 22, 'text-anchor':'middle', 'font-size': 12, 'font-weight': 800, fill: col, 'font-family': 'Noto Sans KR, sans-serif' })
+    const tw = Math.max(38, label.length * 10 + 20)
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g')
+    g.appendChild(_mkSvgEl('rect',{x:xp(c)-tw/2,y:4,width:tw,height:26,rx:4,
+      fill:'#fff',stroke:PEN[c%PEN.length],'stroke-width':1.8,
+      filter:'drop-shadow(1px 1px 0 rgba(0,0,0,0.12))'}))
+    const t = _mkSvgEl('text',{x:xp(c),y:22,'text-anchor':'middle',
+      'font-size':11,'font-weight':800,fill:PEN[c%PEN.length],'font-family':'Noto Sans KR, sans-serif'})
     t.textContent = label; g.appendChild(t); svgEl.appendChild(g)
   })
 
-  // Prize pills (bottom)
+  // 상품 박스 (하단)
   ld.prizes.forEach((prize, c) => {
-    const col = COLORS[c % COLORS.length], bg = BGTINT[c % BGTINT.length]
     const label = prize.length > 5 ? prize.slice(0,4)+'…' : prize
-    const tw = Math.max(38, label.length * 10 + 18)
-    const py = PAD_T + rows * ROW_H + 11
-    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g')
-    g.appendChild(mkEl('rect', { x: xp(c)-tw/2, y: py, width: tw, height: 26, rx: 13, fill: bg, stroke: col, 'stroke-width': 2.5 }))
-    const t = mkEl('text', { x: xp(c), y: py+18, 'text-anchor':'middle', 'font-size': 12, 'font-weight': 800, fill: col, 'font-family': 'Noto Sans KR, sans-serif' })
+    const tw = Math.max(38, label.length * 10 + 20)
+    const py = PAD_T + rows * ROW_H + 10
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g')
+    g.appendChild(_mkSvgEl('rect',{x:xp(c)-tw/2,y:py,width:tw,height:26,rx:4,
+      fill:'#fffbe6',stroke:'#666','stroke-width':1.6,
+      filter:'drop-shadow(1px 1px 0 rgba(0,0,0,0.12))'}))
+    const t = _mkSvgEl('text',{x:xp(c),y:py+18,'text-anchor':'middle',
+      'font-size':11,'font-weight':800,fill:'#333','font-family':'Noto Sans KR, sans-serif'})
     t.textContent = label; g.appendChild(t); svgEl.appendChild(g)
   })
 
-  // Animate paths
+  // 경로 애니메이션
   let step = 0
   const lines = ld.paths.map((path, pi) => {
-    const pl = mkEl('polyline', { fill:'none', stroke: COLORS[pi % COLORS.length],
+    const pl = _mkSvgEl('polyline', { fill:'none', stroke: PEN[pi % PEN.length],
       'stroke-width': 3.5, 'stroke-opacity': 0.9,
       'stroke-linecap': 'round', 'stroke-linejoin': 'round',
       points: xp(path.cols[0]) + ',' + PAD_T })
     svgEl.appendChild(pl); return pl
   })
   const dots = ld.paths.map((path, pi) => {
-    const d = mkEl('circle', { r: 6, fill: COLORS[pi % COLORS.length],
+    const d = _mkSvgEl('circle', { r: 6, fill: PEN[pi % PEN.length],
       cx: xp(path.cols[0]), cy: PAD_T, stroke:'#fff', 'stroke-width': 2 })
     svgEl.appendChild(d); return d
   })
 
-  // Build right-angle path points up to a given step
   function orthoPts(cols, upTo) {
     const pts = [xp(cols[0]) + ',' + PAD_T]
     for (let r = 0; r < Math.min(upTo, rows); r++) {
       const curY = PAD_T + r * ROW_H
       const nxtY = PAD_T + (r + 1) * ROW_H
-      if (cols[r + 1] !== cols[r]) pts.push(xp(cols[r + 1]) + ',' + curY) // horizontal rung
-      pts.push(xp(cols[r + 1]) + ',' + nxtY)                               // vertical descent
+      if (cols[r + 1] !== cols[r]) pts.push(xp(cols[r + 1]) + ',' + curY)
+      pts.push(xp(cols[r + 1]) + ',' + nxtY)
     }
     return pts.join(' ')
   }
@@ -541,18 +565,19 @@ function renderResult(ld) {
       clearInterval(tick)
       resList.innerHTML = ''
       ld.results.forEach(r => {
-        const col = COLORS[r.startCol % COLORS.length], bg = BGTINT[r.startCol % BGTINT.length]
+        const col = PEN[r.startCol % PEN.length]
         const row = document.createElement('div')
         row.className = 'res-row'
-        row.style.borderColor = col; row.style.background = bg
         row.innerHTML = '<span class="res-user" style="color:' + col + '">' + r.user + '</span>' +
-          '<span class="res-arrow">→</span><span class="res-prize">' + r.prize + '</span>'
+          '<span class="res-arrow"> → </span><span class="res-prize">' + r.prize + '</span>'
         resList.appendChild(row)
       })
       if (hideTimer) clearTimeout(hideTimer)
       hideTimer = setTimeout(hide, 12000)
     }
   }, 55)
+
+  show()
 }
 
 function renderManualPreview(ld) {
@@ -560,59 +585,31 @@ function renderManualPreview(ld) {
   phColl.style.display = 'none'
   phRes.classList.add('on')
 
-  const cols = ld.cols, rows = ld.rows
-  const COL_W = Math.min(120, Math.floor(760 / Math.max(cols - 1, 1)))
-  const PAD_X = 50, PAD_T = 52, PAD_B = 48
-  const ROW_H = Math.max(16, Math.min(30, Math.floor((480 - PAD_T - PAD_B) / Math.max(1, rows))))
-  const W = PAD_X * 2 + (cols - 1) * COL_W
-  const H = PAD_T + rows * ROW_H + PAD_B
-  svgEl.setAttribute('viewBox', '0 0 ' + W + ' ' + H)
-  svgEl.style.height = H + 'px'
-  svgEl.innerHTML = ''
+  const layout = _buildGrid(ld)
+  const { rows, PAD_T, ROW_H, xp } = layout
 
-  const xp = c => PAD_X + c * COL_W
-  const mkEl = (tag, attrs) => {
-    const el = document.createElementNS('http://www.w3.org/2000/svg', tag)
-    Object.entries(attrs).forEach(([k,v]) => el.setAttribute(k,v)); return el
-  }
-
-  // Rails
-  for (let c = 0; c < cols; c++) {
-    svgEl.appendChild(mkEl('line', {
-      x1: xp(c), y1: PAD_T, x2: xp(c), y2: PAD_T + rows * ROW_H,
-      stroke: '#333', 'stroke-width': 3.5, 'stroke-linecap': 'round'
-    }))
-    svgEl.appendChild(mkEl('circle', { cx: xp(c), cy: PAD_T, r: 5, fill: '#333' }))
-    svgEl.appendChild(mkEl('circle', { cx: xp(c), cy: PAD_T + rows * ROW_H, r: 5, fill: '#333' }))
-  }
-
-  // Rungs (가로줄 표시)
-  ld.rungs.forEach(rg => {
-    svgEl.appendChild(mkEl('line', {
-      x1: xp(rg.leftCol), y1: PAD_T + rg.row * ROW_H,
-      x2: xp(rg.leftCol + 1), y2: PAD_T + rg.row * ROW_H,
-      stroke: '#333', 'stroke-width': 3, 'stroke-linecap': 'round'
-    }))
-  })
-
-  // Name pills (top)
+  // 이름 박스 (상단)
   ld.order.forEach((name, c) => {
-    const col = COLORS[c % COLORS.length], bg = BGTINT[c % BGTINT.length]
     const label = name.length > 5 ? name.slice(0,4)+'…' : name
-    const tw = Math.max(38, label.length * 10 + 18)
-    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g')
-    g.appendChild(mkEl('rect', { x: xp(c)-tw/2, y: 4, width: tw, height: 26, rx: 13, fill: bg, stroke: col, 'stroke-width': 2.5 }))
-    const t = mkEl('text', { x: xp(c), y: 22, 'text-anchor':'middle', 'font-size': 12, 'font-weight': 800, fill: col, 'font-family': 'Noto Sans KR, sans-serif' })
+    const tw = Math.max(38, label.length * 10 + 20)
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g')
+    g.appendChild(_mkSvgEl('rect',{x:xp(c)-tw/2,y:4,width:tw,height:26,rx:4,
+      fill:'#fff',stroke:PEN[c%PEN.length],'stroke-width':1.8,
+      filter:'drop-shadow(1px 1px 0 rgba(0,0,0,0.12))'}))
+    const t = _mkSvgEl('text',{x:xp(c),y:22,'text-anchor':'middle',
+      'font-size':11,'font-weight':800,fill:PEN[c%PEN.length],'font-family':'Noto Sans KR, sans-serif'})
     t.textContent = label; g.appendChild(t); svgEl.appendChild(g)
   })
 
-  // Prize pills (bottom) hidden as "?"
+  // 상품 박스 (하단) — 전부 "?"
   ld.prizes.forEach((_, c) => {
-    const col = COLORS[c % COLORS.length], bg = BGTINT[c % BGTINT.length]
-    const tw = 42, py = PAD_T + rows * ROW_H + 11
-    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g')
-    g.appendChild(mkEl('rect', { x: xp(c)-tw/2, y: py, width: tw, height: 26, rx: 13, fill: bg, stroke: col, 'stroke-width': 2.5 }))
-    const t = mkEl('text', { x: xp(c), y: py+18, 'text-anchor':'middle', 'font-size': 15, 'font-weight': 900, fill: col, 'font-family': 'Noto Sans KR, sans-serif' })
+    const tw = 36, py = PAD_T + rows * ROW_H + 10
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g')
+    g.appendChild(_mkSvgEl('rect',{x:xp(c)-tw/2,y:py,width:tw,height:26,rx:4,
+      fill:'#fff',stroke:'#bbb','stroke-width':1.4,
+      filter:'drop-shadow(1px 1px 0 rgba(0,0,0,0.08))'}))
+    const t = _mkSvgEl('text',{x:xp(c),y:py+18,'text-anchor':'middle',
+      'font-size':14,'font-weight':900,fill:'#ccc','font-family':'Noto Sans KR, sans-serif'})
     t.textContent = '?'; g.appendChild(t); svgEl.appendChild(g)
   })
 
