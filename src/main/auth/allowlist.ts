@@ -1,6 +1,6 @@
 import https from 'https'
 
-const SHEET_API = 'https://script.google.com/macros/s/AKfycbxOJbEdv6KcjyXv_GDz4vek74vh0Ubn2oRxhuX_dIdJ8HMrcJ6tx1WuvoraDYSI7Zwo/exec'
+const SHEET_API = 'https://script.google.com/macros/s/AKfycbwHzJgDCwHEPRrNXk0Q8puWely5U15Rd71JyCvFdNjvAUdUgk9-7INlps-lYuf3UW7h/exec'
 
 export interface AllowEntry { id: string; name: string }
 

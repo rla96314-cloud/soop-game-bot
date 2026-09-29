@@ -36,10 +36,12 @@ export default function App() {
       .then(savedUser => {
         if (savedUser?.id) {
           // Re-verify in background (silently)
-          ;(el.authRecheck as () => Promise<{ ok: boolean; user?: AuthUser }>)()
+          ;(el.authRecheck as () => Promise<{ ok: boolean; user?: AuthUser; error?: string }>)()
             .then(r => {
               if (r.ok && r.user) setUser(r.user)
-              else { setUser(null) }
+              // 목록에서 명시적으로 빠진 경우만 로그아웃. 서버 접속/응답 오류면 저장된 로그인 유지
+              else if (r.error === '허용되지 않은 계정입니다.') setUser(null)
+              else setUser(savedUser)
             })
             .catch(() => {
               // Network error → still allow if was saved
