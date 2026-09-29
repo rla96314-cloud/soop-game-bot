@@ -3,6 +3,7 @@ import { AppProvider }  from './contexts/AppContext'
 import LoginScreen      from './pages/Login'
 import Sidebar          from './components/Sidebar'
 import TitleBar         from './components/TitleBar'
+import StatusBar        from './components/StatusBar'
 import Dashboard        from './pages/Dashboard'
 import Settings         from './pages/Settings'
 import GamesPage        from './pages/Games'
@@ -15,27 +16,24 @@ export type Page = 'dashboard' | 'games' | 'overlay' | 'history' | 'settings' | 
 
 interface AuthUser { id: string; name: string }
 
+const STRIP_PAGES: Page[] = ['dashboard', 'games', 'overlay', 'history']
+const FILL_PAGES:  Page[] = ['dashboard', 'games', 'overlay', 'history']
+
 export default function App() {
   const [page, setPage]         = useState<Page>('dashboard')
   const [gamesInitial, setGamesInitial] = useState<string>('roulette')
   const [user, setUser]         = useState<AuthUser | null>(null)
   const [ready, setReady]       = useState(false)
 
-  const navigateToGame = (gameId: string) => {
-    setGamesInitial(gameId)
-    setPage('games')
-  }
+  const navigate = (p: Page, gameId?: string) => { if (gameId) setGamesInitial(gameId); setPage(p) }
 
   const el = (window as unknown as Record<string, unknown>).electron as Record<string, (...args: unknown[]) => unknown>
 
-  // On mount: check if a user is already saved
   useEffect(() => {
     if (!el?.authGetUser) { setReady(true); return }
-
     ;(el.authGetUser as () => Promise<AuthUser | null>)()
       .then(savedUser => {
         if (savedUser?.id) {
-          // Re-verify in background (silently)
           ;(el.authRecheck as () => Promise<{ ok: boolean; user?: AuthUser; error?: string }>)()
             .then(r => {
               if (r.ok && r.user) setUser(r.user)
@@ -43,10 +41,7 @@ export default function App() {
               else if (r.error === '허용되지 않은 계정입니다.') setUser(null)
               else setUser(savedUser)
             })
-            .catch(() => {
-              // Network error → still allow if was saved
-              setUser(savedUser)
-            })
+            .catch(() => setUser(savedUser))
             .finally(() => setReady(true))
         } else {
           setReady(true)
@@ -55,41 +50,34 @@ export default function App() {
       .catch(() => setReady(true))
   }, [])
 
-  const handleLogin = (loggedUser: AuthUser) => setUser(loggedUser)
-
   const handleLogout = () => {
     if (el?.authLogout) (el.authLogout as () => Promise<unknown>)()
     setUser(null)
   }
 
-  // Splash while checking saved session
   if (!ready) {
-    return (
-      <div className={styles.splash}>
-        <div className={styles.splashSpinner} />
-      </div>
-    )
+    return <div className={styles.splash}><div className={styles.splashSpinner} /></div>
   }
-
-  // Not authenticated → login screen
   if (!user) {
-    return <LoginScreen onSuccess={handleLogin} />
+    return <LoginScreen onSuccess={setUser} />
   }
 
-  // Authenticated → main app
   return (
     <AppProvider>
       <div className={styles.shell}>
-        <TitleBar user={user} onLogout={handleLogout} />
+        <TitleBar user={user} onLogout={handleLogout} onSettings={() => setPage('settings')} />
         <div className={styles.body}>
-          <Sidebar current={page} onChange={setPage} />
+          <Sidebar current={page} onChange={setPage} user={user} />
           <main className={styles.main}>
-            {page === 'dashboard' && <Dashboard onNavigateToGame={navigateToGame} />}
-            {page === 'games'     && <GamesPage initialSelected={gamesInitial} />}
-            {page === 'overlay'   && <OverlayPage />}
-            {page === 'settings'  && <Settings />}
-            {page === 'history'   && <HistoryPage />}
-            {page === 'help'      && <HelpPage />}
+            {STRIP_PAGES.includes(page) && <div className={styles.strip}><StatusBar user={user} /></div>}
+            <div className={FILL_PAGES.includes(page) ? styles.pageFill : styles.page}>
+              {page === 'dashboard' && <Dashboard onNavigate={navigate} user={user} />}
+              {page === 'games'     && <GamesPage initialSelected={gamesInitial} onHelp={() => setPage('help')} />}
+              {page === 'overlay'   && <OverlayPage />}
+              {page === 'history'   && <HistoryPage />}
+              {page === 'settings'  && <Settings user={user} />}
+              {page === 'help'      && <HelpPage />}
+            </div>
           </main>
         </div>
       </div>

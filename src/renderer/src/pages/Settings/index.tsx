@@ -1,361 +1,222 @@
 import { useEffect, useState } from 'react'
 import { useApp } from '../../contexts/AppContext'
+import Icon from '../../components/Icon'
+import { CopyBtn } from '../Games/GameConfig'
 import styles from './Settings.module.css'
 
 const el = () => (window as unknown as Record<string, Record<string, unknown>>).electron
-
+type P = Parameters<ReturnType<typeof useApp>['patchSettings']>[0]
 interface WeflabTrigger { keyword: string }
 
-export default function Settings() {
-  const { settings, patchSettings, refreshSettings, connected } = useApp()
+function Row({ title, desc, children }: { title: string; desc: string; children: React.ReactNode }) {
+  return (
+    <section className={`card ${styles.row}`}>
+      <div className={styles.rowLeft}>
+        <div className="sec-title" style={{ fontSize: 19 }}>{title}</div>
+        <div className="sec-desc">{desc}</div>
+      </div>
+      <div className={styles.rowRight}>{children}</div>
+    </section>
+  )
+}
 
-  // SOOP
-  const [channelId,          setChannelId]          = useState('')
-  const [userId,             setUserId]             = useState('')
-  const [token,              setToken]              = useState('')
-  const [simMode,            setSimMode]            = useState(true)
-  const [balloonAutoTrigger, setBalloonAutoTrigger] = useState(true)
-  const [globalThreshold,    setGlobalThreshold]    = useState(50)
+function Switch({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+  return (
+    <span className="switch"><input type="checkbox" checked={checked} disabled={disabled} onChange={e => onChange(e.target.checked)} /><span className="track" /></span>
+  )
+}
 
-  // Overlay
-  const [overlayPort, setOverlayPort] = useState(3939)
+export default function Settings({ user }: { user?: { id: string; name: string } | null }) {
+  const { settings, patchSettings, refreshSettings, connected, simulation, standby, stats } = useApp()
+  const s = (settings ?? {}) as Record<string, Record<string, unknown>>
 
-  // UI
-  const [uiScale, setUiScale] = useState(110)
-
-  // Weflab
-  const [weflabEnabled,  setWeflabEnabled]  = useState(false)
-  const [weflabUrl,      setWeflabUrl]      = useState('')
-  const [triggers,       setTriggers]       = useState<WeflabTrigger[]>([])
-  const [balloonTrigger, setBalloonTrigger] = useState(false)
-  const [weflabRunning,  setWeflabRunning]  = useState(false)
-  const [weflabLog,      setWeflabLog]      = useState<string[]>([])
-  const [urlDirty,       setUrlDirty]       = useState(false)
-
-  const [saved,        setSaved]        = useState(false)
+  const [channelId, setChannelId] = useState('')
+  const [port, setPort]           = useState(3939)
+  const [weflabUrl, setWeflabUrl] = useState('')
+  const [weflabRunning, setWeflabRunning] = useState(false)
+  const [weflabLog, setWeflabLog] = useState<string[]>([])
+  const [urlDirty, setUrlDirty]   = useState(false)
   const [reconnecting, setReconnecting] = useState(false)
+  const [idSaved, setIdSaved]     = useState(false)
 
   useEffect(() => {
     if (!settings) return
-    const s = settings as Record<string, Record<string, unknown>>
-    setChannelId(         (s.soop?.channelId          as string)  ?? '')
-    setUserId(            (s.soop?.userId              as string)  ?? '')
-    setToken(             (s.soop?.token               as string)  ?? '')
-    setSimMode(           (s.soop?.simulationMode      as boolean) !== false)
-    setBalloonAutoTrigger((s.soop?.balloonAutoTrigger  as boolean) !== false)
-    setGlobalThreshold(   (s.soop?.globalThreshold     as number)  ?? 50)
-    setOverlayPort(       (s.overlay?.port             as number)  ?? 3939)
-    setUiScale(           (s.ui?.scale                 as number)  ?? 110)
-    setWeflabEnabled(     !!(s.weflab?.enabled         as boolean))
-    setWeflabUrl(         (s.weflab?.url               as string)  ?? '')
-    setTriggers(          (s.weflab?.triggers          as WeflabTrigger[]) ?? [])
-    setBalloonTrigger(    !!(s.weflab?.balloonTrigger  as boolean))
+    setChannelId((s.soop?.channelId as string) ?? '')
+    setPort((s.overlay?.port as number) ?? 3939)
+    setWeflabUrl((s.weflab?.url as string) ?? '')
   }, [settings])
 
-  // weflab event listeners
   useEffect(() => {
-    const e = el()
-    const offResult = (e.onWeflabResult as (cb: (t: string, n: string) => void) => () => void)(
-      (text, nick) => setWeflabLog(l =>
-        [`[${new Date().toLocaleTimeString()}] 룰렛: ${text}${nick ? ` (${nick})` : ''}`, ...l].slice(0, 20))
-    )
-    const offDonation = (e.onWeflabDonation as (cb: (d: { donor: string; balloons: number; amount: number; message: string }) => void) => () => void)(
-      (d) => setWeflabLog(l => {
-        const what = d.balloons > 0 ? `별풍선 ${d.balloons}개` : `${d.amount.toLocaleString()}원`
-        return [`[${new Date().toLocaleTimeString()}] 후원: ${d.donor || '?'} ${what}${d.message ? ` "${d.message}"` : ''}`, ...l].slice(0, 20)
-      })
-    )
-    const offLoaded = (e.onWeflabLoaded as (cb: () => void) => () => void)(
-      () => setWeflabLog(l => [`[${new Date().toLocaleTimeString()}] 페이지 로드 완료`, ...l].slice(0, 20))
-    )
-    const offRetrying = (e.onWeflabRetrying as (cb: (m: string) => void) => () => void)(
-      (m) => setWeflabLog(l => [`[재연결] ${m}`, ...l].slice(0, 20))
-    )
-    const offError  = (e.onWeflabError  as (cb: (err: string) => void) => () => void)(
-      (err) => setWeflabLog(l => [`[오류] ${err}`, ...l].slice(0, 20))
-    )
-    return () => { offResult(); offDonation(); offLoaded(); offRetrying(); offError() }
+    const e = el(); const push = (line: string) => setWeflabLog(l => [`[${new Date().toLocaleTimeString()}] ${line}`, ...l].slice(0, 20))
+    const offs = [
+      (e.onWeflabResult as (cb: (t: string, n: string) => void) => () => void)((t, n) => push(`룰렛: ${t}${n ? ` (${n})` : ''}`)),
+      (e.onWeflabDonation as (cb: (d: { donor: string; balloons: number; amount: number; message: string }) => void) => () => void)(d => push(`후원: ${d.donor || '?'} ${d.balloons > 0 ? `별풍선 ${d.balloons}개` : `${d.amount.toLocaleString()}원`}${d.message ? ` "${d.message}"` : ''}`)),
+      (e.onWeflabLoaded as (cb: () => void) => () => void)(() => push('페이지 로드 완료')),
+      (e.onWeflabRetrying as (cb: (m: string) => void) => () => void)(m => push(`재연결: ${m}`)),
+      (e.onWeflabError as (cb: (m: string) => void) => () => void)(m => push(`오류: ${m}`)),
+    ]
+    return () => offs.forEach(f => f())
   }, [])
+  useEffect(() => { (el().weflabStatus as () => Promise<{ running: boolean }>)().then(r => setWeflabRunning(r.running)).catch(() => {}) })
 
-  // Sync weflab running state on every mount (tab switch 후 정확한 상태 반영)
-  useEffect(() => {
-    (el().weflabStatus as () => Promise<{ running: boolean; url: string }>)()
-      .then(s => setWeflabRunning(s.running))
-      .catch(() => {})
-  })
-
-  const save = () => {
-    patchSettings({
-      soop: {
-        channelId,
-        userId,
-        token,
-        simulationMode:     simMode,
-        balloonAutoTrigger,
-        globalThreshold:    Number(globalThreshold),
-      },
-      overlay: { port: Number(overlayPort) },
-      weflab:  { enabled: weflabEnabled, url: weflabUrl, triggers, balloonTrigger },
-    })
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
-  }
+  const soop = (patch: Record<string, unknown>) => patchSettings({ soop: patch } as P)
+  const simMode = (s.soop?.simulationMode as boolean) !== false
+  const autoTrigger = (s.soop?.balloonAutoTrigger as boolean) !== false
+  const threshold = (s.soop?.globalThreshold as number) ?? 50
+  const uiScale = (s.ui?.scale as number) ?? 110
+  const weflabEnabled = !!(s.weflab?.enabled as boolean)
+  const balloonTrigger = !!(s.weflab?.balloonTrigger as boolean)
+  const triggers = (s.weflab?.triggers as WeflabTrigger[]) ?? []
 
   const reconnect = async () => {
     setReconnecting(true)
-    try {
-      const e = el()
-      await (e.soopDisconnect as () => Promise<void>)()
-      await (e.soopConnect    as () => Promise<void>)()
-      refreshSettings()
-    } catch {
-      /* ignore */
-    } finally {
-      setReconnecting(false)
-    }
+    try { const e = el(); await (e.soopDisconnect as () => Promise<void>)(); await (e.soopConnect as () => Promise<void>)(); refreshSettings() } catch {} finally { setReconnecting(false) }
   }
+  const saveChannel = async () => { soop({ channelId: channelId.trim() }); setIdSaved(true); setTimeout(() => setIdSaved(false), 1800); await reconnect() }
 
-  // 체크박스 토글: 감지 시작/중지 + 즉시 설정 저장
-  const toggleWeflab = async () => {
+  const toggleWeflab = async (on: boolean) => {
     const e = el()
-    const newEnabled = !weflabEnabled
-    setWeflabEnabled(newEnabled)
-
-    if (newEnabled) {
-      if (!weflabUrl.trim()) { setWeflabEnabled(false); return }
-      await (e.weflabStart as (url: string) => Promise<unknown>)(weflabUrl.trim())
-      setWeflabRunning(true)
-    } else {
-      await (e.weflabStop as () => Promise<unknown>)()
-      setWeflabRunning(false)
-    }
-    // 즉시 저장 (프로그램 재시작 시 자동 감지용)
-    patchSettings({ weflab: { enabled: newEnabled, url: weflabUrl, triggers } } as Parameters<typeof patchSettings>[0])
+    if (on) { if (!weflabUrl.trim()) return; await (e.weflabStart as (u: string) => Promise<unknown>)(weflabUrl.trim()); setWeflabRunning(true) }
+    else { await (e.weflabStop as () => Promise<unknown>)(); setWeflabRunning(false) }
+    patchSettings({ weflab: { enabled: on, url: weflabUrl.trim() } } as P)
   }
-
-  // URL 변경 후 재시작
   const restartWeflab = async () => {
     if (!weflabUrl.trim()) return
-    const e = el()
-    await (e.weflabStop  as () => Promise<unknown>)()
-    await (e.weflabStart as (url: string) => Promise<unknown>)(weflabUrl.trim())
-    setWeflabRunning(true); setUrlDirty(false)
-    patchSettings({ weflab: { enabled: true, url: weflabUrl, triggers } } as Parameters<typeof patchSettings>[0])
+    const e = el(); await (e.weflabStop as () => Promise<unknown>)(); await (e.weflabStart as (u: string) => Promise<unknown>)(weflabUrl.trim())
+    setWeflabRunning(true); setUrlDirty(false); patchSettings({ weflab: { enabled: true, url: weflabUrl.trim() } } as P)
   }
+  const saveTriggers = (next: WeflabTrigger[]) => patchSettings({ weflab: { triggers: next } } as P)
 
-  const saveTriggers = (next: WeflabTrigger[]) => {
-    setTriggers(next)
-    patchSettings({ weflab: { triggers: next } } as Parameters<typeof patchSettings>[0])
-  }
+  const overlayUrl = `http://localhost:${port}/overlay/roulette`
+  const connLabel = connected ? (simulation ? '시뮬레이션 중' : '연결됨') : (standby ? '방송 대기 중' : '연결 안 됨')
 
   return (
     <div className={styles.page}>
       <div className={styles.header}>
-        <h1 className={styles.title}>설정</h1>
-        <button className={styles.saveBtn} onClick={save}>
-          {saved ? '✓ 저장됨' : '저장'}
-        </button>
+        <span className={styles.headIc}><Icon name="settings" size={26} /></span>
+        <div>
+          <h1 className={styles.title}>설정</h1>
+          <div className="sec-desc">방송과 게임을 연결하기 위한 기본 설정을 관리합니다.</div>
+        </div>
       </div>
 
-      {/* SOOP 연동 */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>SOOP 연동</h2>
-        <div className={styles.statusRow}>
-          <span className={styles.statusDot} style={{ background: connected ? '#10B981' : '#EF4444' }} />
-          <span className={styles.statusText}>{connected ? '연결됨' : '연결 안 됨'}</span>
-          <button
-            className={styles.reconnectBtn}
-            onClick={reconnect}
-            disabled={reconnecting}
-          >
-            {reconnecting ? '재연결 중…' : '재연결'}
+      <Row title="SOOP 연결" desc="SOOP 계정과 방송을 연결합니다.">
+        <div className={styles.connRow}>
+          <span className={styles.connDot} style={{ background: connected ? 'var(--live)' : (standby ? '#f2a600' : '#ff5f57') }} />
+          <b className={styles.connText}>{connLabel}</b>
+          <span className={styles.connMeta}>{user ? `${user.name} (${user.id})` : ''}</span>
+          <span className={styles.connMeta}>시청자 <b className="num">{stats.todayViewers}</b>명</span>
+          {standby && !connected && <span className={styles.connMeta} title={standby}>{standby}</span>}
+          <button className="btn" style={{ marginLeft: 'auto' }} onClick={reconnect} disabled={reconnecting}>
+            <Icon name="refresh" size={14} />{reconnecting ? '재연결 중…' : '다시 연결'}
           </button>
         </div>
+      </Row>
 
-        <div className={styles.field}>
-          <label>채널 ID</label>
-          <input value={channelId} onChange={e => setChannelId(e.target.value)} placeholder="스트리머 채널 ID" />
-          <p className={styles.hint}>
-            실제 연동에 필수 — 스트리머의 SOOP 아이디 (비어 있으면 시뮬레이션으로 동작). 방송 중이 아니면 30초마다 자동 재확인합니다.
-          </p>
+      <Row title="방송자 ID 설정" desc="내 방송의 고유 ID를 설정합니다. 채널 URL 또는 사용자명을 사용하세요.">
+        <label className="field-label">방송자 ID (사용자명)</label>
+        <div className="input-group" style={{ maxWidth: 640 }}>
+          <input className="input" value={channelId} placeholder="예: foxyeon" onChange={e => setChannelId(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveChannel()} />
+          <button className="btn btn-dark" onClick={saveChannel}>{idSaved ? '저장됨' : '확인'}</button>
         </div>
-        <div className={styles.field}>
-          <label>유저 ID (선택)</label>
-          <input value={userId} onChange={e => setUserId(e.target.value)} placeholder="SOOP 로그인 ID" />
-        </div>
-        <div className={styles.field}>
-          <label>인증 토큰 (선택)</label>
-          <input type="password" value={token} onChange={e => setToken(e.target.value)} placeholder="채팅 읽기에는 필요 없음" />
-        </div>
+        <div className="field-hint">예시: foxyeon, mychannel (https://ch.sooplive.co.kr/{'{사용자명}'}). 닉네임을 넣어도 아이디로 자동 변환됩니다. 방송 중이 아니면 30초마다 다시 확인합니다.</div>
+      </Row>
 
-        <div className={styles.toggle}>
-          <label>
-            <input type="checkbox" checked={simMode} onChange={e => setSimMode(e.target.checked)} />
-            <span>시뮬레이션 모드 (실제 연결 없이 테스트)</span>
-          </label>
-        </div>
-        <div className={styles.toggle}>
-          <label>
-            <input type="checkbox" checked={balloonAutoTrigger} onChange={e => setBalloonAutoTrigger(e.target.checked)} />
-            <span>별풍선 자동 게임 트리거</span>
-          </label>
-        </div>
+      <Row title="시뮬레이션 모드" desc="실제 방송 연결 없이 이벤트를 테스트할 수 있습니다.">
+        <label className="switch-row">
+          <Switch checked={simMode} onChange={v => { soop({ simulationMode: v }); setTimeout(reconnect, 50) }} />
+          <div><b>시뮬레이션 모드 사용</b><div className="field-hint" style={{ marginTop: 2 }}>가상의 채팅·별풍선 이벤트로 모든 기능을 테스트할 수 있습니다. 실제 방송에서는 꺼 두세요.</div></div>
+        </label>
+      </Row>
 
-        <div className={styles.field} style={{ marginTop: 12 }}>
-          <label>전역 최소 별풍선 수량</label>
-          <input
-            type="number"
-            value={globalThreshold}
-            onChange={e => setGlobalThreshold(Number(e.target.value))}
-            min={0}
-            max={9999}
-          />
-          <p className={styles.hint}>
-            이 수량 미만의 별풍선은 게임 트리거로 인식하지 않습니다.
-          </p>
-        </div>
-      </section>
-
-      {/* 화면 */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>화면</h2>
-        <div className={styles.field}>
-          <label>UI 배율 (텍스트·인터페이스 크기)</label>
-          <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-            {[90, 100, 110, 120, 130].map(pct => (
-              <button
-                key={pct}
-                onClick={() => {
-                  setUiScale(pct)
-                  patchSettings({ ui: { scale: pct } } as Parameters<typeof patchSettings>[0])
-                }}
-                style={{
-                  padding: '7px 14px',
-                  borderRadius: 8,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  border: `1.5px solid ${uiScale === pct ? 'var(--p500)' : 'var(--border2)'}`,
-                  background: uiScale === pct ? 'var(--p500)' : 'var(--surface)',
-                  color: uiScale === pct ? '#fff' : 'var(--text2)',
-                }}
-              >{pct}%</button>
-            ))}
+      <Row title="별풍선 트리거 설정" desc="별풍선 이벤트가 발생할 때 실행할 동작을 설정합니다.">
+        <label className="switch-row" style={{ marginBottom: 14 }}>
+          <b>별풍선 트리거 사용</b>
+          <Switch checked={autoTrigger} onChange={v => soop({ balloonAutoTrigger: v })} />
+        </label>
+        <div className={styles.two}>
+          <div>
+            <label className="field-label">최소 별풍선 개수</label>
+            <div className="input-group">
+              <input className="input" type="number" min={0} max={9999} value={threshold} onChange={e => soop({ globalThreshold: Number(e.target.value) })} disabled={!autoTrigger} />
+              <span className={`btn ${styles.unit}`}>개</span>
+            </div>
           </div>
-          <p className={styles.hint}>선택 즉시 적용됩니다. 글자가 작게 느껴지면 110~120%를 권장합니다.</p>
+          <div>
+            <label className="field-label">트리거 대상</label>
+            <select className="select" value="all" disabled><option value="all">모든 별풍선</option></select>
+          </div>
         </div>
-      </section>
+        <div className="field-hint">설정한 개수 이상의 별풍선 이벤트가 발생하면 게임 내 이벤트가 실행됩니다. 게임별 트리거 개수는 게임 화면에서 따로 정할 수 있습니다.</div>
+      </Row>
 
-      {/* OBS 오버레이 */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>OBS 오버레이</h2>
-        <div className={styles.field}>
-          <label>포트</label>
-          <input
-            type="number"
-            value={overlayPort}
-            onChange={e => setOverlayPort(Number(e.target.value))}
-            min={1024} max={65535}
-          />
+      <Row title="OBS 설정" desc="OBS에서 사용할 연결 정보와 소스 URL을 확인합니다.">
+        <div className={styles.obs}>
+          <div>
+            <label className="field-label">웹소켓 포트 (로컬)</label>
+            <div className="input-group">
+              <input className="input" type="number" min={1024} max={65535} value={port} onChange={e => setPort(Number(e.target.value))} onBlur={() => patchSettings({ overlay: { port: Number(port) } } as P)} />
+              <CopyBtn text={String(port)} label="복사" dark={false} />
+            </div>
+          </div>
+          <div>
+            <label className="field-label">OBS 소스 URL (브라우저 소스)</label>
+            <div className="input-group">
+              <div className={`input ${styles.urlBox}`}>{overlayUrl}</div>
+              <CopyBtn text={overlayUrl} />
+            </div>
+          </div>
         </div>
-        <div className={styles.overlayUrls}>
-          {['roulette','ladder','pickboard','quiz','slot','number','lottery'].map(id => (
-            <div key={id} className={styles.overlayRow}>
-              <span className={styles.overlayName}>{id}</span>
-              <code className={styles.overlayCode}>
-                http://localhost:{overlayPort}/overlay/{id}
-              </code>
+        <div className="field-hint">OBS에서 '브라우저' 소스를 추가하고 위 URL을 입력하세요. 권장 크기 1920×1080. 게임별 URL은 OBS 오버레이 화면에 있습니다. 포트를 바꾸면 앱을 다시 시작해야 적용됩니다.</div>
+      </Row>
+
+      <Row title="위플랩 연동" desc="위플랩 후원·룰렛 페이지를 감시해 게임을 실행합니다.">
+        <label className="switch-row" style={{ marginBottom: 12 }}>
+          <b>위플랩 연동 사용</b>
+          <Switch checked={weflabEnabled} onChange={toggleWeflab} disabled={!weflabUrl.trim() && !weflabEnabled} />
+          <span className={styles.connMeta} style={{ color: weflabRunning ? 'var(--ok)' : 'var(--muted)', fontWeight: 700 }}>{weflabRunning ? '● 감지 중' : '○ 중지됨'}</span>
+        </label>
+        <div className={styles.wfRow}>
+          <span className={styles.wfLabel}>위플랩 URL</span>
+          <div className="input-group" style={{ flex: 1 }}>
+            <input className="input" value={weflabUrl} placeholder="https://weflab.com/page/..." onChange={e => { setWeflabUrl(e.target.value); if (weflabRunning) setUrlDirty(true) }} onBlur={() => { if (!weflabRunning) patchSettings({ weflab: { url: weflabUrl.trim() } } as P) }} />
+            {urlDirty && weflabRunning ? <button className="btn btn-primary" onClick={restartWeflab}>재시작</button> : <CopyBtn text={weflabUrl} label="복사" dark={false} />}
+          </div>
+        </div>
+        <div className="field-hint">위플랩 룰렛 결과가 감지되면 룰렛 게임을 실행합니다. 활성화 상태는 저장되어 앱을 켤 때 자동으로 감시를 시작합니다.</div>
+
+        <label className="switch-row" style={{ margin: '14px 0 6px' }}>
+          <Switch checked={balloonTrigger} disabled={!weflabEnabled} onChange={v => patchSettings({ weflab: { balloonTrigger: v } } as P)} />
+          <div><b>후원 별풍선을 게임 트리거로 사용</b><div className="field-hint" style={{ marginTop: 2 }}>위플랩에서 감지된 별풍선 후원을 SOOP 별풍선과 똑같이 게임 발동에 씁니다.</div></div>
+        </label>
+
+        <label className="field-label" style={{ marginTop: 12 }}>트리거 키워드 (비워두면 모든 룰렛 결과에 발동)</label>
+        <div className={styles.keywords}>
+          {triggers.map((t, i) => (
+            <div key={i} className="input-group" style={{ width: 220 }}>
+              <input className="input" placeholder="키워드" value={t.keyword} disabled={!weflabEnabled} onChange={e => saveTriggers(triggers.map((x, j) => j === i ? { keyword: e.target.value } : x))} />
+              <button className="btn" onClick={() => saveTriggers(triggers.filter((_, j) => j !== i))}><Icon name="delete" size={14} /></button>
             </div>
           ))}
+          <button className="btn" disabled={!weflabEnabled} onClick={() => saveTriggers([...triggers, { keyword: '' }])}><Icon name="plus" size={14} />키워드 추가</button>
         </div>
-      </section>
-
-      {/* weflab */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>weflab 연동</h2>
-
-        <div className={styles.field}>
-          <label>weflab 방송 URL</label>
-          <div className={styles.rwRow}>
-            <input
-              className={styles.rwInput}
-              value={weflabUrl}
-              onChange={e => { setWeflabUrl(e.target.value); if (weflabRunning) setUrlDirty(true) }}
-              placeholder="https://weflab.com/page/..."
-            />
-            {urlDirty && weflabRunning && (
-              <button className={styles.rwToggleBtn} onClick={restartWeflab}>재시작</button>
-            )}
-          </div>
-        </div>
-
-        <div className={styles.toggle} style={{ marginTop: 8 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-            <input type="checkbox" checked={weflabEnabled} onChange={toggleWeflab} disabled={!weflabUrl.trim() && !weflabEnabled} />
-            <span>weflab 룰렛 결과 감지 활성화</span>
-          </label>
-          <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: weflabRunning ? '#3fb950' : '#6e7681' }}>
-            {weflabRunning ? '● 감지 중' : '○ 중지됨'}
-          </span>
-        </div>
-        <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>
-          활성화하면 프로그램 시작 시 자동으로 감지를 시작합니다
-        </div>
-
-        <div className={styles.toggle} style={{ marginTop: 8 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={balloonTrigger}
-              onChange={() => {
-                const next = !balloonTrigger
-                setBalloonTrigger(next)
-                patchSettings({ weflab: { balloonTrigger: next } } as Parameters<typeof patchSettings>[0])
-              }}
-              disabled={!weflabEnabled}
-            />
-            <span>weflab 후원 별풍선을 게임 트리거로 사용</span>
-          </label>
-        </div>
-        <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>
-          위플랩 페이지에서 감지된 별풍선 후원을 SOOP 별풍선과 동일하게 게임 발동에 사용합니다
-        </div>
-
-        <div className={styles.field}>
-          <label>트리거 키워드 (비워두면 모든 결과에 발동)</label>
-          <div className={styles.rwTriggerList}>
-            {triggers.map((t, i) => (
-              <div key={i} className={styles.rwTriggerRow}>
-                <input
-                  className={styles.rwInput}
-                  placeholder="키워드"
-                  value={t.keyword}
-                  onChange={e => saveTriggers(triggers.map((x, j) => j === i ? { keyword: e.target.value } : x))}
-                  disabled={!weflabEnabled}
-                />
-                <button className={styles.rwDelBtn}
-                  onClick={() => saveTriggers(triggers.filter((_, j) => j !== i))}>✕</button>
-              </div>
-            ))}
-            <button
-              className={styles.rwAddTriggerBtn}
-              onClick={() => saveTriggers([...triggers, { keyword: '' }])}
-              disabled={!weflabEnabled}
-            >+ 키워드 추가</button>
-          </div>
-        </div>
-
         {weflabRunning && (
-          <div className={styles.rwLog}>
-            <div className={styles.rwLogTitle}>수신 로그</div>
-            {weflabLog.length === 0
-              ? <div className={styles.rwLogEmpty}>결과 대기 중...</div>
-              : weflabLog.map((line, i) => (
-                  <div key={i} className={styles.rwLogLine}>{line}</div>
-                ))
-            }
+          <div className={styles.log}>
+            <div className={styles.logTitle}>수신 로그</div>
+            {weflabLog.length === 0 ? <div className={styles.logEmpty}>결과 대기 중…</div> : weflabLog.map((l, i) => <div key={i} className={styles.logLine}>{l}</div>)}
           </div>
         )}
-      </section>
+      </Row>
+
+      <Row title="UI 배율 설정" desc="프로그램 화면의 UI 크기를 조절합니다.">
+        <div className={styles.scaleRow}>
+          <span className={styles.wfLabel}>UI 배율</span>
+          <select className="select" style={{ width: 300 }} value={uiScale} onChange={e => patchSettings({ ui: { scale: Number(e.target.value) } } as P)}>
+            {[90, 100, 110, 120, 130].map(p => <option key={p} value={p}>{p}%{p === 100 ? ' (기본)' : ''}</option>)}
+          </select>
+          <span className="field-hint" style={{ marginTop: 0 }}>선택 즉시 적용됩니다. 글자가 작게 느껴지면 110~120%를 권장합니다.</span>
+        </div>
+      </Row>
     </div>
   )
 }

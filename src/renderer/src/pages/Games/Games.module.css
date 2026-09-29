@@ -1,142 +1,67 @@
+/* ── 게임 페이지 레이아웃 (방송 놀이도구 디자인) ── */
 .layout {
-  display: flex;
-  height: 100%;
-  overflow: hidden;
-}
-
-.sidebar {
-  width: 200px;
-  flex-shrink: 0;
-  padding: 24px 12px;
-  border-right: 1px solid var(--border);
-  overflow-y: auto;
-}
-
-.sideTitle {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-2);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 0 8px;
-  margin-bottom: 10px;
-}
-
-.gameBtn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 9px 10px;
-  border: none;
-  background: transparent;
-  border-radius: 8px;
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.15s;
-  margin-bottom: 2px;
-}
-.gameBtn:hover { background: var(--p50); }
-.gameBtn.active { background: var(--p100); }
-
-.gameIcon { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
-.gameName { font-size: 13px; font-weight: 500; color: var(--text); flex: 1; }
-.statusDot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-
-.panel {
-  flex: 1;
-  padding: 28px 32px;
-  overflow-y: auto;
-}
-
-.panelHeader {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 28px;
-}
-
-.panelIcon  { width: 14px; height: 14px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
-.panelTitle { font-size: 20px; font-weight: 700; color: var(--text); flex: 1; }
-
-.panelHeaderRight {
-  display: flex; align-items: center; gap: 10px;
-}
-
-/* ── Toggle switch ── */
-.toggleWrap {
-  display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;
-}
-.toggleInput { display: none; }
-.toggleTrack {
-  position: relative; width: 44px; height: 24px;
-  background: var(--border); border-radius: 12px;
-  transition: background 0.2s;
-}
-.toggleInput:checked + .toggleTrack { background: var(--p500); }
-.toggleThumb {
-  position: absolute; top: 3px; left: 3px;
-  width: 18px; height: 18px; border-radius: 50%;
-  background: #fff; transition: transform 0.2s;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
-}
-.toggleInput:checked + .toggleTrack .toggleThumb { transform: translateX(20px); }
-.toggleLabel { font-size: 12px; font-weight: 600; color: var(--text3); min-width: 32px; }
-
-/* ── OBS URL button ── */
-.obsUrlBtn {
-  padding: 7px 13px; border-radius: 8px;
-  border: 1.5px solid var(--border); background: transparent;
-  font-size: 12px; font-weight: 600; color: var(--text3);
-  cursor: pointer; transition: border-color 0.15s, color 0.15s; font-family: inherit;
-  white-space: nowrap;
-}
-.obsUrlBtn:hover     { border-color: var(--p400); color: var(--p500); }
-.obsUrlBtnCopied     { border-color: #10B981 !important; color: #10B981 !important; }
-
-.runBtn {
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 9px 20px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-.runBtn:disabled { cursor: not-allowed; opacity: 0.7; }
-
-.fields {
-  background: #fff;
-  border-radius: 14px;
-  padding: 22px;
-  box-shadow: var(--shadow-sm);
   display: grid;
-  gap: 16px;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 320px minmax(0, 1fr) minmax(460px, 34%);
+  gap: 14px;
+  height: 100%;
+  min-height: 0;
 }
+.col { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.scroll { overflow: auto; min-height: 0; flex: 1; }
 
-.field label {
-  display: block;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-2);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 5px;
+/* 게임 라이브러리 */
+.lib { display: flex; flex-direction: column; min-height: 0; }
+.libList { display: flex; flex-direction: column; overflow: auto; }
+.libItem {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px; border-top: 1px solid var(--line);
+  background: transparent; text-align: left; width: 100%;
+  transition: background .12s;
 }
-.field input {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1.5px solid var(--border);
-  border-radius: 8px;
-  font-size: 14px;
-  color: var(--text);
-  background: var(--bg);
-  outline: none;
-  box-sizing: border-box;
+.libItem:hover { background: var(--surface2); }
+.libItem.active { background: var(--orange-bg); box-shadow: inset 3px 0 0 var(--orange); }
+.libText { flex: 1; min-width: 0; }
+.libName { font-size: 14px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+.libDesc { font-size: 12px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.libArrow { color: var(--muted); }
+.libDot { width: 8px; height: 8px; border-radius: 50%; background: var(--live); }
+
+/* 설정 카드 */
+.cfg { display: flex; flex-direction: column; min-height: 0; }
+.cfgHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 16px 12px; }
+.cfgBody { flex: 1; min-height: 0; overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.cfgFoot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--line); }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.field label { display: block; font-size: 12px; font-weight: 700; color: var(--text2); margin-bottom: 6px; }
+.field input, .field select {
+  width: 100%; height: 36px; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); font-size: 13px;
 }
-.field input:focus { border-color: var(--p400); }
+.field input:focus, .field select:focus { border-color: var(--orange); box-shadow: 0 0 0 2px var(--orange-bg); }
+.unitField { position: relative; }
+.unitField span { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--muted); }
+.unitField input { padding-right: 34px; }
+.animBtns { display: flex; gap: 8px; }
+.animBtn { flex: 1; height: 40px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); font-weight: 700; color: var(--text2); }
+.animBtn.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+.note { font-size: 12px; color: var(--muted); line-height: 1.6; padding: 12px 14px; background: var(--surface2); border-radius: var(--radius); }
+
+/* 미리보기 카드 */
+.pv { display: flex; flex-direction: column; min-height: 0; }
+.pvBody { flex: 1; min-height: 0; overflow: auto; padding: 0 16px 16px; display: flex; flex-direction: column; gap: 14px; }
+.pvStage { position: relative; border-radius: var(--radius); min-height: 260px; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.pvStage canvas { max-width: 100%; height: auto; }
+.pvOverlay { position: absolute; left: 12px; right: 12px; bottom: 12px; background: rgba(23,36,55,.9); color: #fff; border-radius: var(--radius); padding: 10px 14px; font-weight: 800; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.pvOverlay em { font-style: normal; color: var(--orange); font-size: 16px; }
+.pvIdle { display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--muted); text-align: center; }
+.pvIdle b { color: var(--text); font-size: 16px; }
+.pvIdle small { font-size: 12px; line-height: 1.6; }
+.pvResult { text-align: center; }
+.pvResult .big { font-size: 28px; font-weight: 900; color: var(--orange); margin: 6px 0; }
+.pvUrl { display: flex; flex-direction: column; gap: 8px; }
+.pvUrlRow { display: flex; gap: 8px; }
+.pvUrlBox { flex: 1; min-width: 0; height: 40px; display: flex; align-items: center; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface2); font-family: 'Inter', monospace; font-size: 12px; color: #6a3cff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pvActions { display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px; }
 
 /* ── List editor ── */
 

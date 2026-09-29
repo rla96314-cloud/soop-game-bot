@@ -69,6 +69,7 @@ export function useApp() { return useContext(Ctx) }
 const GAME_META: Record<string, { name: string }> = {
   roulette: { name: '룰렛'     },
   ladder:   { name: '사다리타기' },
+  pickboard:{ name: '뽑기판'    },
   quiz:     { name: '퀴즈'     },
   slot:     { name: '슬롯머신'  },
   race:     { name: '경주'     },

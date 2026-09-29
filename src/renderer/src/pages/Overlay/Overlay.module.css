@@ -1,90 +1,36 @@
-.page {
-  padding: 32px 36px;
-}
-
-.header { margin-bottom: 20px; }
-.title  { font-size: 22px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
-.sub    { font-size: 14px; color: var(--text2); }
-
-.infoBox {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  background: var(--p50);
-  border: 1px solid var(--p200);
-  border-radius: 12px;
-  padding: 14px 16px;
-  font-size: 13px;
-  color: var(--text);
-  margin-bottom: 24px;
-  line-height: 1.5;
-}
-
-
-.grid {
+.layout {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: minmax(420px, 1.1fr) minmax(480px, 1fr);
   gap: 14px;
+  height: 100%;
+  min-height: 0;
 }
+.preview { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.headRight { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+.stage { flex: 1; min-height: 0; margin: 0 16px 16px; border-radius: var(--radius); display: flex; align-items: center; justify-content: center; padding: 20px; overflow: hidden; }
+.stage canvas { max-width: 100%; max-height: 100%; height: auto; }
+.placeholder { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; color: var(--muted); }
+.placeholder b { color: var(--text); font-size: 18px; }
+.placeholder small { font-size: 12px; line-height: 1.6; }
 
-.card {
-  background: #fff;
-  border-radius: 14px;
-  padding: 18px;
-  box-shadow: var(--shadow-sm);
+.right { display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 14px; min-height: 0; }
+.urls { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.table { flex: 1; min-height: 0; overflow: auto; }
+.tr { display: grid; grid-template-columns: 40px 120px minmax(0, 1fr) 84px 72px; gap: 10px; align-items: center; padding: 8px 16px; border-top: 1px solid var(--line); font-size: 12px; }
+.th { background: var(--surface2); font-weight: 700; color: var(--muted); position: sticky; top: 0; z-index: 1; }
+.trActive { background: var(--orange-bg); }
+.gcell { display: flex; align-items: center; gap: 8px; font-weight: 700; white-space: nowrap; }
+.urlBtn {
+  height: 32px; padding: 0 10px; text-align: left; min-width: 0;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface2);
+  font-family: 'Inter', monospace; font-size: 12px; color: #6a3cff;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.urlBtn:hover { border-color: var(--orange); }
 
-.cardTop {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-.gameIcon { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
-.gameName { font-size: 15px; font-weight: 600; color: var(--text); }
-
-.urlBox {
-  background: var(--bg);
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-family: monospace;
-  font-size: 12px;
-  color: var(--p600);
-  word-break: break-all;
-  margin-bottom: 12px;
-}
-
-.cardActions {
-  display: flex;
-  gap: 8px;
-}
-
-.copyBtn {
-  flex: 1;
-  background: var(--p500);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 0;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.copyBtn:hover { background: var(--p600); }
-
-.previewBtn {
-  background: transparent;
-  border: 1.5px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 14px;
-  font-size: 13px;
-  cursor: pointer;
-  color: var(--text2);
-  transition: border-color 0.15s, color 0.15s;
-}
-.previewBtn:hover { border-color: var(--p400); color: var(--p500); }
-
-.copyBtnDone { background: #10B981 !important; }
-
-.portNote { color: var(--p400); font-weight: 600; }
+.howto { flex-shrink: 0; }
+.steps { list-style: none; padding: 0 16px 14px; display: flex; flex-direction: column; gap: 8px; }
+.steps li { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--surface2); border-radius: var(--radius); }
+.steps i { width: 32px; height: 32px; border-radius: 50%; background: var(--orange); color: #fff; font-style: normal; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.steps b { display: block; font-size: 13px; }
+.steps small { font-size: 12px; color: var(--muted); }
