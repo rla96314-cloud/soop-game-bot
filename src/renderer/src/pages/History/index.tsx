@@ -8,7 +8,6 @@ const GAME_FILTERS = [
   { id: 'all',      name: '전체'     },
   { id: 'roulette', name: '룰렛'     },
   { id: 'ladder',   name: '사다리타기' },
-  { id: 'boss',     name: '보스전'    },
   { id: 'quiz',     name: '퀴즈'     },
   { id: 'slot',     name: '슬롯머신'  },
   { id: 'race',     name: '경주'     },
@@ -19,7 +18,7 @@ const GAME_FILTERS = [
 ]
 
 const GAME_COLORS: Record<string, string> = {
-  roulette: '#8B5CF6', ladder: '#3B82F6', boss: '#EF4444',
+  roulette: '#8B5CF6', ladder: '#3B82F6',
   race:     '#14B8A6', rps:    '#EC4899', fish: '#22D3EE',
   lottery:  '#F97316', number: '#06B6D4',
 }

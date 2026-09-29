@@ -3,7 +3,7 @@ import type { Settings } from '../store/settings'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type GameId = 'roulette' | 'ladder' | 'boss' | 'quiz' |
+export type GameId = 'roulette' | 'ladder' | 'quiz' |
                      'slot' | 'race' | 'rps' | 'fish' | 'lottery' | 'number'
 
 export type GameStatus = 'idle' | 'collecting' | 'running' | 'showing_result'
@@ -15,48 +15,6 @@ export interface GameResult {
   result:    string
   detail:    string
   ts:        number
-}
-
-export interface BossParticipant {
-  totalDamage:     number
-  attackCount:     number
-  critCount:       number
-  pendingBalloons: number
-}
-
-export interface BossRollResult {
-  user:       string
-  roll:       number      // 1~12
-  damage:     number
-  isCritical: boolean
-  ts:         number
-}
-
-export interface BossLootItem {
-  name:        string
-  description: string
-}
-
-export interface BossLootResult {
-  user:             string
-  item:             BossLootItem
-  contributionRate: number
-}
-
-export interface BossState {
-  alive:            boolean
-  maxHp:            number
-  currentHp:        number
-  bossName:         string
-  damagePerDot:     number
-  critChance:       number
-  critEnabled:      boolean
-  critMultiplier:   number
-  balloonThreshold: number
-  phase2HpPercent:  number
-  participants:     Record<string, BossParticipant>
-  lastRoll?:        BossRollResult
-  lootResults?:     BossLootResult[]
 }
 
 export interface LadderRung  { row: number; leftCol: number }
@@ -132,7 +90,6 @@ export interface GameState {
   id:       GameId
   status:   GameStatus
   result:   GameResult | null
-  boss?:    BossState
   ladder?:  LadderState
   quiz?:    QuizState
   roulette?: RouletteSpinState
@@ -169,7 +126,7 @@ export class GameEngine extends EventEmitter {
 
   init(settings: Settings) {
     this.settings = settings
-    const ids: GameId[] = ['roulette','ladder','boss','quiz','slot','race','rps','fish','lottery','number']
+    const ids: GameId[] = ['roulette','ladder','quiz','slot','race','rps','fish','lottery','number']
     for (const id of ids) {
       this.states.set(id, this.makeIdleState(id))
     }
@@ -180,24 +137,7 @@ export class GameEngine extends EventEmitter {
   }
 
   private makeIdleState(id: GameId): GameState {
-    const cfg   = this.settings?.games[id]
-    const state: GameState = { id, status: 'idle', result: null }
-    if (id === 'boss' && cfg) {
-      const maxHp = (cfg.maxHp as number) ?? 100000
-      state.boss = {
-        alive:            true,
-        maxHp,
-        currentHp:        maxHp,
-        bossName:         (cfg.bossName         as string)  ?? '보스',
-        damagePerDot:     (cfg.damagePerDot     as number)  ?? 100,
-        critChance:       (cfg.critChance        as number)  ?? 0.15,
-        critEnabled:      (cfg.critEnabled       as boolean) !== false,
-        critMultiplier:   (cfg.critMultiplier    as number)  ?? 2,
-        balloonThreshold: (cfg.balloonThreshold  as number)  ?? 100,
-        participants:     {},
-      }
-    }
-    return state
+    return { id, status: 'idle', result: null }
   }
 
   getState(id: GameId): GameState {
@@ -219,22 +159,6 @@ export class GameEngine extends EventEmitter {
     this.todayViewers.add(username)
     this.emit('stats')
 
-    // ── 보스전: 특정 갯수 별풍선 → 자동 시작 + 즉시 주사위 ──────────────
-    const bossCfg       = this.settings.games.boss
-    const bossEnabled   = bossCfg?.enabled !== false
-    const bossThreshold = (bossCfg?.balloonThreshold as number) ?? 100
-
-    if (bossEnabled && amount === bossThreshold) {
-      const bs = this.getState('boss')
-      if (bs.status === 'idle') this.startBossRaid()
-      const bs2 = this.getState('boss')
-      if (bs2.status === 'running' && bs2.boss?.alive) {
-        bs2.boss.participants[username] ??= { totalDamage: 0, attackCount: 0, critCount: 0, pendingBalloons: 0 }
-        this.bossRollDice(username, bs2)
-        return  // 보스가 트리거 처리 — 다른 게임 중복 발동 방지
-      }
-    }
-
     if (!this.settings.soop.balloonAutoTrigger) return
 
     // 조건을 만족하는 게임 중 임계값이 가장 높은(가장 구체적인) 게임 하나만 발동.
@@ -242,7 +166,6 @@ export class GameEngine extends EventEmitter {
     // 진행 중(idle 아님)인 게임은 건너뛰어 다음 후보가 발동되게 한다.
     let best: { id: GameId; threshold: number } | null = null
     for (const [id, cfg] of Object.entries(this.settings.games)) {
-      if (id === 'boss') continue
       if (!cfg.enabled) continue
       if (this.getState(id as GameId).status !== 'idle') continue
       const threshold = cfg.balloonThreshold || this.settings.soop.globalThreshold
@@ -263,11 +186,6 @@ export class GameEngine extends EventEmitter {
       if (cfg.chatCommand && msg.startsWith(cfg.chatCommand as string)) {
         if (id === 'ladder') {
           this.ladderJoin(username)
-        } else if (id === 'boss') {
-          const bossState = this.getState('boss')
-          if (bossState.status === 'running' && bossState.boss?.alive) {
-            this.bossRollDice(username, bossState)
-          }
         } else if (id === 'quiz') {
           this.quizAnswer(username, msg.replace(cfg.chatCommand as string, '').trim())
         } else if (this.getState(id as GameId).status === 'idle') {
@@ -290,8 +208,6 @@ export class GameEngine extends EventEmitter {
     switch (gameId) {
       case 'roulette': this.runRoulette(triggeredBy, balloon); break
       case 'ladder':   this.startLadder(triggeredBy, balloon); break
-      case 'boss':     this.startBossRaid(); break
-
       case 'quiz':     this.startQuiz(triggeredBy, balloon); break
       case 'slot':     this.runSlot(triggeredBy, balloon); break
       case 'race':     this.runRace(triggeredBy, balloon); break
@@ -440,177 +356,6 @@ export class GameEngine extends EventEmitter {
     results.sort((a, b) => prizes.indexOf(a.prize) - prizes.indexOf(b.prize))
 
     return { rows, cols, rungs, paths, order: participants, prizes: prizeOrder, results }
-  }
-
-  // ── Boss Raid ─────────────────────────────────────────────────────────────
-
-  startBossRaid() {
-    const state = this.getState('boss')
-    if (state.status !== 'idle') return   // already running
-
-    const cfg   = this.settings.games.boss
-    const maxHp = (cfg?.maxHp as number) ?? 100000
-    state.status = 'running'
-    state.boss   = {
-      alive:            true,
-      maxHp,
-      currentHp:        maxHp,
-      bossName:         (cfg?.bossName          as string)  ?? '보스',
-      damagePerDot:     (cfg?.damagePerDot      as number)  ?? 100,
-      critChance:       (cfg?.critChance         as number)  ?? 0.15,
-      critEnabled:      (cfg?.critEnabled        as boolean) !== false,
-      critMultiplier:   (cfg?.critMultiplier     as number)  ?? 2,
-      balloonThreshold: (cfg?.balloonThreshold   as number)  ?? 100,
-      phase2HpPercent:  (cfg?.phase2HpPercent    as number)  ?? 50,
-      participants:     {},
-    }
-    this.emit('game:update', 'boss', state)
-  }
-
-  private bossRollDice(user: string, state: GameState) {
-    if (!state.boss?.alive) return
-
-    const roll         = Math.floor(Math.random() * 12) + 1
-    let   damage       = roll * state.boss.damagePerDot
-    const isCritical   = state.boss.critEnabled && Math.random() < state.boss.critChance
-    if (isCritical) damage = Math.round(damage * state.boss.critMultiplier)
-
-    state.boss.currentHp = Math.max(0, state.boss.currentHp - damage)
-
-    const p = state.boss.participants[user]
-    if (p) {
-      p.totalDamage  += damage
-      p.attackCount  += 1
-      if (isCritical) p.critCount++
-    }
-
-    state.boss.lastRoll = { user, roll, damage, isCritical, ts: Date.now() }
-    this.emit('game:update', 'boss', state)
-    // Defeat is triggered via setSharedBossHp() after server confirms HP reaches 0
-  }
-
-  private defeatBoss(lastUser: string, state: GameState) {
-    if (!state.boss) return
-
-    const cfg       = this.settings.games.boss
-    const lootItems = (cfg?.lootItems as BossLootItem[]) ?? []
-    const loot      = this.drawBossLoot(state.boss.participants, lootItems)
-
-    state.boss.lootResults = loot
-
-    const totalDamage = Object.values(state.boss.participants)
-      .reduce((s, p) => s + p.totalDamage, 0)
-
-    // Fire-and-forget Google Sheets webhook
-    const webhookUrl = (cfg as Record<string, unknown>)?.sheetsWebhookUrl as string
-    if (webhookUrl) {
-      this.postRaidToSheets(webhookUrl, state.boss, loot).catch(() => {})
-    }
-
-    const result: GameResult = {
-      gameId:      'boss',
-      triggeredBy: lastUser,
-      balloon:     0,
-      result:      '보스 처치!',
-      detail:      `총 데미지: ${totalDamage.toLocaleString()} | 참여자: ${Object.keys(state.boss.participants).length}명`,
-      ts:          Date.now(),
-    }
-    this.finishGame('boss', result)
-
-    // 30초 후 자동 idle 리셋 — 다음 별풍선 트리거로 새 보스 시작 가능
-    setTimeout(() => {
-      const bs = this.states.get('boss')
-      if (bs && bs.status === 'showing_result') this.resetBoss()
-    }, 30000)
-  }
-
-  private async postRaidToSheets(url: string, boss: BossState, loot: BossLootResult[]) {
-    const totalDmg = Object.values(boss.participants).reduce((s, p) => s + p.totalDamage, 0)
-    const participants = Object.entries(boss.participants)
-      .filter(([, p]) => p.totalDamage > 0)
-      .sort((a, b) => b[1].totalDamage - a[1].totalDamage)
-      .map(([user, p]) => ({
-        user,
-        totalDamage:      p.totalDamage,
-        attackCount:      p.attackCount,
-        critCount:        p.critCount,
-        contributionRate: totalDmg > 0 ? +(p.totalDamage / totalDmg * 100).toFixed(1) : 0,
-      }))
-
-    const payload = {
-      bossName:    boss.bossName,
-      maxHp:       boss.maxHp,
-      raidedAt:    new Date().toISOString(),
-      participants,
-      lootResults: loot.map((r, i) => ({
-        rank:             i + 1,
-        user:             r.user,
-        item:             r.item.name,
-        description:      r.item.description ?? '',
-        contributionRate: +r.contributionRate.toFixed(1),
-      })),
-    }
-
-    await fetch(url, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(payload),
-    })
-  }
-
-  private drawBossLoot(
-    participants: Record<string, BossParticipant>,
-    lootItems:   BossLootItem[],
-  ): BossLootResult[] {
-    if (!lootItems.length) return []
-
-    const entries = Object.entries(participants)
-      .filter(([, p]) => p.totalDamage > 0)
-      .map(([user, p]) => ({ user, weight: p.totalDamage }))
-
-    if (!entries.length) return []
-
-    const totalWeight = entries.reduce((s, e) => s + e.weight, 0)
-
-    return lootItems.map(item => {
-      let r      = Math.random() * totalWeight
-      let winner = entries[entries.length - 1]
-      for (const e of entries) {
-        r -= e.weight
-        if (r <= 0) { winner = e; break }
-      }
-      return {
-        user:             winner.user,
-        item,
-        contributionRate: (winner.weight / totalWeight) * 100,
-      }
-    })
-  }
-
-  setSharedBossHp(hp: number, alive: boolean) {
-    const state = this.getState('boss')
-    if (!state.boss || state.status !== 'running') return
-
-    const wasAlive       = state.boss.alive
-    state.boss.currentHp = Math.max(0, hp)
-
-    if (!alive && wasAlive) {
-      state.boss.alive = false
-      this.defeatBoss(state.boss.lastRoll?.user ?? '공동', state)
-      return
-    }
-
-    this.emit('game:update', 'boss', state)
-  }
-
-  resetBoss() {
-    const state  = this.getState('boss')
-    state.status = 'idle'
-    state.result = null
-    state.boss   = undefined
-    const idle   = this.makeIdleState('boss')
-    state.boss   = idle.boss
-    this.emit('game:update', 'boss', state)
   }
 
   // ── Quiz ──────────────────────────────────────────────────────────────────
@@ -904,22 +649,21 @@ export class GameEngine extends EventEmitter {
     this.emit('game:result', id, result)
     this.emit('game:update', id, state)
 
-    // Reset to idle after 5s (except boss - reset manually)
-    if (id !== 'boss') {
-      setTimeout(() => {
-        const s2 = this.states.get(id)
-        if (s2) {
-          s2.status = 'idle'
-          s2.result = null
-          if (id === 'roulette') s2.roulette = undefined
-          if (id === 'ladder')  s2.ladder   = undefined
-          if (id === 'quiz')    s2.quiz     = undefined
-          if (id === 'slot')    s2.slot     = undefined
-          if (id === 'number')  s2.number   = undefined
-          this.emit('game:update', id, s2)
-        }
-      }, 5000)
-    }
+    // Reset to idle after 5s
+    setTimeout(() => {
+      const s2 = this.states.get(id)
+      if (s2) {
+        s2.status = 'idle'
+        s2.result = null
+        if (id === 'roulette') s2.roulette = undefined
+        if (id === 'ladder')  s2.ladder   = undefined
+        if (id === 'quiz')    s2.quiz     = undefined
+        if (id === 'slot')    s2.slot     = undefined
+        if (id === 'number')  s2.number   = undefined
+        if (id === 'lottery') s2.lottery  = undefined
+        this.emit('game:update', id, s2)
+      }
+    }, 5000)
   }
 }
 

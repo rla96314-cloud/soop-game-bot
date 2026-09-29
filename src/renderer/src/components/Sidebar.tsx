@@ -20,14 +20,6 @@ const GamesIcon = () => (
     <circle cx="15.5" cy="11.5" r=".8" fill="currentColor" stroke="none"/>
   </svg>
 )
-const BossIcon = () => (
-  <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M10 2L4 7v5c0 3 2.5 5 6 5s6-2 6-5V7L10 2z"/>
-    <line x1="7" y1="13" x2="7" y2="15"/>
-    <line x1="10" y1="13" x2="10" y2="15"/>
-    <line x1="13" y1="13" x2="13" y2="15"/>
-  </svg>
-)
 const OverlayIcon = () => (
   <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
     <rect x="2" y="3" width="16" height="11" rx="2"/>
@@ -59,7 +51,6 @@ const HelpIcon = () => (
 const ICONS: Record<string, () => JSX.Element> = {
   dashboard: DashIcon,
   games:     GamesIcon,
-  boss:      BossIcon,
   overlay:   OverlayIcon,
   history:   HistoryIcon,
   settings:  SettingsIcon,
@@ -73,7 +64,6 @@ interface NavItem { id: Page; label: string }
 const NAV: NavItem[] = [
   { id: 'dashboard', label: '대시보드'    },
   { id: 'games',     label: '게임 관리'   },
-  { id: 'boss',      label: '보스전'       },
   { id: 'overlay',   label: 'OBS 오버레이' },
   { id: 'history',   label: '기록 / 통계' },
   { id: 'settings',  label: '설정'        },

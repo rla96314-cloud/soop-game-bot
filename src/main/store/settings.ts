@@ -6,7 +6,6 @@ export interface RouletteItem { name: string; probability: number }
 export interface QuizQuestion { question: string; answer: string }
 export interface Prize        { name: string; description: string }
 export interface PickItem     { name: string; description: string; color: string; count: number }
-export interface BossLootItem { name: string; description: string }
 
 export interface GameConfig {
   enabled:          boolean
@@ -20,11 +19,6 @@ export interface GameConfig {
   maxParticipants?: number
   joinDuration?:   number
   prizes?:         Prize[]
-  // boss
-  maxHp?:             number
-  currentHp?:         number
-  damagePerBalloon?:  number
-  damagePerChat?:     number
   // pickboard
   pickRows?: number
   pickCols?: number
@@ -90,20 +84,6 @@ const DEFAULTS: Settings = {
         { name: '2등', description: '음료 쿠폰' },
         { name: '꽝',  description: '' },
       ],
-    },
-    boss: {
-      enabled: true, balloonThreshold: 100, chatCommand: '',
-      bossName:        '보스',
-      maxHp:           100000,
-      damagePerDot:    100,
-      critChance:      0.15,
-      critEnabled:     true,
-      critMultiplier:  2,
-      lootItems: [
-        { name: '1등 상품', description: '치킨 쿠폰'  },
-        { name: '2등 상품', description: '음료 쿠폰'  },
-        { name: '3등 상품', description: '간식 쿠폰'  },
-      ] as BossLootItem[],
     },
     pickboard: {
       enabled: true, balloonThreshold: 0, chatCommand: '',

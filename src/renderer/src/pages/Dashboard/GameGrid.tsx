@@ -4,7 +4,6 @@ import styles from './GameGrid.module.css'
 const GAMES = [
   { id: 'roulette', name: '룰렛',     color: '#8B5CF6' },
   { id: 'ladder',   name: '사다리타기', color: '#3B82F6' },
-  { id: 'boss',     name: '보스전',    color: '#EF4444' },
   { id: 'quiz',     name: '퀴즈',     color: '#10B981' },
   { id: 'slot',     name: '슬롯머신',  color: '#8B5CF6' },
   { id: 'race',     name: '경주',     color: '#6366F1' },
@@ -34,12 +33,6 @@ function GameIcon({ id, color }: { id: string; color: string }) {
         <line x1={13} y1={14} x2={31} y2={14} {...s} />
         <line x1={13} y1={24} x2={31} y2={24} {...s} />
         <line x1={13} y1={34} x2={31} y2={34} {...s} />
-      </svg>
-    )
-    case 'boss': return (
-      <svg viewBox="0 0 44 44" width={44} height={44}>
-        <path d="M8 34 L10 16 L18 24 L22 10 L26 24 L34 16 L36 34 Z" {...s} />
-        <rect x={8} y={34} width={28} height={5} rx={2.5} {...s} />
       </svg>
     )
     case 'quiz': return (

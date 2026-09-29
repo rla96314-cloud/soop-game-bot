@@ -8,11 +8,10 @@ import Settings         from './pages/Settings'
 import GamesPage        from './pages/Games'
 import OverlayPage      from './pages/Overlay'
 import HistoryPage      from './pages/History'
-import BossPage         from './pages/Boss'
 import HelpPage         from './pages/Help'
 import styles           from './App.module.css'
 
-export type Page = 'dashboard' | 'games' | 'boss' | 'overlay' | 'history' | 'settings' | 'help'
+export type Page = 'dashboard' | 'games' | 'overlay' | 'history' | 'settings' | 'help'
 
 interface AuthUser { id: string; name: string }
 
@@ -85,7 +84,6 @@ export default function App() {
           <main className={styles.main}>
             {page === 'dashboard' && <Dashboard onNavigateToGame={navigateToGame} />}
             {page === 'games'     && <GamesPage initialSelected={gamesInitial} />}
-            {page === 'boss'      && <BossPage />}
             {page === 'overlay'   && <OverlayPage />}
             {page === 'settings'  && <Settings />}
             {page === 'history'   && <HistoryPage />}

@@ -27,8 +27,6 @@ contextBridge.exposeInMainWorld('electron', {
   gameState:   (gameId: string)        => ipcRenderer.invoke('game:state', gameId),
   gameAll:     ()                      => ipcRenderer.invoke('game:all'),
   gameHistory: (limit?: number)        => ipcRenderer.invoke('game:history', limit),
-  bossStart:   ()                      => ipcRenderer.invoke('boss:start'),
-  bossReset:   ()                      => ipcRenderer.invoke('boss:reset'),
 
   // Overlay
   overlayUrl:       (gameId: string)                  => ipcRenderer.invoke('overlay:url', gameId),
@@ -54,9 +52,6 @@ contextBridge.exposeInMainWorld('electron', {
   weflabStop:   ()            => ipcRenderer.invoke('weflab:stop'),
   weflabStatus: ()            => ipcRenderer.invoke('weflab:status'),
 
-  // Schedule
-  scheduleToday: (force?: boolean) => ipcRenderer.invoke('schedule:today', force ?? false),
-
   // Event subscriptions
   onSoopConnected:    (cb: () => void)                        => on('soop:connected',    cb),
   onSoopDisconnected: (cb: () => void)                        => on('soop:disconnected', cb),
@@ -64,7 +59,6 @@ contextBridge.exposeInMainWorld('electron', {
   onSoopStandby:      (cb: (msg: string) => void)             => on('soop:standby',      cb),
   onSoopBalloon:      (cb: (e: SoopBalloonEvent) => void)     => on('soop:balloon',      cb),
   onSoopChat:         (cb: (e: SoopChatEvent) => void)        => on('soop:chat',         cb),
-  onSoopFanAlert:     (cb: (e: FanAlertEvent) => void)        => on('soop:fan-alert',    cb),
   onGameUpdate:       (cb: (id: string, s: unknown) => void)  => on('game:update',       cb),
   onGameResult:       (cb: (id: string, r: unknown) => void)  => on('game:result',       cb),
   onQuizQuestion:     (cb: (q: unknown) => void)              => on('quiz:question',      cb),
@@ -80,4 +74,3 @@ interface SoopBalloonEvent { user: string; amount: number; ts: number }
 interface WeflabDonationEvent { donor: string; balloons: number; amount: number; message: string; event: string; ts: number }
 interface SoopChatEvent    { user: string; message: string; ts: number }
 interface StatsSnapshot    { todayRuns: number; todayBalloons: number; todayViewers: number }
-interface FanAlertEvent    { userId: string; userNick: string; broadcasts: { id: string; name: string; rank: number }[]; ts: number }

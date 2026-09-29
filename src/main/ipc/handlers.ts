@@ -1,86 +1,16 @@
-import { ipcMain, BrowserWindow, shell, app } from 'electron'
+import { ipcMain, BrowserWindow, shell } from 'electron'
 import { gameEngine, type GameId } from '../games/engine'
 import { soopClient }              from '../soop/client'
 import { overlayServer }           from '../overlay/server'
-import { loadSettings, patchSettings, saveSettings } from '../store/settings'
-import { verifyUser, fetchAllowlist }               from '../auth/allowlist'
-import { openSoopLoginWindow }                      from '../auth/soopLogin'
-import { fetchTodaySchedule }                       from '../schedule/fetcher'
-import { weflabWatcher }                            from '../weflab/watcher'
-import { existsSync, mkdirSync, writeFileSync, unlinkSync, readFileSync } from 'fs'
-import { join } from 'path'
-import { homedir } from 'os'
-
-// ── 팬 DB ────────────────────────────────────────────────────────────────────
-const FAN_DB_PATH = join(homedir(), 'virtual-fan-monitor', 'data', 'fans.json')
-
-interface FanInfo { nick: string; broadcasts: { id: string; name: string; rank: number }[] }
-let fanDB: Record<string, FanInfo> = {}
-
-function loadFanDB() {
-  try {
-    fanDB = JSON.parse(readFileSync(FAN_DB_PATH, 'utf-8'))
-  } catch { fanDB = {} }
-}
-loadFanDB()
-setInterval(loadFanDB, 60_000)
-
-function lookupFan(userId: string, userNick: string): FanInfo | null {
-  const id = userId.toLowerCase()
-  if (fanDB[id]) return fanDB[id]
-  for (const info of Object.values(fanDB)) {
-    if (info.nick && info.nick === userNick) return info
-  }
-  return null
-}
-
-// 세션 내 중복 알림 방지 (채팅+입장 둘 다 잡히는 경우)
-const alertedThisSession = new Set<string>()
-
-const BOSS_HP_SERVER = 'http://100.89.116.107:4081'
-const EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp']
-
-async function downloadBossImages(imageUrls: Record<string, string>) {
-  const dataDir = join(app.getPath('userData'), 'data')
-  if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true })
-  for (const [phase, url] of Object.entries(imageUrls)) {
-    if (!url || typeof url !== 'string') continue
-    try {
-      const ir  = await fetch(url)
-      if (!ir.ok) continue
-      const buf = Buffer.from(await ir.arrayBuffer())
-      const ct  = ir.headers.get('content-type') ?? 'image/png'
-      const ext = ct.includes('jpeg') || ct.includes('jpg') ? 'jpg'
-                : ct.includes('gif') ? 'gif' : ct.includes('webp') ? 'webp' : 'png'
-      const base = join(dataDir, `boss-image-${phase}`)
-      EXTS.forEach(e => { try { unlinkSync(`${base}.${e}`) } catch {} })
-      writeFileSync(`${base}.${ext}`, buf)
-    } catch {}
-  }
-}
-
-function emitFanAlert(send: (ch: string, ...a: unknown[]) => void, userId: string, userNick: string) {
-  const key = userId.toLowerCase()
-  if (alertedThisSession.has(key)) return
-  const info = lookupFan(userId, userNick)
-  if (!info) return
-  alertedThisSession.add(key)
-  // 5분 후 재감지 허용 (같은 사람이 나갔다 들어올 수 있음)
-  setTimeout(() => alertedThisSession.delete(key), 5 * 60_000)
-  send('soop:fan-alert', {
-    userId,
-    userNick: info.nick || userNick,
-    broadcasts: info.broadcasts.slice(0, 3),
-    ts: Date.now(),
-  })
-}
+import { loadSettings, patchSettings } from '../store/settings'
+import { verifyUser }              from '../auth/allowlist'
+import { openSoopLoginWindow }     from '../auth/soopLogin'
+import { weflabWatcher }           from '../weflab/watcher'
 
 export function registerIpcHandlers(win: BrowserWindow) {
   const send = (ch: string, ...args: unknown[]) => {
     if (!win.isDestroyed()) win.webContents.send(ch, ...args)
   }
-
-  let lastBossRollTs = 0
 
   // ── SOOP connection ──────────────────────────────────────────────────────
 
@@ -99,12 +29,6 @@ export function registerIpcHandlers(win: BrowserWindow) {
   soopClient.on('chat', (user, msg) => {
     send('soop:chat', { user, message: msg, ts: Date.now() })
     gameEngine.onChat(user, msg)
-    // 채팅으로 열혈팬 감지 (입장 패킷 보완)
-    emitFanAlert(send, user, user)
-  })
-
-  soopClient.on('enter', (userId: string, userNick: string) => {
-    emitFanAlert(send, userId, userNick)
   })
 
   // ── Game engine ──────────────────────────────────────────────────────────
@@ -112,40 +36,6 @@ export function registerIpcHandlers(win: BrowserWindow) {
   gameEngine.on('game:update', (id, state) => {
     send('game:update', id, state)
     overlayServer.sendState(state)
-
-    // Shared boss: report damage to server on each new roll
-    if (id === 'boss' && state.boss?.lastRoll && state.boss.lastRoll.ts > lastBossRollTs) {
-      lastBossRollTs = state.boss.lastRoll.ts
-      const roll      = state.boss.lastRoll
-      const channelId = loadSettings().soop?.channelId ?? 'unknown'
-      fetch(`${BOSS_HP_SERVER}/boss-attack`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ channelId, username: roll.user, damage: roll.damage, isCrit: roll.isCritical }),
-      })
-        .then(r => r.json())
-        .then((j: Record<string, unknown>) => {
-          gameEngine.setSharedBossHp(j.currentHp as number, j.alive as boolean)
-        })
-        .catch(() => {})
-    }
-  })
-
-  overlayServer.setCommandHandler((cmd) => {
-    if (cmd.type === 'start-boss') {
-      gameEngine.startBossRaid()
-    } else if (cmd.type === 'reset-boss') {
-      gameEngine.resetBoss()
-    } else if (cmd.type === 'update-settings') {
-      const s    = cmd.settings as Record<string, unknown>
-      const urls = s.imageUrls as Record<string, string> | undefined
-      if (urls) downloadBossImages(urls).catch(() => {})
-      const { imageUrls: _drop, ...bossOnly } = s
-      const next = patchSettings({ games: { boss: bossOnly } })
-      gameEngine.updateSettings(next)
-    } else if (cmd.type === 'sync-boss-hp') {
-      gameEngine.setSharedBossHp(cmd.currentHp as number, cmd.alive as boolean)
-    }
   })
   gameEngine.on('game:result', (id, result) => {
     send('game:result', id, result)
@@ -199,17 +89,6 @@ export function registerIpcHandlers(win: BrowserWindow) {
   ipcMain.handle('game:state',   (_, gameId: GameId) => gameEngine.getState(gameId))
   ipcMain.handle('game:all',     ()                   => gameEngine.getAllStates())
   ipcMain.handle('game:history', (_, limit = 50)      => gameEngine.getHistory(limit))
-  ipcMain.handle('boss:start', () => {
-    gameEngine.startBossRaid()
-    const cfg = loadSettings().games.boss as Record<string, unknown>
-    fetch(`${BOSS_HP_SERVER}/shared-boss/start`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ maxHp: (cfg?.maxHp as number) ?? 100000, bossName: (cfg?.bossName as string) ?? '보스' }),
-    }).catch(() => {})
-    return { ok: true }
-  })
-  ipcMain.handle('boss:reset', () => { gameEngine.resetBoss(); return { ok: true } })
 
   // Overlay
   ipcMain.handle('overlay:url',       (_, gameId: string)        => overlayServer.getUrl(gameId))
@@ -296,13 +175,4 @@ export function registerIpcHandlers(win: BrowserWindow) {
     running: weflabWatcher.isRunning,
     url:     weflabWatcher.url,
   }))
-
-  // Schedule
-  ipcMain.handle('schedule:today', async (_, force: boolean) => {
-    try {
-      return { ok: true, data: await fetchTodaySchedule(force) }
-    } catch (err) {
-      return { ok: false, error: String(err) }
-    }
-  })
 }

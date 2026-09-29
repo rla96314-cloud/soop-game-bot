@@ -5,7 +5,7 @@ import styles from './Overlay.module.css'
 const GAMES = [
   { id: 'roulette', name: '룰렛',     color: '#8B5CF6' },
   { id: 'ladder',   name: '사다리타기', color: '#3B82F6' },
-  { id: 'boss',     name: '보스전',    color: '#EF4444' },
+  { id: 'pickboard', name: '뽑기판',   color: '#EC4899' },
   { id: 'quiz',     name: '퀴즈',     color: '#10B981' },
   { id: 'slot',     name: '슬롯머신',  color: '#6366F1' },
   { id: 'race',     name: '경주',     color: '#6366F1' },

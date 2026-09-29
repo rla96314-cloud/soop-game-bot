@@ -258,7 +258,7 @@ export default function Settings() {
           />
         </div>
         <div className={styles.overlayUrls}>
-          {['roulette','ladder','quiz','slot','boss','number','lottery'].map(id => (
+          {['roulette','ladder','pickboard','quiz','slot','number','lottery'].map(id => (
             <div key={id} className={styles.overlayRow}>
               <span className={styles.overlayName}>{id}</span>
               <code className={styles.overlayCode}>
