@@ -20,7 +20,7 @@ export default function Dashboard({ onNavigate, user }: {
   onNavigate: (page: 'games' | 'overlay' | 'help' | 'history', gameId?: string) => void
   user?: { id: string; name: string } | null
 }) {
-  const { settings, stats, history, gameStates, triggerGame, connected, simulation } = useApp()
+  const { settings, stats, history, gameStates, connected, liveViewers } = useApp()
   const [selected, setSelected] = useState('roulette')
   const port = ((settings?.overlay as Record<string, unknown> | undefined)?.port as number) ?? 3939
   const games = (settings?.games as Record<string, Record<string, unknown>> | undefined) ?? {}
@@ -58,11 +58,11 @@ export default function Dashboard({ onNavigate, user }: {
         </div>
         <div className={styles.quickList}>
           {quick.map(g => (
-            <button key={g.id} className={styles.gameRow} title={g.engine ? '클릭하면 바로 실행됩니다' : '게임 화면으로 이동'}
-              onClick={() => { setSelected(g.id); if (g.engine && !busy(g.id)) triggerGame(g.id); else if (!g.engine) onNavigate('games', g.id) }}>
+            <button key={g.id} className={styles.gameRow} title="선택하면 가운데 설정과 오른쪽 미리보기가 바뀝니다. 실행은 오른쪽 실행 버튼으로."
+              onClick={() => setSelected(g.id)}>
               <span className="game-ic lg" style={{ background: g.color }}><Icon name={g.icon} size={24} /></span>
               <span className={styles.gameText}><b>{g.name}{busy(g.id) && <span className={styles.dot} />}</b><small>{g.desc}</small></span>
-              <Icon name={g.engine ? 'play' : 'chevron-right'} size={16} className={styles.arrow} />
+              <Icon name="chevron-right" size={16} className={styles.arrow} />
             </button>
           ))}
         </div>
@@ -96,16 +96,16 @@ export default function Dashboard({ onNavigate, user }: {
       {/* ── 하단 3칸 ── */}
       <div className={`card ${styles.bottom} ${styles.b1}`}>
         <div className="card-head"><div className="sec-title" style={{ fontSize: 16 }}>방송 현황</div>
-          <span className={`badge ${connected ? 'badge-live' : 'badge-idle'}`}>{connected ? (simulation ? 'SIM' : 'LIVE') : 'OFF'}</span></div>
+          <span className={`badge ${connected ? 'badge-live' : 'badge-idle'}`}>{connected ? 'LIVE' : 'OFF'}</span></div>
         <div className={styles.kpis}>
-          <div className={styles.kpi}><small><Icon name="users" size={12} /> 동시 시청자</small><b className="num">{stats.todayViewers.toLocaleString()}</b></div>
+          <div className={styles.kpi} title="현재 시청자 수 (방송국 API, 15초마다 갱신)"><small><Icon name="users" size={12} /> 동시 시청자</small><b className="num">{liveViewers.toLocaleString()}</b></div>
           <div className={styles.kpi}><small><Icon name="play" size={12} /> 오늘 실행 수</small><b className="num">{stats.todayRuns.toLocaleString()}</b></div>
           <div className={styles.kpi}><small><Icon name="gift" size={12} /> 소모 별풍선</small><b className={`num ${styles.orange}`}>{stats.todayBalloons.toLocaleString()}</b></div>
           <div className={styles.kpi}><small><Icon name="clock" size={12} /> 실행 시간</small><b className="num">{fmtElapsed(elapsed)}</b></div>
         </div>
         <div className={styles.userLine}>
           <Icon name="users" size={18} />
-          <div><b>{user?.name ?? '스트리머'} ({user?.id ?? '-'})</b><small>{connected ? (simulation ? '시뮬레이션 이벤트로 게임을 테스트하는 중입니다.' : '지금, 시청자와 함께하는 방송이 진행 중입니다.') : 'SOOP 채팅에 연결되어 있지 않습니다.'}</small></div>
+          <div><b>{user?.name ?? '스트리머'} ({user?.id ?? '-'})</b><small>{connected ? '지금, 시청자와 함께하는 방송이 진행 중입니다.' : 'SOOP 채팅에 연결되어 있지 않습니다.'}</small></div>
         </div>
       </div>
 
@@ -129,7 +129,7 @@ export default function Dashboard({ onNavigate, user }: {
       <div className={`card ${styles.bottom} ${styles.b3}`}>
         <div className="card-head"><div className="sec-title" style={{ fontSize: 16 }}>빠른 통계</div><span className="badge badge-idle">오늘</span></div>
         <div className={styles.stat4}>
-          <div><small><Icon name="users" size={14} /> 참여 시청자</small><b className="num">{stats.todayViewers.toLocaleString()}</b></div>
+          <div title="오늘 채팅하거나 후원한 시청자 수"><small><Icon name="users" size={14} /> 참여 시청자</small><b className="num">{stats.todayViewers.toLocaleString()}</b></div>
           <div><small><Icon name="play" size={14} /> 총 실행 수</small><b className="num">{stats.todayRuns.toLocaleString()}</b></div>
           <div><small><Icon name="gift" size={14} /> 소모 별풍선</small><b className={`num ${styles.orange}`}>{stats.todayBalloons.toLocaleString()}</b></div>
           <div><small><Icon name="check" size={14} /> 당첨 횟수</small><b className="num">{wins}</b></div>

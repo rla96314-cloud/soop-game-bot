@@ -57,6 +57,7 @@ contextBridge.exposeInMainWorld('electron', {
   onSoopDisconnected: (cb: () => void)                        => on('soop:disconnected', cb),
   onSoopError:        (cb: (err: string) => void)             => on('soop:error',        cb),
   onSoopStandby:      (cb: (msg: string) => void)             => on('soop:standby',      cb),
+  onSoopViewers:      (cb: (n: number) => void)               => on('soop:viewers',      cb),
   onSoopBalloon:      (cb: (e: SoopBalloonEvent) => void)     => on('soop:balloon',      cb),
   onSoopChat:         (cb: (e: SoopChatEvent) => void)        => on('soop:chat',         cb),
   onGameUpdate:       (cb: (id: string, s: unknown) => void)  => on('game:update',       cb),

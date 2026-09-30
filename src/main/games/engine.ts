@@ -168,7 +168,8 @@ export class GameEngine extends EventEmitter {
     for (const [id, cfg] of Object.entries(this.settings.games)) {
       if (!cfg.enabled) continue
       if (this.getState(id as GameId).status !== 'idle') continue
-      const threshold = cfg.balloonThreshold || this.settings.soop.globalThreshold
+      const threshold = Number(cfg.balloonThreshold) || 0
+      if (threshold <= 0) continue   // 0 = 이 게임은 별풍선으로 발동하지 않음
       if (amount >= threshold && (!best || threshold > best.threshold)) {
         best = { id: id as GameId, threshold }
       }

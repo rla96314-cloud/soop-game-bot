@@ -77,18 +77,17 @@ app.whenReady().then(() => {
   // Register IPC
   registerIpcHandlers(win)
 
-  // Auto-connect SOOP (simulation mode by default)
+  // Auto-connect SOOP (항상 실연동. 채널 ID가 비어 있으면 로그인한 SOOP 아이디 사용)
   soopClient.connect({
-    channelId:  settings.soop.channelId,
+    channelId:  settings.soop.channelId || settings.user?.id || '',
     userId:     settings.soop.userId,
     token:      settings.soop.token,
-    simulation: settings.soop.simulationMode !== false,
+    simulation: false,
   })
 
-  // Auto-start weflab watcher if previously enabled
-  const wf = settings.weflab as Record<string, unknown> | undefined
-  if (wf?.enabled && wf?.url) {
-    weflabWatcher.start(wf.url as string)
+  // 위플랩 URL이 저장돼 있으면 자동 감시 시작
+  if (settings.weflab?.url) {
+    weflabWatcher.start(settings.weflab.url)
   }
 
   app.on('activate', () => {

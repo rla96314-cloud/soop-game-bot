@@ -11,6 +11,7 @@ export interface GameConfig {
   enabled:          boolean
   balloonThreshold: number
   chatCommand:      string
+  weflabKeywords?:  string[]   // 위플랩 룰렛 결과에 이 키워드가 있으면 이 게임 실행
   // roulette
   items?:        RouletteItem[]
   spinDuration?: number
@@ -30,27 +31,21 @@ export interface GameConfig {
   [key: string]: unknown
 }
 
-export interface WeflabTrigger { keyword: string }
-
 export interface Settings {
   user?: { id: string; name: string } | null
   soop: {
     channelId:          string
     userId:             string
     token:              string
-    simulationMode:     boolean
+    simulationMode:     boolean   // 사용 안 함 (항상 실연동)
     balloonAutoTrigger: boolean
-    globalThreshold:    number
   }
   games:   Record<string, GameConfig>
   overlay: { port: number; theme: string }
   ui:      { scale: number }   // 전체 UI 배율(%) — 90~130
 
   weflab: {
-    enabled:        boolean
-    url:            string
-    triggers:       WeflabTrigger[]
-    balloonTrigger: boolean   // 위플랩 후원 별풍선을 SOOP 별풍선처럼 게임 트리거로 사용
+    url: string   // 비어 있지 않으면 앱 시작 시 자동 감시. 룰렛 결과 키워드는 게임별 weflabKeywords, 후원 별풍선은 항상 트리거
   }
 }
 
@@ -59,9 +54,8 @@ const DEFAULTS: Settings = {
     channelId:          '',
     userId:             '',
     token:              '',
-    simulationMode:     true,
+    simulationMode:     false,
     balloonAutoTrigger: true,
-    globalThreshold:    50,
   },
   games: {
     roulette: {
@@ -121,7 +115,7 @@ const DEFAULTS: Settings = {
   },
   overlay: { port: 3939, theme: 'purple' },
   ui:      { scale: 110 },
-  weflab:  { enabled: false, url: '', triggers: [], balloonTrigger: false },
+  weflab:  { url: '' },
 }
 
 function getPath() {

@@ -34,6 +34,7 @@ export interface AppCtx {
   connected:  boolean
   simulation: boolean
   standby:    string | null   // 방송 대기/재접속 상태 메시지 (실연동 모드에서 오프라인일 때)
+  liveViewers: number         // 현재 시청자 수 (방송국 API)
   chat:       ChatItem[]
   history:    HistoryItem[]
   stats:      Stats
@@ -50,6 +51,7 @@ const defaultCtx: AppCtx = {
   connected:  false,
   simulation: true,
   standby:    null,
+  liveViewers: 0,
   chat:       [],
   history:    [],
   stats:      { todayRuns: 0, todayBalloons: 0, todayViewers: 0 },
@@ -86,6 +88,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [connected,  setConnected]  = useState(false)
   const [simulation, setSimulation] = useState(true)
   const [standby,    setStandby]    = useState<string | null>(null)
+  const [liveViewers, setLiveViewers] = useState(0)
   const [chat,       setChat]       = useState<ChatItem[]>([])
   const [history,    setHistory]    = useState<HistoryItem[]>([])
   const [stats,      setStats]      = useState<Stats>({ todayRuns: 0, todayBalloons: 0, todayViewers: 0 })
@@ -148,6 +151,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     off.push((el.onSoopStandby as (cb: (msg: string) => void) => () => void)(
       msg => { setConnected(false); setStandby(msg) }
+    ))
+
+    off.push(((el.onSoopViewers as ((cb: (n: number) => void) => () => void) | undefined) ?? (() => () => {}))(
+      n => setLiveViewers(n)
     ))
 
     off.push((el.onSoopBalloon as (cb: (e: { user: string; amount: number; ts: number }) => void) => () => void)(
@@ -218,7 +225,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <Ctx.Provider value={{
-      connected, simulation, standby,
+      connected, simulation, standby, liveViewers,
       chat, history, stats, gameStates, settings,
       triggerGame, refreshSettings, patchSettings,
     }}>

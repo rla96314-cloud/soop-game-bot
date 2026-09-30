@@ -21,8 +21,8 @@ interface Props {
 }
 
 export default function Sidebar({ current, onChange, user }: Props) {
-  const { connected, simulation, standby } = useApp()
-  const connLabel = connected ? (simulation ? '시뮬레이션 중' : '방송 연결됨') : (standby ? '방송 대기 중' : '연결 끊김')
+  const { connected, standby } = useApp()
+  const connLabel = connected ? '방송 연결됨' : (standby ? '방송 대기 중' : '연결 끊김')
   const connColor = connected ? 'var(--live)' : (standby ? '#f2a600' : '#ff5f57')
 
   return (

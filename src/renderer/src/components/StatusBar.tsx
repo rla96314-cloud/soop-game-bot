@@ -9,21 +9,21 @@ const fmtTime = (ts: number) => {
 }
 
 export default function StatusBar({ user }: { user?: { id: string; name: string } | null }) {
-  const { connected, simulation, standby, stats, history } = useApp()
-  const live = connected && !simulation
-  const label = connected ? (simulation ? '시뮬레이션 중' : '방송 연결됨') : (standby ?? '연결 끊김')
+  const { connected, standby, stats, history, liveViewers } = useApp()
+  const live = connected
+  const label = connected ? '방송 연결됨' : (standby ? '방송 대기 중' : '연결 끊김')
   const recent = history.slice(0, 3)
 
   return (
     <div className={styles.bar}>
       <div className={styles.left}>
         <span className={styles.liveDot} style={{ background: connected ? 'var(--live)' : '#ff5f57' }} />
-        <span className={`${styles.live} ${live ? styles.liveOn : styles.liveOff}`}>{live ? 'LIVE' : (simulation && connected ? 'SIM' : 'OFF')}</span>
+        <span className={`${styles.live} ${live ? styles.liveOn : styles.liveOff}`}>{live ? 'LIVE' : 'OFF'}</span>
         <span className={styles.conn}>{label}</span>
         {user && <span className={styles.user}>{user.name} <em>({user.id})</em></span>}
       </div>
       <span className={styles.sep} />
-      <div className={styles.stat}><span>시청자</span><b className="num">{stats.todayViewers.toLocaleString()}</b></div>
+      <div className={styles.stat} title="현재 시청자 수 (방송국 API, 15초마다 갱신)"><span>시청자</span><b className="num">{liveViewers.toLocaleString()}</b></div>
       <span className={styles.sep} />
       <div className={styles.stat}><span>오늘 실행</span><b className="num">{stats.todayRuns.toLocaleString()}</b></div>
       <span className={styles.sep} />

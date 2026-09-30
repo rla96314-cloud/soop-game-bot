@@ -5,7 +5,7 @@ import { gameById } from '../../games'
 import Icon from '../../components/Icon'
 import styles from './Games.module.css'
 import {
-  RouletteEditor, LotteryEditor, LadderEditor, QuizEditor, PickBoardEditor, NumberPanel, Field,
+  RouletteEditor, LotteryEditor, LadderEditor, QuizEditor, PickBoardEditor, PickBoardPanel, NumberPanel, Field,
   type RouletteItem, type LotteryPrize, type Prize, type QuizQuestion, type PickItem,
 } from './panels'
 
@@ -106,8 +106,13 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
           {gameId === 'number' && (
             <NumberPanel key="number" gSettings={g} gameStates={gameStates} saveSetting={save} />
           )}
-          {gameId === 'pickboard' && (
-            <div className={styles.note}>뽑기판은 오른쪽 미리보기 패널에서 칸을 눌러 진행합니다. 칸 크기와 상품은 <b>항목 설정</b> 탭에서 바꿉니다.</div>
+          {gameId === 'pickboard' && (<>
+            <PickBoardPanel key={`${(g.pickRows as number) ?? 4}x${(g.pickCols as number) ?? 5}`}
+              rows={(g.pickRows as number) ?? 4} cols={(g.pickCols as number) ?? 5} items={(g.pickItems as PickItem[]) ?? []} />
+            <div className={styles.note}>칸을 누르면 하나씩 공개되고 OBS 오버레이에 바로 반영됩니다. 칸 크기와 상품은 <b>항목 설정</b> 탭에서 바꿉니다.</div>
+          </>)}
+          {game.engine && (
+            <KeywordEditor keywords={(g.weflabKeywords as string[]) ?? []} onSave={v => save('weflabKeywords', v)} />
           )}
           {['race', 'rps', 'fish'].includes(gameId) && (
             <div className={styles.note}>이 게임은 추가 설정이 없습니다. 별풍선 트리거 개수와 채팅 명령어만 정하면 됩니다.</div>
@@ -169,6 +174,27 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
           </button>
         )}
       </div>
+    </div>
+  )
+}
+
+/** 위플랩 룰렛 결과 키워드 — 결과 텍스트에 포함되면 이 게임 실행 */
+function KeywordEditor({ keywords, onSave }: { keywords: string[]; onSave: (v: string[]) => void }) {
+  const [input, setInput] = useState('')
+  const add = () => { const k = input.trim(); if (!k || keywords.includes(k)) { setInput(''); return } onSave([...keywords, k]); setInput('') }
+  return (
+    <div className={styles.field}>
+      <label>위플랩 룰렛 키워드</label>
+      <div className={styles.kwRow}>
+        {keywords.map(k => (
+          <span key={k} className={styles.kw}>{k}<button onClick={() => onSave(keywords.filter(x => x !== k))} title="삭제">×</button></span>
+        ))}
+        <div className="input-group" style={{ width: 220 }}>
+          <input className="input" placeholder="키워드 입력 후 Enter" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()} />
+          <button className="btn" onClick={add}><Icon name="plus" size={14} /></button>
+        </div>
+      </div>
+      <div className="field-hint">위플랩 룰렛 결과 문구에 이 키워드가 들어 있으면 이 게임이 실행됩니다. 비워 두면 위플랩 룰렛으로는 실행되지 않습니다.</div>
     </div>
   )
 }

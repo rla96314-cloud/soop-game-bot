@@ -5,7 +5,7 @@ import { gameById } from '../../games'
 import Icon from '../../components/Icon'
 import styles from './Games.module.css'
 import { CopyBtn } from './GameConfig'
-import { LadderPanel, PickBoardPanel, QuizPanel, SlotPanel, type PickItem } from './panels'
+import { LadderPanel, QuizPanel, SlotPanel } from './panels'
 
 const WHEEL_COLORS = ['#e0342c', '#ff7a1a', '#f2a600', '#12a866', '#2f6bff', '#7a3cff', '#00a884', '#e0489a']
 
@@ -89,8 +89,13 @@ export default function GamePreview({ gameId, port, wheelSize = 320, title = '�
           <LadderPanel key="ladder" gSettings={g} gameStates={gameStates} />
         )}
         {gameId === 'pickboard' && (
-          <PickBoardPanel key={`${(g.pickRows as number) ?? 4}x${(g.pickCols as number) ?? 5}`}
-            rows={(g.pickRows as number) ?? 4} cols={(g.pickCols as number) ?? 5} items={(g.pickItems as PickItem[]) ?? []} />
+          <div className={`${styles.pvStage} checker`}>
+            <div className={styles.pvIdle}>
+              <span className="game-ic lg" style={{ background: game.color, width: 64, height: 64 }}><Icon name={game.icon} size={32} /></span>
+              <b>뽑기판</b>
+              <small>가운데 설정 칸의 뽑기판에서 칸을 누르면<br />OBS 오버레이에 바로 반영됩니다.</small>
+            </div>
+          </div>
         )}
         {gameId === 'quiz' && (
           <QuizPanel key="quiz" gSettings={g} gameStates={gameStates} saveSetting={save} />

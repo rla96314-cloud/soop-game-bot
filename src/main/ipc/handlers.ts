@@ -18,6 +18,7 @@ export function registerIpcHandlers(win: BrowserWindow) {
   soopClient.on('disconnected', ()           => send('soop:disconnected'))
   soopClient.on('error',        (err)        => send('soop:error', err))
   soopClient.on('standby',      (msg)        => send('soop:standby', msg))
+  soopClient.on('viewers',      (n: number)  => send('soop:viewers', n))
   // 닉네임 입력을 채널 아이디로 해석했으면 설정에 반영해 다음 시작부터 바로 연결
   soopClient.on('resolved',     (id: string) => {
     patchSettings({ soop: { channelId: id } } as Parameters<typeof patchSettings>[0])
@@ -68,10 +69,10 @@ export function registerIpcHandlers(win: BrowserWindow) {
   ipcMain.handle('soop:connect', (_, opts) => {
     const s = loadSettings()
     soopClient.connect({
-      channelId:  opts?.channelId  ?? s.soop.channelId,
+      channelId:  (opts?.channelId ?? s.soop.channelId) || s.user?.id || '',
       userId:     opts?.userId     ?? s.soop.userId,
       token:      opts?.token      ?? s.soop.token,
-      simulation: opts?.simulation ?? s.soop.simulationMode,
+      simulation: false,
     })
     return { ok: true }
   })
@@ -142,21 +143,20 @@ export function registerIpcHandlers(win: BrowserWindow) {
   })
 
   // weflab
+  // 위플랩 룰렛 결과 → 게임별 키워드가 포함된 게임 실행
   weflabWatcher.on('result', (text: string, nick: string) => {
     send('weflab:result', text, nick)
     const s = loadSettings()
-    if (!s.weflab.enabled) return
-    const validTriggers = s.weflab.triggers.filter(t => t.keyword)
-    // 트리거가 없으면 모든 결과에 반응, 있으면 키워드 포함 여부 검사
-    const matched = validTriggers.length === 0
-      || validTriggers.some(t => text.toLowerCase().includes(t.keyword.toLowerCase()))
-    if (matched) gameEngine.trigger('roulette', nick || 'weflab', 0)
+    const lower = text.toLowerCase()
+    for (const [id, cfg] of Object.entries(s.games)) {
+      if (id === 'pickboard' || !cfg.enabled) continue
+      const kws = ((cfg.weflabKeywords as string[] | undefined) ?? []).map(k => k.trim().toLowerCase()).filter(Boolean)
+      if (kws.some(k => lower.includes(k))) gameEngine.trigger(id as GameId, nick || 'weflab', 0)
+    }
   })
-  // 위플랩 후원(socket.io) → 대시보드 표시 + (옵션) 별풍선 게임 트리거
+  // 위플랩 후원 별풍선 → SOOP 별풍선과 동일하게 게임 트리거 (항상)
   weflabWatcher.on('donation', (d: { donor: string; balloons: number; amount: number; message: string; ts: number }) => {
     send('weflab:donation', d)
-    const s = loadSettings()
-    if (!s.weflab.enabled || !s.weflab.balloonTrigger) return
     if (d.balloons > 0) gameEngine.onBalloon(d.donor || 'weflab', d.balloons)
   })
   weflabWatcher.on('loaded',   ()          => send('weflab:loaded'))

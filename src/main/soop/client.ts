@@ -20,6 +20,7 @@ import WebSocket from 'ws'
  *   'balloon' (username, amount) - 별풍선 수신
  *   'chat'    (username, message) - 채팅 메시지
  *   'enter'   (userId, userNick)  - 시청자 입장
+ *   'viewers' (count)             - 현재 시청자 수 (chapi station API 15초 폴링)
  */
 
 const F   = '\x0c'
@@ -36,6 +37,7 @@ const SVC_BALLOON   = 18  // 별풍선
 const PING_MS          = 20000
 const OFFLINE_RETRY_MS = 30000
 const RECONNECT_MS     = 5000
+const VIEWER_POLL_MS   = 15000
 
 interface ChannelInfo { chdomain: string; chpt: number; chatno: string; bjnick: string }
 
@@ -50,6 +52,8 @@ export class SoopClient extends EventEmitter {
   private simInterval:    ReturnType<typeof setInterval> | null = null
   private reconnectTimer: ReturnType<typeof setTimeout>  | null = null
   private pingTimer:      ReturnType<typeof setInterval> | null = null
+  private viewerTimer:    ReturnType<typeof setInterval> | null = null
+  private currentBj       = ''
   private connected  = false
   private simMode    = true
   private session    = 0   // connect/disconnect 세대 — 늦게 도착한 비동기 응답 무시용
@@ -95,6 +99,25 @@ export class SoopClient extends EventEmitter {
     if (this.simInterval)    { clearInterval(this.simInterval);    this.simInterval    = null }
     if (this.reconnectTimer) { clearTimeout(this.reconnectTimer);  this.reconnectTimer = null }
     if (this.pingTimer)      { clearInterval(this.pingTimer);      this.pingTimer      = null }
+    if (this.viewerTimer)    { clearInterval(this.viewerTimer);    this.viewerTimer    = null }
+  }
+
+  // 방송국 API로 현재 시청자 수 조회 (방송 중이 아니면 broad = null)
+  private async fetchViewers(bj: string): Promise<number | null> {
+    try {
+      const res = await fetch(`https://chapi.sooplive.co.kr/api/${encodeURIComponent(bj)}/station`, { headers: { 'User-Agent': 'Mozilla/5.0' } })
+      if (!res.ok) return null
+      const j = await res.json() as { broad?: { current_sum_viewer?: number } | null }
+      const n = j.broad?.current_sum_viewer
+      return typeof n === 'number' ? n : null
+    } catch { return null }
+  }
+
+  private startViewerPoll(bj: string) {
+    if (this.viewerTimer) clearInterval(this.viewerTimer)
+    const tick = async () => { const n = await this.fetchViewers(bj); if (n !== null) this.emit('viewers', n) }
+    tick()
+    this.viewerTimer = setInterval(tick, VIEWER_POLL_MS)
   }
 
   // ── Real connection ─────────────────────────────────────────────────────────
@@ -177,6 +200,7 @@ export class SoopClient extends EventEmitter {
       return
     }
 
+    this.currentBj = bj
     const url = `wss://${info.chdomain}:${info.chpt + 1}/Websocket/${bj}`
     const ws  = new WebSocket(url, ['chat'], { handshakeTimeout: 10000 })
     this.ws   = ws
@@ -237,6 +261,7 @@ export class SoopClient extends EventEmitter {
           this.connected = true
           this.emit('connected')
         }
+        this.startViewerPoll(this.currentBj)
         break
       }
 
@@ -321,6 +346,8 @@ export class SoopClient extends EventEmitter {
 
     // 첫 이벤트는 1초 후
     this.simInterval = setTimeout(tick, 1000) as unknown as ReturnType<typeof setInterval>
+    this.viewerTimer = setInterval(() => this.emit('viewers', 80 + Math.floor(Math.random() * 40)), VIEWER_POLL_MS)
+    this.emit('viewers', 97)
   }
 }
 
