@@ -42,7 +42,7 @@ export interface Settings {
   }
   games:   Record<string, GameConfig>
   overlay: { port: number; theme: string }
-  ui:      { scale: number }   // 전체 UI 배율(%) — 90~130
+  ui:      { scale: number; autoFit?: boolean }   // scale: 자동 맞춤 위에 곱하는 사용자 배율(%), autoFit: 자동 맞춤 도입 후 마이그레이션 표시
 
   weflab: {
     url: string   // 비어 있지 않으면 앱 시작 시 자동 감시. 룰렛 결과 키워드는 게임별 weflabKeywords, 후원 별풍선은 항상 트리거
@@ -114,7 +114,7 @@ const DEFAULTS: Settings = {
     },
   },
   overlay: { port: 3939, theme: 'purple' },
-  ui:      { scale: 110 },
+  ui:      { scale: 100, autoFit: true },
   weflab:  { url: '' },
 }
 
@@ -127,6 +127,8 @@ function getPath() {
 export function loadSettings(): Settings {
   try {
     const raw = JSON.parse(readFileSync(getPath(), 'utf-8'))
+    // 자동 맞춤 도입 전 저장된 배율(기본 110)은 100으로 되돌림 — 이제 창 크기에 맞춰 자동으로 커짐
+    if (raw.ui && raw.ui.autoFit === undefined) raw.ui = { ...raw.ui, scale: 100, autoFit: true }
     return {
       ...DEFAULTS,
       ...raw,

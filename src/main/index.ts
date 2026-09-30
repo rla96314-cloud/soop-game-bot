@@ -6,6 +6,7 @@ import { soopClient }           from './soop/client'
 import { overlayServer }        from './overlay/server'
 import { registerIpcHandlers }  from './ipc/handlers'
 import { weflabWatcher }        from './weflab/watcher'
+import { applyAutoZoom }        from './zoom'
 
 const isDev = !app.isPackaged
 
@@ -25,11 +26,15 @@ function createWindow(): BrowserWindow {
 
   win.on('ready-to-show', () => win.show())
 
-  // UI 배율 적용 (페이지 로드마다 재적용 — 새로고침/HMR 대비)
-  win.webContents.on('did-finish-load', () => {
-    const scale = loadSettings().ui?.scale ?? 100
-    win.webContents.setZoomFactor(scale / 100)
+  // 창 크기에 맞춘 자동 배율 (페이지 로드·창 크기 변경마다 재적용)
+  win.webContents.on('did-finish-load', () => applyAutoZoom(win))
+  let resizeTimer: ReturnType<typeof setTimeout> | null = null
+  win.on('resize', () => {
+    if (resizeTimer) clearTimeout(resizeTimer)
+    resizeTimer = setTimeout(() => applyAutoZoom(win), 40)
   })
+  win.on('maximize',   () => applyAutoZoom(win))
+  win.on('unmaximize', () => applyAutoZoom(win))
 
   // 메인 창을 닫으면 앱 완전 종료.
   // 위플랩 감시용 숨김 창이 남아 있으면 window-all-closed가 발생하지 않아

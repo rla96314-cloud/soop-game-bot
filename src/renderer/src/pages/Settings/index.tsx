@@ -162,13 +162,13 @@ export default function Settings({ user }: { user?: { id: string; name: string }
         )}
       </Row>
 
-      <Row title="UI 배율 설정" desc="프로그램 화면의 UI 크기를 조절합니다.">
+      <Row title="UI 배율 설정" desc="화면은 창 크기에 맞춰 자동으로 커지고 작아집니다. 그 위에 더할 배율입니다.">
         <div className={styles.scaleRow}>
           <span className={styles.wfLabel}>UI 배율</span>
           <select className="select" style={{ width: 300 }} value={uiScale} onChange={e => patchSettings({ ui: { scale: Number(e.target.value) } } as P)}>
             {[90, 100, 110, 120, 130].map(p => <option key={p} value={p}>{p}%{p === 100 ? ' (기본)' : ''}</option>)}
           </select>
-          <span className="field-hint" style={{ marginTop: 0 }}>선택 즉시 적용됩니다.</span>
+          <span className="field-hint" style={{ marginTop: 0 }}>선택 즉시 적용됩니다. 100%가 창에 딱 맞는 크기이고, 키우면 내용이 잘릴 수 있습니다.</span>
         </div>
       </Row>
     </div>

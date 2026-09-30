@@ -6,6 +6,7 @@ import { loadSettings, patchSettings } from '../store/settings'
 import { verifyUser }              from '../auth/allowlist'
 import { openSoopLoginWindow }     from '../auth/soopLogin'
 import { weflabWatcher }           from '../weflab/watcher'
+import { applyAutoZoom }           from '../zoom'
 
 export function registerIpcHandlers(win: BrowserWindow) {
   const send = (ch: string, ...args: unknown[]) => {
@@ -58,10 +59,8 @@ export function registerIpcHandlers(win: BrowserWindow) {
   ipcMain.handle('settings:set', (_, patch) => {
     const next = patchSettings(patch)
     gameEngine.updateSettings(next)
-    // UI 배율 즉시 반영
-    if (!win.isDestroyed()) {
-      win.webContents.setZoomFactor((next.ui?.scale ?? 100) / 100)
-    }
+    // UI 배율 즉시 반영 (자동 맞춤 × 사용자 배율)
+    applyAutoZoom(win)
     return next
   })
 
