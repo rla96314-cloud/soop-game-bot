@@ -209,6 +209,10 @@ const rbText    = document.getElementById('rb-text')
 const startBtn  = document.getElementById('start-btn')
 const leverKnob = document.getElementById('lever-knob')
 let spinning = false
+let lastRunId = null
+let timers = []            // 진행 중 연출 타이머 — 새 판이 오면 전부 취소
+function later(fn, ms) { const t = setTimeout(fn, ms); timers.push(t); return t }
+function cancelAll() { timers.forEach(clearTimeout); timers = [] }
 
 // Dot twinkle
 setInterval(() => {
@@ -239,7 +243,7 @@ function spinReel(reelEl, innerEl, target, symbols, stopMs) {
   requestAnimationFrame(() => requestAnimationFrame(() => {
     innerEl.style.transition = 'transform ' + (stopMs * 0.75 / 1000).toFixed(2) + 's cubic-bezier(0.2,0,0.5,1)'
     innerEl.style.transform  = 'translateY(-' + ((rows - 5) * cellH) + 'px)'
-    setTimeout(() => {
+    later(() => {
       innerEl.style.transition = 'transform 0.5s cubic-bezier(0,0,0.15,1)'
       innerEl.style.transform  = 'translateY(-' + ((rows - 1) * cellH) + 'px)'
       reelEl.classList.add('lit')
@@ -261,7 +265,10 @@ function showConfetti() {
 }
 
 function startSpin(slot) {
-  if (spinning) return; spinning = true
+  // 같은 판(runId)이 다시 오면 무시, 다른 판이면 진행 중 연출을 끊고 새로 시작 (spinMs 가 길 때 두 번째 판이 안 보이던 문제)
+  if (slot.runId !== undefined && slot.runId === lastRunId) return
+  lastRunId = slot.runId ?? null
+  cancelAll(); spinning = true
   const symbols = slot.symbols.length >= 3 ? slot.symbols : ['🍒','🍋','🍊','⭐','🎰','💎']
   const targets = slot.symbols
   const spinMs  = slot.spinMs ?? 3000
@@ -272,10 +279,11 @@ function startSpin(slot) {
   resultBar.className = 'result-bar'; rbText.textContent = ''
   ;[0,1,2].forEach(i => document.getElementById('reel' + i).classList.remove('lit'))
 
+  leverKnob.classList.remove('pulled'); startBtn.classList.remove('active')
   leverKnob.classList.add('pulled')
-  setTimeout(() => leverKnob.classList.remove('pulled'), 600)
+  later(() => leverKnob.classList.remove('pulled'), 600)
   startBtn.classList.add('active')
-  setTimeout(() => startBtn.classList.remove('active'), 300)
+  later(() => startBtn.classList.remove('active'), 300)
 
   wrap.classList.add('show')
   ;[0,1,2].forEach(i => spinReel(
@@ -283,13 +291,13 @@ function startSpin(slot) {
     targets[i], symbols, stops[i]
   ))
 
-  setTimeout(() => {
+  later(() => {
     if (slot.jackpot)      { resultBar.className = 'result-bar show jackpot'; rbText.textContent = 'JACKPOT!'; showConfetti() }
     else if (slot.twoKind) { resultBar.className = 'result-bar show twoKind'; rbText.textContent = '2개 일치!' }
     else                   { resultBar.className = 'result-bar show miss';    rbText.textContent = '꽝' }
   }, stops[2] + 600)
 
-  setTimeout(() => {
+  later(() => {
     wrap.classList.remove('show'); spinning = false
     ;[0,1,2].forEach(i => document.getElementById('reel' + i).classList.remove('lit'))
   }, hideAt)

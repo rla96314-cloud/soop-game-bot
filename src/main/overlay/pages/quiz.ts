@@ -178,6 +178,8 @@ export const QUIZ_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 
   function startTimer(dl, limit) {
     deadline = dl; totalSec = limit
+    // 이전 판 결과의 숨김 타이머가 새 문제를 2초 만에 지워버리지 않게
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }
     if (ticker) clearInterval(ticker)
     timerRow.style.display = ''
     resultRow.classList.remove('visible')
@@ -224,6 +226,7 @@ export const QUIZ_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
             const isWin = !s.result.result.includes('시간 초과')
             showResult(s.result.result, isWin)
           } else if (s.status === 'idle') {
+            // 결과를 보여주는 중이면 결과 숨김 타이머(7초)에 맡기고, 아니면 바로 숨김
             if (!resultRow.classList.contains('visible')) hide()
           }
         }

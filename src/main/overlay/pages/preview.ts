@@ -35,8 +35,9 @@ const GAMES=[
 ]
 const grid=document.getElementById('grid')
 function layout(){
-  const cellW=grid.offsetWidth/4
-  const cellH=grid.offsetHeight/2
+  // grid 1920×1080, padding 10, gap 10 → 측정 없이 계산 (OBS CEF 는 offsetWidth 가 불안정)
+  const cellW=(1920-20-30)/4
+  const cellH=(1080-20-10)/2
   const scale=Math.min(cellW/1920, cellH/1080)
   grid.querySelectorAll('iframe').forEach(f=>{f.style.transform='scale('+scale+')'})
 }

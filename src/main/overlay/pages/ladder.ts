@@ -355,11 +355,13 @@ function show() { card.classList.add('show') }
 function hide() { card.classList.remove('show') }
 
 function renderCollecting(ladder) {
+  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }   // 이전 판 결과 숨김 타이머가 새 모집 화면을 지우지 않게
   phColl.style.display = ''
   phRes.classList.remove('on')
   resList.innerHTML = ''
   cntLbl.textContent = ladder.participants.length + '/' + ladder.maxSlots + '명'
-  const pct = Math.max(0, Math.min(100, ((ladder.deadline - Date.now()) / 30000) * 100))
+  const total = ladder.joinMs || 30000
+  const pct = Math.max(0, Math.min(100, ((ladder.deadline - Date.now()) / total) * 100))
   tfill.style.width = pct + '%'
   chips.innerHTML = ''
   ladder.participants.forEach((p, i) => {
@@ -374,7 +376,10 @@ function renderCollecting(ladder) {
   show()
 }
 
+let pathTick = null
 function renderResult(ld) {
+  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }
+  if (pathTick) { clearInterval(pathTick); pathTick = null }
   phColl.style.display = 'none'
   phRes.classList.add('on')
 
@@ -410,7 +415,7 @@ function renderResult(ld) {
     return pts.join(' ')
   }
 
-  const tick = setInterval(() => {
+  const tick = pathTick = setInterval(() => {
     step++
     ld.paths.forEach((path, pi) => {
       lines[pi].setAttribute('points', orthoPts(path.cols, step))
@@ -431,6 +436,8 @@ function renderResult(ld) {
 }
 
 function renderManualPreview(ld) {
+  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }
+  if (pathTick) { clearInterval(pathTick); pathTick = null }
   _revealLd = ld
   phColl.style.display = 'none'
   phRes.classList.add('on')

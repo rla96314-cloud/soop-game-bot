@@ -178,7 +178,8 @@ export const OVERLAY_HTML = (gameId: string, theme: string, port: number) => `<!
     ws.onmessage = e => {
       try {
         const msg = JSON.parse(e.data)
-        if (msg.type === 'game:result') showResult(msg.data)
+        // 이 소스가 맡은 게임의 결과만 — /overlay/race 에 룰렛·슬롯 결과가 겹쳐 뜨지 않게
+        if (msg.type === 'game:result' && msg.data && msg.data.gameId === '${gameId}') showResult(msg.data)
         if (msg.type === 'ping') ws.send(JSON.stringify({type:'pong'}))
       } catch {}
     }
