@@ -2,13 +2,24 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { loadSettings }         from './store/settings'
 import { gameEngine }           from './games/engine'
-import { soopClient }           from './soop/client'
 import { overlayServer }        from './overlay/server'
-import { registerIpcHandlers }  from './ipc/handlers'
-import { weflabWatcher }        from './weflab/watcher'
+import { registerIpcHandlers, startServices, stopServices } from './ipc/handlers'
+import { isAuthed }             from './auth/gate'
 import { applyAutoZoom }        from './zoom'
 
 const isDev = !app.isPackaged
+
+// 두 번째 인스턴스가 뜨면 오버레이 포트 충돌 + 후원 이중 처리 — 하나만 허용
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+}
+
+function isSafeExternalUrl(url: string): boolean {
+  try {
+    const u = new URL(url)
+    return u.protocol === 'https:' || (u.protocol === 'http:' && (u.hostname === 'localhost' || u.hostname === '127.0.0.1'))
+  } catch { return false }
+}
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -19,8 +30,9 @@ function createWindow(): BrowserWindow {
     backgroundColor: '#F4F1FE',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
+      sandbox: true,            // preload 는 contextBridge/ipcRenderer 만 쓰므로 샌드박스 가능
       contextIsolation: true,
+      nodeIntegration: false,
     },
   })
 
@@ -40,15 +52,22 @@ function createWindow(): BrowserWindow {
   // 위플랩 감시용 숨김 창이 남아 있으면 window-all-closed가 발생하지 않아
   // 프로세스가 백그라운드에 계속 살아있게 되는 문제 방지.
   win.on('closed', () => {
-    soopClient.disconnect()
-    weflabWatcher.stop()
+    stopServices()
     overlayServer.stop()
     app.quit()
   })
 
+  // 외부 링크: https 와 로컬 오버레이만. file:// 등 다른 스킴은 열지 않는다
   win.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
+    if (isSafeExternalUrl(url)) shell.openExternal(url)
     return { action: 'deny' }
+  })
+  // 렌더러 자체가 다른 페이지로 이동하는 것도 차단 (dev 서버 / 번들 파일만)
+  win.webContents.on('will-navigate', (e, url) => {
+    const dev = process.env['ELECTRON_RENDERER_URL']
+    if (dev && url.startsWith(dev)) return
+    if (url.startsWith('file://')) return
+    e.preventDefault()
   })
 
   if (isDev && process.env['ELECTRON_RENDERER_URL']) {
@@ -73,7 +92,7 @@ app.whenReady().then(() => {
   const settings = loadSettings()
   gameEngine.init(settings)
 
-  // Start overlay server
+  // Start overlay server (포트 충돌은 'error' 이벤트로 알림 — 앱이 죽지 않음)
   overlayServer.start(settings.overlay.port ?? 3939)
 
   // Create window
@@ -82,18 +101,14 @@ app.whenReady().then(() => {
   // Register IPC
   registerIpcHandlers(win)
 
-  // Auto-connect SOOP (항상 실연동. 채널 ID가 비어 있으면 로그인한 SOOP 아이디 사용)
-  soopClient.connect({
-    channelId:  settings.soop.channelId || settings.user?.id || '',
-    userId:     settings.soop.userId,
-    token:      settings.soop.token,
-    simulation: false,
-  })
+  // SOOP 자동연결·위플랩 감시는 로그인(허용 목록 통과) 상태일 때만.
+  // 미인증 상태의 재검증은 렌더러가 auth:recheck 로 요청하고, 통과하면 그때 시작된다.
+  if (isAuthed()) startServices()
 
-  // 위플랩 URL이 저장돼 있으면 자동 감시 시작
-  if (settings.weflab?.url) {
-    weflabWatcher.start(settings.weflab.url)
-  }
+  app.on('second-instance', () => {
+    if (win.isMinimized()) win.restore()
+    win.focus()
+  })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -101,8 +116,7 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
-  soopClient.disconnect()
-  weflabWatcher.stop()
+  stopServices()
   overlayServer.stop()
   if (process.platform !== 'darwin') app.quit()
 })
