@@ -35,6 +35,5 @@ nsis:
   shortcutName: SOOP Game Bot
   license: null
 
-publish:
-  provider: generic
-  url: https://github.com/your-repo/soop-game-bot/releases/latest/download
+# 자동 업데이트(electron-updater)는 쓰지 않음 — publish 설정은 플레이스홀더였으므로 제거. GitHub Release 는 workflow 가 올린다.
+publish: null
