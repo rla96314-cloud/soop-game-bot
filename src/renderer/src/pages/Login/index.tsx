@@ -3,11 +3,13 @@ import styles from './Login.module.css'
 
 interface Props {
   onSuccess: (user: { id: string; name: string }) => void
+  /** 자동 로그인 실패 사유 등 (App 에서 전달) */
+  note?: string | null
 }
 
 type State = 'idle' | 'waiting' | 'error'
 
-export default function LoginScreen({ onSuccess }: Props) {
+export default function LoginScreen({ onSuccess, note }: Props) {
   const [state,  setState]  = useState<State>('idle')
   const [errMsg, setErrMsg] = useState('')
 
@@ -84,6 +86,11 @@ export default function LoginScreen({ onSuccess }: Props) {
           {state === 'error' && (
             <div className={styles.error}>
               {errMsg}
+            </div>
+          )}
+          {state !== 'error' && note && (
+            <div className={styles.error} style={{ opacity: 0.85 }}>
+              {note}
             </div>
           )}
         </div>

@@ -33,3 +33,13 @@
   border-radius: 50%; animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* 메인 프로세스 알림 배너 (포트 충돌·설정 파일 손상 등) */
+.notices { display: flex; flex-direction: column; gap: 6px; padding: 8px 16px 0; flex-shrink: 0; }
+.notice {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 8px 12px; border-radius: 10px; font-size: 13px; font-weight: 600;
+  background: #FFF4E5; color: #7A3E00; border: 1px solid #FFD8A8;
+}
+.notice_error { background: #FDECEC; color: #8A1C1C; border-color: #F5B5B5; }
+.notice_info  { background: #EAF2FF; color: #1D4F91; border-color: #BFD6FF; }

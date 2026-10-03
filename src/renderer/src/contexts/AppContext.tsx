@@ -1,14 +1,6 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
-
-export interface ChatItem {
-  user: string
-  message: string
-  ts: number
-  isBalloon: boolean
-  amount?: number
-}
 
 export interface HistoryItem {
   gameId: string
@@ -27,19 +19,23 @@ export interface Stats {
 }
 
 export interface GameStates {
-  [gameId: string]: { status: string; [k: string]: unknown }
+  [gameId: string]: { status: string; queued?: number; [k: string]: unknown }
 }
+
+export interface AppNotice { id: number; level: 'info' | 'warn' | 'error'; message: string; ts: number }
 
 export interface AppCtx {
   connected:  boolean
   simulation: boolean
   standby:    string | null   // 방송 대기/재접속 상태 메시지 (실연동 모드에서 오프라인일 때)
+  lastError:  string | null   // 마지막 SOOP 연결 오류 (원인 표시용)
   liveViewers: number         // 현재 시청자 수 (방송국 API)
-  chat:       ChatItem[]
   history:    HistoryItem[]
   stats:      Stats
   gameStates: GameStates
   settings:   Record<string, unknown> | null
+  notices:    AppNotice[]     // 메인 프로세스 알림 (포트 충돌, 설정 파일 손상 등)
+  dismissNotice: (id: number) => void
   triggerGame:   (gameId: string) => void
   refreshSettings: () => void
   patchSettings: (patch: unknown) => void
@@ -49,14 +45,16 @@ export interface AppCtx {
 
 const defaultCtx: AppCtx = {
   connected:  false,
-  simulation: true,
+  simulation: false,
   standby:    null,
+  lastError:  null,
   liveViewers: 0,
-  chat:       [],
   history:    [],
   stats:      { todayRuns: 0, todayBalloons: 0, todayViewers: 0 },
   gameStates: {},
   settings:   null,
+  notices:    [],
+  dismissNotice:    () => {},
   triggerGame:      () => {},
   refreshSettings:  () => {},
   patchSettings:    () => {},
@@ -81,52 +79,49 @@ const GAME_META: Record<string, { name: string }> = {
   number:   { name: '숫자 추첨' },
 }
 
-const MAX_CHAT    = 100
-const MAX_HISTORY = 50
+// 메인 프로세스가 1000건까지 들고 있으므로 같은 상한으로 받아온다
+const MAX_HISTORY = 1000
+
+type El = Record<string, (...args: never[]) => unknown>
+const el = (window as unknown as { electron?: El }).electron
+
+let noticeSeq = 0
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [connected,  setConnected]  = useState(false)
-  const [simulation, setSimulation] = useState(true)
+  const [simulation, setSimulation] = useState(false)
   const [standby,    setStandby]    = useState<string | null>(null)
+  const [lastError,  setLastError]  = useState<string | null>(null)
   const [liveViewers, setLiveViewers] = useState(0)
-  const [chat,       setChat]       = useState<ChatItem[]>([])
   const [history,    setHistory]    = useState<HistoryItem[]>([])
   const [stats,      setStats]      = useState<Stats>({ todayRuns: 0, todayBalloons: 0, todayViewers: 0 })
   const [gameStates, setGameStates] = useState<GameStates>({})
   const [settings,   setSettings]   = useState<Record<string, unknown> | null>(null)
+  const [notices,    setNotices]    = useState<AppNotice[]>([])
 
-  const el = (window as unknown as Record<string, unknown>).electron as Record<string, unknown>
+  const call = <T,>(name: string, ...args: unknown[]): Promise<T> => {
+    const fn = el?.[name] as ((...a: unknown[]) => Promise<T>) | undefined
+    return fn ? fn(...args) : Promise.reject(new Error(`electron.${name} 없음`))
+  }
+  const sub = (name: string, cb: (...a: unknown[]) => void): (() => void) => {
+    const fn = el?.[name] as ((cb: (...a: unknown[]) => void) => () => void) | undefined
+    return fn ? fn(cb) : () => {}
+  }
 
   // ── Boot ──────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!el) return
-
-    // Load initial data
-    ;(el.settingsGet as () => Promise<unknown>)()
-      .then(s => setSettings(s as Record<string, unknown>))
+    call<Record<string, unknown>>('settingsGet').then(setSettings).catch(() => {})
+    call<{ connected: boolean; simulation: boolean }>('soopStatus')
+      .then(s => { setConnected(s.connected); setSimulation(s.simulation) }).catch(() => {})
+    call<Stats>('statsGet').then(setStats).catch(() => {})
+    call<GameStates[string][]>('gameAll')
+      // 메인은 배열(getAllStates)로 주므로 gameId 키의 맵으로 바꾼다 — 예전엔 배열을 그대로 넣어 첫 갱신 전까지 상태가 비어 있었음
+      .then(list => setGameStates(Object.fromEntries((list ?? []).map(s => [String(s.id ?? ''), s]))))
       .catch(() => {})
-
-    ;(el.soopStatus as () => Promise<{ connected: boolean; simulation: boolean }>)()
-      .then(s => { setConnected(s.connected); setSimulation(s.simulation) })
-      .catch(() => {})
-
-    ;(el.statsGet as () => Promise<Stats>)()
-      .then(s => setStats(s))
-      .catch(() => {})
-
-    ;(el.gameAll as () => Promise<GameStates>)()
-      .then(s => setGameStates(s))
-      .catch(() => {})
-
-    ;(el.gameHistory as (n: number) => Promise<unknown[]>)(MAX_HISTORY)
-      .then(items => {
-        const mapped = (items as HistoryItem[]).map(r => ({
-          ...r,
-          gameName: GAME_META[r.gameId]?.name ?? r.gameId,
-        }))
-        setHistory(mapped)
-      })
+    call<HistoryItem[]>('gameHistory', MAX_HISTORY)
+      .then(items => setHistory((items ?? []).map(r => ({ ...r, gameName: GAME_META[r.gameId]?.name ?? r.gameId }))))
       .catch(() => {})
   }, [])
 
@@ -134,102 +129,54 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!el) return
-
     const off: Array<() => void> = []
 
-    off.push((el.onSoopConnected as (cb: () => void) => () => void)(() => {
-      setConnected(true)
-      setStandby(null)
-      ;(el.soopStatus as () => Promise<{ connected: boolean; simulation: boolean }>)()
-        .then(s => setSimulation(s.simulation))
-        .catch(() => {})
+    off.push(sub('onSoopConnected', () => {
+      setConnected(true); setStandby(null); setLastError(null)
+      call<{ connected: boolean; simulation: boolean }>('soopStatus').then(s => setSimulation(s.simulation)).catch(() => {})
     }))
+    off.push(sub('onSoopDisconnected', () => setConnected(false)))
+    off.push(sub('onSoopStandby', (msg) => { setConnected(false); setStandby(String(msg)) }))
+    off.push(sub('onSoopError',   (err) => setLastError(String(err))))
+    off.push(sub('onSoopViewers', (n) => setLiveViewers(Number(n) || 0)))
 
-    off.push((el.onSoopDisconnected as (cb: () => void) => () => void)(() => {
-      setConnected(false)
+    // 별풍선·실행 수 집계는 메인 프로세스(stats:update)가 단일 소스 — 렌더러에서 따로 더하면 이중 집계
+    off.push(sub('onGameUpdate', (id, state) => {
+      setGameStates(prev => ({ ...prev, [String(id)]: state as GameStates[string] }))
     }))
-
-    off.push((el.onSoopStandby as (cb: (msg: string) => void) => () => void)(
-      msg => { setConnected(false); setStandby(msg) }
-    ))
-
-    off.push(((el.onSoopViewers as ((cb: (n: number) => void) => () => void) | undefined) ?? (() => () => {}))(
-      n => setLiveViewers(n)
-    ))
-
-    off.push((el.onSoopBalloon as (cb: (e: { user: string; amount: number; ts: number }) => void) => () => void)(
-      ({ user, amount, ts }) => {
-        setChat(prev => {
-          const item: ChatItem = { user, message: `별풍선 ${amount.toLocaleString()}개`, ts, isBalloon: true, amount }
-          return [item, ...prev].slice(0, MAX_CHAT)
-        })
-        setStats(prev => ({
-          ...prev,
-          todayBalloons: prev.todayBalloons + amount,
-        }))
-      }
-    ))
-
-    off.push((el.onSoopChat as (cb: (e: { user: string; message: string; ts: number }) => void) => () => void)(
-      ({ user, message, ts }) => {
-        setChat(prev => {
-          const item: ChatItem = { user, message, ts, isBalloon: false }
-          return [item, ...prev].slice(0, MAX_CHAT)
-        })
-      }
-    ))
-
-    off.push((el.onGameUpdate as (cb: (id: string, s: unknown) => void) => () => void)(
-      (id, state) => {
-        setGameStates(prev => ({ ...prev, [id]: state as GameStates[string] }))
-      }
-    ))
-
-    off.push((el.onGameResult as (cb: (id: string, r: unknown) => void) => () => void)(
-      (id, result) => {
-        const r = result as HistoryItem
-        const item: HistoryItem = {
-          ...r,
-          gameId:   id,
-          gameName: GAME_META[id]?.name ?? id,
-        }
-        setHistory(prev => [item, ...prev].slice(0, MAX_HISTORY))
-        setStats(prev => ({ ...prev, todayRuns: prev.todayRuns + 1 }))
-      }
-    ))
-
-    off.push((el.onStatsUpdate as (cb: (s: Stats) => void) => () => void)(
-      s => setStats(s)
-    ))
+    off.push(sub('onGameResult', (id, result) => {
+      const r = result as HistoryItem
+      const item: HistoryItem = { ...r, gameId: String(id), gameName: GAME_META[String(id)]?.name ?? String(id) }
+      setHistory(prev => [item, ...prev].slice(0, MAX_HISTORY))
+    }))
+    off.push(sub('onStatsUpdate', (s) => setStats(s as Stats)))
+    off.push(sub('onSettingsChanged', (s) => setSettings(s as Record<string, unknown>)))
+    off.push(sub('onAppNotice', (n) => {
+      const { level, message } = n as { level: AppNotice['level']; message: string }
+      setNotices(prev => [...prev.slice(-9), { id: ++noticeSeq, level, message, ts: Date.now() }])
+    }))
 
     return () => off.forEach(fn => fn())
   }, [])
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
-  const triggerGame = (gameId: string) => {
-    ;(el.gameTrigger as (id: string) => Promise<unknown>)(gameId).catch(() => {})
-  }
+  const triggerGame = useCallback((gameId: string) => { call('gameTrigger', gameId).catch(() => {}) }, [])
+  const refreshSettings = useCallback(() => {
+    call<Record<string, unknown>>('settingsGet').then(setSettings).catch(() => {})
+  }, [])
+  const patchSettings = useCallback((patch: unknown) => {
+    call<Record<string, unknown>>('settingsSet', patch).then(setSettings).catch(() => {})
+  }, [])
+  const dismissNotice = useCallback((id: number) => setNotices(prev => prev.filter(n => n.id !== id)), [])
 
-  const refreshSettings = () => {
-    ;(el.settingsGet as () => Promise<unknown>)()
-      .then(s => setSettings(s as Record<string, unknown>))
-      .catch(() => {})
-  }
+  // value 를 memo 하지 않으면 이벤트마다 모든 소비자가 다시 렌더링된다
+  const value = useMemo<AppCtx>(() => ({
+    connected, simulation, standby, lastError, liveViewers,
+    history, stats, gameStates, settings, notices,
+    dismissNotice, triggerGame, refreshSettings, patchSettings,
+  }), [connected, simulation, standby, lastError, liveViewers, history, stats, gameStates, settings, notices,
+       dismissNotice, triggerGame, refreshSettings, patchSettings])
 
-  const patchSettings = (patch: unknown) => {
-    ;(el.settingsSet as (p: unknown) => Promise<unknown>)(patch)
-      .then(s => setSettings(s as Record<string, unknown>))
-      .catch(() => {})
-  }
-
-  return (
-    <Ctx.Provider value={{
-      connected, simulation, standby, liveViewers,
-      chat, history, stats, gameStates, settings,
-      triggerGame, refreshSettings, patchSettings,
-    }}>
-      {children}
-    </Ctx.Provider>
-  )
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

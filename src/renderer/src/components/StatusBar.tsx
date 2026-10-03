@@ -9,17 +9,19 @@ const fmtTime = (ts: number) => {
 }
 
 export default function StatusBar({ user }: { user?: { id: string; name: string } | null }) {
-  const { connected, standby, stats, history, liveViewers } = useApp()
+  const { connected, standby, lastError, stats, history, liveViewers } = useApp()
   const live = connected
   const label = connected ? '방송 연결됨' : (standby ? '방송 대기 중' : '연결 끊김')
   const recent = history.slice(0, 3)
+  // 끊긴 이유를 마우스 올리면 볼 수 있게 — 채널 ID 오타·소켓 오류가 '연결 끊김'으로만 보이던 문제
+  const title = connected ? undefined : (lastError ?? standby ?? undefined)
 
   return (
     <div className={styles.bar}>
       <div className={styles.left}>
         <span className={styles.liveDot} style={{ background: connected ? 'var(--live)' : '#ff5f57' }} />
         <span className={`${styles.live} ${live ? styles.liveOn : styles.liveOff}`}>{live ? 'LIVE' : 'OFF'}</span>
-        <span className={styles.conn}>{label}</span>
+        <span className={styles.conn} title={title}>{label}{!connected && lastError ? ' ⓘ' : ''}</span>
         {user && <span className={styles.user}>{user.name} <em>({user.id})</em></span>}
       </div>
       <span className={styles.sep} />

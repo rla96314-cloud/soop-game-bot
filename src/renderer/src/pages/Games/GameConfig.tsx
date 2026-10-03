@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useApp } from '../../contexts/AppContext'
 import { gameById } from '../../games'
 import Icon from '../../components/Icon'
+import NumberField from '../../components/NumberField'
 import styles from './Games.module.css'
 import {
   RouletteEditor, LotteryEditor, LadderEditor, QuizEditor, PickBoardEditor, PickBoardPanel, NumberPanel, Field,
@@ -22,6 +23,7 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
   const g = (settings?.games as Record<string, Record<string, unknown>> | undefined)?.[gameId] ?? {}
   const status = gameStates[gameId]?.status ?? 'idle'
   const busy = status === 'running' || status === 'collecting'
+  const queued = (gameStates[gameId]?.queued as number | undefined) ?? 0
   const save = (key: string, value: unknown) => patchSettings({ games: { [gameId]: { [key]: value } } })
   const enabled = (g.enabled as boolean) ?? true
 
@@ -55,37 +57,37 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
             {game.engine && (
               <Field label="별풍선 트리거 (0=비활성)">
                 <div className={styles.unitField}>
-                  <input type="number" min={0} value={(g.balloonThreshold as number) ?? 0} onChange={e => save('balloonThreshold', Number(e.target.value))} />
+                  <NumberField min={0} max={1000000} value={(g.balloonThreshold as number) ?? 0} onCommit={v => save('balloonThreshold', v)} />
                   <span>개</span>
                 </div>
               </Field>
             )}
             {gameId === 'roulette' && (
               <Field label="스핀 시간 (ms)">
-                <input type="number" min={1000} step={500} value={(g.spinDuration as number) ?? 3000} onChange={e => save('spinDuration', Number(e.target.value))} />
+                <NumberField min={1000} max={15000} step={500} value={(g.spinDuration as number) ?? 3000} onCommit={v => save('spinDuration', v)} />
               </Field>
             )}
             {gameId === 'slot' && (
               <Field label="스핀 시간 (ms)">
-                <input type="number" min={2000} max={6000} step={500} value={(g.spinDuration as number) ?? 3000} onChange={e => save('spinDuration', Number(e.target.value))} />
+                <NumberField min={2000} max={8000} step={500} value={(g.spinDuration as number) ?? 3000} onCommit={v => save('spinDuration', v)} />
               </Field>
             )}
             {gameId === 'lottery' && (
               <Field label="스크래치 시간 (ms)">
-                <input type="number" min={1000} max={8000} step={500} value={(g.scratchDuration as number) ?? 3000} onChange={e => save('scratchDuration', Number(e.target.value))} />
+                <NumberField min={1000} max={8000} step={500} value={(g.scratchDuration as number) ?? 3000} onCommit={v => save('scratchDuration', v)} />
               </Field>
             )}
             {gameId === 'ladder' && (<>
               <Field label="참가 시간 (초)">
-                <input type="number" min={5} value={(g.joinDuration as number) ?? 30} onChange={e => save('joinDuration', Number(e.target.value))} />
+                <NumberField min={5} max={600} value={(g.joinDuration as number) ?? 30} onCommit={v => save('joinDuration', v)} />
               </Field>
               <Field label="최대 참가 인원">
-                <input type="number" min={2} value={(g.maxParticipants as number) ?? 8} onChange={e => save('maxParticipants', Number(e.target.value))} />
+                <NumberField min={2} max={50} value={(g.maxParticipants as number) ?? 8} onCommit={v => save('maxParticipants', v)} />
               </Field>
             </>)}
             {gameId === 'quiz' && (
               <Field label="자동 출제 제한 시간 (초)">
-                <input type="number" min={5} max={300} value={(g.timeLimit as number) ?? 30} onChange={e => save('timeLimit', Number(e.target.value))} />
+                <NumberField min={5} max={600} value={(g.timeLimit as number) ?? 30} onCommit={v => save('timeLimit', v)} />
               </Field>
             )}
             {game.engine && (
@@ -107,8 +109,7 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
             <NumberPanel key="number" gSettings={g} gameStates={gameStates} saveSetting={save} />
           )}
           {gameId === 'pickboard' && (<>
-            <PickBoardPanel key={`${(g.pickRows as number) ?? 4}x${(g.pickCols as number) ?? 5}`}
-              rows={(g.pickRows as number) ?? 4} cols={(g.pickCols as number) ?? 5} items={(g.pickItems as PickItem[]) ?? []} />
+            <PickBoardPanel />
             <div className={styles.note}>칸을 누르면 하나씩 공개되고 OBS 오버레이에 바로 반영됩니다. 칸 크기와 상품은 <b>항목 설정</b> 탭에서 바꿉니다.</div>
           </>)}
           {game.engine && (
@@ -170,7 +171,7 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
         </label>
         {game.engine && (
           <button className="btn btn-dark" disabled={busy || !enabled} onClick={() => triggerGame(gameId)}>
-            <Icon name="play" size={14} />{busy ? '진행 중…' : '테스트 실행'}
+            <Icon name="play" size={14} />{busy ? (queued > 0 ? `진행 중… (대기 ${queued})` : '진행 중…') : '테스트 실행'}
           </button>
         )}
       </div>
