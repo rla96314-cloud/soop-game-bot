@@ -30,6 +30,10 @@ contextBridge.exposeInMainWorld('electron', {
   gameAll:        ()                      => ipcRenderer.invoke('game:all'),
   gameHistory:    (limit?: number)        => ipcRenderer.invoke('game:history', limit),
 
+  // Fish log
+  fishRanking:  (limit?: number) => ipcRenderer.invoke('fish:ranking', limit),
+  fishResetLog: ()               => ipcRenderer.invoke('fish:resetLog'),
+
   // Pickboard (상태는 메인 프로세스)
   pickboardGet:    ()            => ipcRenderer.invoke('pickboard:get'),
   pickboardReveal: (idx: number) => ipcRenderer.invoke('pickboard:reveal', idx),

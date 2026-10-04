@@ -9,11 +9,12 @@ import {
   RouletteEditor, LotteryEditor, LadderEditor, QuizEditor, PickBoardEditor, PickBoardPanel, NumberPanel, Field,
   type RouletteItem, type LotteryPrize, type Prize, type QuizQuestion, type PickItem,
 } from './panels'
+import { RaceEditor, FishEditor, type RaceRacer, type FishItem } from './extraGames'
 
 type Tab = 'game' | 'items' | 'screen'
 
 const HAS_ITEMS: Record<string, string> = {
-  roulette: 'items', ladder: 'prizes', lottery: 'prizes', quiz: 'questions', pickboard: 'pickItems',
+  roulette: 'items', ladder: 'prizes', lottery: 'prizes', quiz: 'questions', pickboard: 'pickItems', race: 'racers', fish: 'fishes',
 }
 
 export default function GameConfig({ gameId, onHelp, port }: { gameId: string; onHelp?: () => void; port: number }) {
@@ -85,6 +86,24 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
                 <NumberField min={2} max={50} value={(g.maxParticipants as number) ?? 8} onCommit={v => save('maxParticipants', v)} />
               </Field>
             </>)}
+            {gameId === 'race' && (<>
+              <Field label="예측 접수 시간 (초)">
+                <NumberField min={5} max={600} value={(g.joinDuration as number) ?? 20} onCommit={v => save('joinDuration', v)} />
+              </Field>
+              <Field label="경주 시간 (ms)">
+                <NumberField min={3000} max={30000} step={500} value={(g.raceDuration as number) ?? 8000} onCommit={v => save('raceDuration', v)} />
+              </Field>
+            </>)}
+            {gameId === 'rps' && (
+              <Field label="참가 접수 시간 (초)">
+                <NumberField min={5} max={600} value={(g.joinDuration as number) ?? 15} onCommit={v => save('joinDuration', v)} />
+              </Field>
+            )}
+            {gameId === 'fish' && (
+              <Field label="낚시 연출 시간 (ms)">
+                <NumberField min={2000} max={15000} step={500} value={(g.castDuration as number) ?? 4000} onCommit={v => save('castDuration', v)} />
+              </Field>
+            )}
             {gameId === 'quiz' && (
               <Field label="자동 출제 제한 시간 (초)">
                 <NumberField min={5} max={600} value={(g.timeLimit as number) ?? 30} onCommit={v => save('timeLimit', v)} />
@@ -115,9 +134,9 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
           {game.engine && (
             <KeywordEditor keywords={(g.weflabKeywords as string[]) ?? []} onSave={v => save('weflabKeywords', v)} />
           )}
-          {['race', 'rps', 'fish'].includes(gameId) && (
-            <div className={styles.note}>이 게임은 추가 설정이 없습니다. 별풍선 트리거 개수와 채팅 명령어만 정하면 됩니다.</div>
-          )}
+          {gameId === 'race' && <div className={styles.note}>실행하면 예측 접수가 열리고, 시청자가 <b>{cmdValue || '!경주'} 번호</b>로 1등을 예측합니다. 접수가 닫히면 경주가 시작되고 적중자가 발표됩니다. 대기 중에 시청자가 명령어를 치면 바로 시작됩니다.</div>}
+          {gameId === 'rps' && <div className={styles.note}>실행하면 참가 접수가 열리고, 시청자가 <b>{cmdValue || '!묵찌빠'} 가위/바위/보</b>로 손을 냅니다. 마감되면 스트리머의 손이 무작위로 정해지고 이긴 시청자가 발표됩니다. 대기 중에 시청자가 명령어를 치면 바로 시작됩니다.</div>}
+          {gameId === 'fish' && <div className={styles.note}>실행할 때마다 한 마리를 낚습니다. 시청자별 점수와 마리 수는 앱을 껐다 켜도 유지되며, 오른쪽 미리보기에서 랭킹을 볼 수 있습니다.</div>}
         </>)}
 
         {/* ── 항목 설정 ── */}
@@ -126,13 +145,15 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
           {gameId === 'ladder'    && <LadderEditor    key="l" prizes={(g.prizes as Prize[]) ?? []} onSave={v => save('prizes', v)} />}
           {gameId === 'lottery'   && <LotteryEditor   key="lo" prizes={(g.prizes as LotteryPrize[]) ?? []} onSave={v => save('prizes', v)} />}
           {gameId === 'quiz'      && <QuizEditor      key="q" questions={(g.questions as QuizQuestion[]) ?? []} onSave={v => save('questions', v)} />}
+          {gameId === 'race'      && <RaceEditor key="ra" racers={(g.racers as RaceRacer[]) ?? []} onSave={v => save('racers', v)} />}
+          {gameId === 'fish'      && <FishEditor key="fi" fishes={(g.fishes as FishItem[]) ?? []} onSave={v => save('fishes', v)} />}
           {gameId === 'pickboard' && (
             <PickBoardEditor key="p" items={(g.pickItems as PickItem[]) ?? []} rows={(g.pickRows as number) ?? 4} cols={(g.pickCols as number) ?? 5}
               onSave={v => save('pickItems', v)} onSaveSize={(r, c) => { save('pickRows', r); save('pickCols', c) }} />
           )}
           {gameId === 'slot'   && <div className={styles.note}>슬롯 심볼은 오른쪽 미리보기 패널에서 추가·삭제합니다. (이모지 또는 이미지 URL, 최소 3개)</div>}
           {gameId === 'number' && <div className={styles.note}>추첨 범위와 제외 번호는 <b>게임 설정</b> 탭에서 관리합니다.</div>}
-          {['race', 'rps', 'fish'].includes(gameId) && <div className={styles.note}>이 게임은 편집할 항목이 없습니다.</div>}
+          {gameId === 'rps' && <div className={styles.note}>가위바위보는 편집할 항목이 없습니다. 접수 시간은 <b>게임 설정</b> 탭에서 바꿉니다.</div>}
         </>)}
 
         {/* ── 화면 설정 ── */}

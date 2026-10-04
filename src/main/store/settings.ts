@@ -111,9 +111,25 @@ export const DEFAULTS: Settings = {
       spinDuration: 3000,
       symbols: ['🍒', '🍋', '🍊', '⭐', '🎰', '💎', '7️⃣', '🔔'],
     },
-    race:    { enabled: false, balloonThreshold:   0, chatCommand: '!경주'    },
-    rps:     { enabled: false, balloonThreshold:   0, chatCommand: '!묵찌빠'  },
-    fish:    { enabled: false, balloonThreshold:   0, chatCommand: '!낚시'    },
+    race: {
+      enabled: false, balloonThreshold: 0, chatCommand: '!경주',
+      joinDuration: 20, raceDuration: 8000,
+      racers: [
+        { name: '말', emoji: '🐎' }, { name: '토끼', emoji: '🐇' }, { name: '거북이', emoji: '🐢' },
+        { name: '악어', emoji: '🐊' }, { name: '여우', emoji: '🦊' }, { name: '치타', emoji: '🐆' },
+      ],
+    },
+    rps: { enabled: false, balloonThreshold: 0, chatCommand: '!묵찌빠', joinDuration: 15 },
+    fish: {
+      enabled: false, balloonThreshold: 0, chatCommand: '!낚시',
+      castDuration: 4000,
+      fishes: [
+        { name: '고등어', emoji: '🐟', probability: 50, rarity: 'common',    points: 1 },
+        { name: '참치',   emoji: '🐠', probability: 30, rarity: 'uncommon',  points: 3 },
+        { name: '복어',   emoji: '🐡', probability: 15, rarity: 'rare',      points: 10 },
+        { name: '황금어', emoji: '🐉', probability:  5, rarity: 'legendary', points: 50 },
+      ],
+    },
     lottery: { enabled: false, balloonThreshold:   0, chatCommand: '!복권', scratchDuration: 3000 },
     number:  {
       enabled: false, balloonThreshold: 0, chatCommand: '!추첨',
@@ -147,6 +163,9 @@ export const LIMITS = {
   pickCount:        { min: 0,    max: 100 },
   scale:            { min: 50,   max: 200 },
   maxRunsPerDonation: { min: 1,  max: 100 },
+  raceDuration:     { min: 3000, max: 30000 },
+  castDuration:     { min: 2000, max: 15000 },
+  points:           { min: 0,    max: 100000 },
 } as const
 
 export function clampNum(v: unknown, lim: { min: number; max: number }, fallback: number): number {
@@ -213,6 +232,32 @@ function sanitizeGame(id: string, g: GameConfig, def: GameConfig): GameConfig {
         isWin:  typeof o.isWin === 'boolean' ? o.isWin : String(o.name ?? '').trim() !== '꽝',
       }
     }) as unknown as Prize[]
+  }
+  if (id === 'race') {
+    out.joinDuration = clampNum(g.joinDuration, LIMITS.joinDuration, 20)
+    out.raceDuration = clampNum(g.raceDuration, LIMITS.raceDuration, 8000)
+    const racers = Array.isArray(g.racers) ? (g.racers as unknown[]).map(r => {
+      const o = (r ?? {}) as Record<string, unknown>
+      return { name: String(o.name ?? '').trim(), emoji: String(o.emoji ?? '').trim() || '🏃' }
+    }).filter(r => r.name).slice(0, 8) : []
+    out.racers = racers.length >= 2 ? racers : def.racers
+  }
+  if (id === 'rps') {
+    out.joinDuration = clampNum(g.joinDuration, LIMITS.joinDuration, 15)
+  }
+  if (id === 'fish') {
+    out.castDuration = clampNum(g.castDuration, LIMITS.castDuration, 4000)
+    const RAR = ['common', 'uncommon', 'rare', 'legendary']
+    out.fishes = Array.isArray(g.fishes) ? (g.fishes as unknown[]).map(f => {
+      const o = (f ?? {}) as Record<string, unknown>
+      return {
+        name:        String(o.name ?? '').trim() || '물고기',
+        emoji:       String(o.emoji ?? '').trim() || '🐟',
+        probability: clampNum(o.probability, LIMITS.probability, 0),
+        rarity:      RAR.includes(String(o.rarity)) ? String(o.rarity) : 'common',
+        points:      clampNum(o.points, LIMITS.points, 1),
+      }
+    }) : def.fishes
   }
   if (id === 'number') {
     let min = clampNum(g.minNumber, LIMITS.minNumber, 1)

@@ -1,6 +1,8 @@
-import { ipcMain, BrowserWindow, shell } from 'electron'
+import { ipcMain, BrowserWindow, shell, app } from 'electron'
+import { join } from 'path'
 import { gameEngine, GAME_IDS, type GameId } from '../games/engine'
 import { pickboardStore }          from '../games/pickboard'
+import { FishLog }                 from '../games/fishlog'
 import { soopClient }              from '../soop/client'
 import { overlayServer, OverlayServer } from '../overlay/server'
 import { loadSettings, patchSettings, takeLoadError, type SettingsPatch } from '../store/settings'
@@ -94,6 +96,13 @@ export function registerIpcHandlers(win: BrowserWindow) {
   gameEngine.on('quiz:question', (q) => send('quiz:question', q))
   gameEngine.on('stats', sendStats)
   gameEngine.on('log', (m: string) => send('app:notice', { level: 'warn', message: m }))
+
+  // ── Fish log (낚시 누적 기록) ─────────────────────────────────────────────
+
+  const fishLog = new FishLog(() => join(app.getPath('userData'), 'data'))
+  gameEngine.setFishRecorder((user, fish) => fishLog.record(user, fish))
+  ipcMain.handle('fish:ranking', (_, limit = 10) => fishLog.ranking(Math.min(100, Math.max(1, Number(limit) || 10))))
+  ipcMain.handle('fish:resetLog', authed(() => { fishLog.reset(); return { ok: true } }))
 
   // ── Pickboard (상태는 메인에 있음) ────────────────────────────────────────
 

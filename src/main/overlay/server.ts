@@ -12,7 +12,9 @@ import { PREVIEW_OVERLAY_HTML } from './pages/preview'
 import { MONITOR_OVERLAY_HTML } from './pages/monitor'
 import { LOTTERY_OVERLAY_HTML } from './pages/lottery'
 import { SLOT_OVERLAY_HTML } from './pages/slot'
-import { OVERLAY_HTML } from './pages/generic'
+import { RACE_OVERLAY_HTML } from './pages/race'
+import { RPS_OVERLAY_HTML } from './pages/rps'
+import { FISH_OVERLAY_HTML } from './pages/fish'
 
 // URL 경로의 gameId 는 허용 목록으로만 — HTML/스크립트 안에 그대로 들어가므로 반사형 XSS 차단
 const PAGES: Record<string, (port: number) => string> = {
@@ -25,9 +27,9 @@ const PAGES: Record<string, (port: number) => string> = {
   pickboard: PICKBOARD_OVERLAY_HTML,
   monitor:   MONITOR_OVERLAY_HTML,
   preview:   PREVIEW_OVERLAY_HTML,
-  race:      p => OVERLAY_HTML('race', 'purple', p),
-  rps:       p => OVERLAY_HTML('rps',  'purple', p),
-  fish:      p => OVERLAY_HTML('fish', 'purple', p),
+  race:      RACE_OVERLAY_HTML,
+  rps:       RPS_OVERLAY_HTML,
+  fish:      FISH_OVERLAY_HTML,
 }
 export const OVERLAY_IDS = Object.keys(PAGES)
 

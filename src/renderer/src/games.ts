@@ -17,9 +17,9 @@ export const GAMES: GameMeta[] = [
   { id: 'pickboard', name: '뽑기판',     desc: '칸을 선택해 상품을 뽑는 게임',            color: '#ff7a3d', icon: 'pickboard', engine: false },
   { id: 'quiz',      name: '퀴즈',      desc: '질문과 보기로 진행하는 퀴즈 게임',        color: '#2f6bff', icon: 'quiz',      engine: true  },
   { id: 'slot',      name: '슬롯머신',   desc: '3개의 슬롯으로 잭팟을 노리는 게임',       color: '#7a3cff', icon: 'slot',      engine: true  },
-  { id: 'race',      name: '경주',      desc: '캐릭터 경주 시뮬레이션 게임',             color: '#00a884', icon: 'race',      engine: true  },
-  { id: 'rps',       name: '가위바위보', desc: '시청자와 대결하는 가위바위보 게임',       color: '#e0342c', icon: 'rps',       engine: true  },
-  { id: 'fish',      name: '낚시',      desc: '물고기를 낚아 아이템을 획득하는 게임',    color: '#1aa7d8', icon: 'fishing',   engine: true  },
+  { id: 'race',      name: '경주',      desc: '시청자가 채팅으로 1등을 예측하는 동물 경주 게임', color: '#00a884', icon: 'race',      engine: true  },
+  { id: 'rps',       name: '가위바위보', desc: '시청자가 채팅으로 손을 내 스트리머와 대결하는 게임', color: '#e0342c', icon: 'rps',       engine: true  },
+  { id: 'fish',      name: '낚시',      desc: '물고기를 낚아 점수를 모으는 게임 (시청자별 누적 랭킹)', color: '#1aa7d8', icon: 'fishing',   engine: true  },
   { id: 'lottery',   name: '복권',      desc: '복권을 긁어 당첨을 노리는 게임',          color: '#f2a600', icon: 'lottery',   engine: true  },
   { id: 'number',    name: '숫자 추첨',  desc: '랜덤 숫자를 추첨하는 게임',               color: '#2f6bff', icon: 'number',    engine: true  },
 ]

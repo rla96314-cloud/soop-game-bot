@@ -6,6 +6,7 @@ import Icon from '../../components/Icon'
 import styles from './Games.module.css'
 import { CopyBtn } from './GameConfig'
 import { LadderPanel, QuizPanel, SlotPanel } from './panels'
+import { RacePanel, RpsPanel, FishPanel } from './extraGames'
 
 const WHEEL_COLORS = ['#e0342c', '#ff7a1a', '#f2a600', '#12a866', '#2f6bff', '#7a3cff', '#00a884', '#e0489a']
 
@@ -103,7 +104,10 @@ export default function GamePreview({ gameId, port, wheelSize = 320, title = 'Îù
         {gameId === 'slot' && (
           <SlotPanelBridge gameId={gameId} g={g} />
         )}
-        {['race', 'rps', 'fish', 'lottery', 'number'].includes(gameId) && (
+        {gameId === 'race' && <RacePanel state={state} />}
+        {gameId === 'rps'  && <RpsPanel state={state} />}
+        {gameId === 'fish' && <FishPanel state={state} />}
+        {['lottery', 'number'].includes(gameId) && (
           <div className={`${styles.pvStage} checker`}>
             {!busy && !result && (
               <div className={styles.pvIdle}>

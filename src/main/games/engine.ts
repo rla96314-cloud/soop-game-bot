@@ -92,6 +92,50 @@ export interface LotteryPickState {
   isWin:       boolean
 }
 
+// ── 경주 ──
+export interface RaceRacer { name: string; emoji: string }
+/** 주자 한 명의 진행 곡선 파라미터 — 오버레이가 같은 식(raceProgress)으로 그린다 */
+export interface RaceCurve { finish: number; amp: number; freq: number; phase: number }
+export interface RaceState {
+  racers:    RaceRacer[]
+  bets:      Record<string, number>   // 닉네임 → 주자 인덱스
+  deadline:  number
+  joinMs:    number
+  command:   string
+  raceMs?:   number
+  startedAt?: number
+  curves?:   RaceCurve[]
+  order?:    number[]                 // 도착 순서 (주자 인덱스)
+}
+
+// ── 가위바위보 ──
+export type RpsHand = 'rock' | 'paper' | 'scissors'
+export interface RpsState {
+  picks:     Record<string, RpsHand>
+  deadline:  number
+  joinMs:    number
+  command:   string
+  streamer?: RpsHand
+  startedAt?: number
+  revealMs?: number
+  winners?:  string[]
+  draws?:    string[]
+  losers?:   string[]
+}
+
+// ── 낚시 ──
+export type FishRarity = 'common' | 'uncommon' | 'rare' | 'legendary'
+export interface FishItem { name: string; emoji: string; probability: number; rarity: FishRarity; points: number }
+export interface FishCastState {
+  triggeredBy: string
+  fish:        FishItem
+  castMs:      number
+  startedAt:   number
+  count:       number   // 이 사람이 이 물고기를 낚은 누적 횟수
+  totalPoints: number   // 이 사람의 누적 점수
+}
+export type FishRecorder = (user: string, fish: FishItem) => { count: number; totalPoints: number }
+
 export interface GameState {
   id:       GameId
   status:   GameStatus
@@ -103,6 +147,9 @@ export interface GameState {
   slot?:    SlotSpinState
   number?:  NumberPickState
   lottery?: LotteryPickState
+  race?:    RaceState
+  rps?:     RpsState
+  fish?:    FishCastState
 }
 
 interface QueuedRun { triggeredBy: string; balloon: number }
@@ -144,6 +191,68 @@ export function normalizeAnswer(s: string): string {
 export function isLotteryWin(p: LotteryPrize): boolean {
   return typeof p.isWin === 'boolean' ? p.isWin : p.name.trim() !== '꽝'
 }
+
+// ── 가위바위보 ──
+
+export const RPS_EMOJI: Record<RpsHand, string> = { rock: '✊', paper: '🖐️', scissors: '✌️' }
+export const RPS_LABEL: Record<RpsHand, string> = { rock: '바위', paper: '보', scissors: '가위' }
+
+/** 채팅 문구 → 손. 가위/바위/보, 주먹/보자기, 찌/묵/빠, 이모지, s/r/p 를 받는다 */
+export function parseHand(text: string): RpsHand | null {
+  const t = (text ?? '').trim().toLowerCase()
+  if (!t) return null
+  if (/^(가위|찌|✌|✌️|scissors?|s)$/.test(t)) return 'scissors'
+  if (/^(바위|주먹|묵|✊|👊|rock|r)$/.test(t)) return 'rock'
+  if (/^(보|보자기|빠|🖐|🖐️|✋|paper|p)$/.test(t)) return 'paper'
+  return null
+}
+
+/** 시청자 기준 결과 */
+export function rpsOutcome(viewer: RpsHand, streamer: RpsHand): 'win' | 'draw' | 'lose' {
+  if (viewer === streamer) return 'draw'
+  const beats: Record<RpsHand, RpsHand> = { rock: 'scissors', scissors: 'paper', paper: 'rock' }
+  return beats[viewer] === streamer ? 'win' : 'lose'
+}
+
+// ── 경주 ──
+
+/**
+ * 주자별 진행 곡선 생성. 도착 순서를 먼저 균등하게 섞고(공정), 순위대로 도착 시각을 배정한 뒤
+ * 흔들림(사인파)을 얹는다. 흔들림은 출발·도착 지점에서 0 이 되므로 순위가 뒤집히지 않는다.
+ */
+export function buildRaceCurves(n: number, rand = Math.random): { curves: RaceCurve[]; order: number[] } {
+  const order = Array.from({ length: n }, (_, i) => i)
+  for (let i = n - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [order[i], order[j]] = [order[j], order[i]] }
+  const curves: RaceCurve[] = new Array(n)
+  order.forEach((racer, rank) => {
+    const finish = n === 1 ? 0.9 : 0.78 + 0.2 * (rank / (n - 1))   // 1등 0.78, 꼴찌 0.98 (전체 시간 대비)
+    curves[racer] = { finish, amp: 0.05 + rand() * 0.07, freq: 1 + rand() * 2, phase: rand() * Math.PI * 2 }
+  })
+  return { curves, order }
+}
+
+/** t: 0..1 (경주 전체 시간 대비) → 진행도 0..1. 오버레이 스크립트에 같은 식이 있다 */
+export function raceProgress(c: RaceCurve, t: number): number {
+  if (t >= c.finish) return 1
+  const u = Math.max(0, t / c.finish)
+  const wobble = c.amp * Math.sin(2 * Math.PI * c.freq * u + c.phase) * u * (1 - u) * 4
+  return Math.min(0.995, Math.max(0, u + wobble))
+}
+
+/** "!경주 3" / "!경주 토끼" / "!경주 🐇" → 주자 인덱스 */
+export function parseRacerPick(arg: string, racers: RaceRacer[]): number | null {
+  const a = (arg ?? '').trim()
+  if (!a) return null
+  const n = Number(a.replace(/번$/, ''))
+  if (Number.isInteger(n) && n >= 1 && n <= racers.length) return n - 1
+  const low = a.toLowerCase()
+  const idx = racers.findIndex(r => r.name.toLowerCase() === low || r.emoji === a)
+  return idx >= 0 ? idx : null
+}
+
+// ── 낚시 ──
+
+export const FISH_RARITY_LABEL: Record<FishRarity, string> = { common: '일반', uncommon: '고급', rare: '희귀', legendary: '레전드' }
 
 /**
  * 사다리 생성 (순수 함수 — 테스트용으로 분리)
@@ -214,7 +323,18 @@ export class GameEngine extends EventEmitter {
   private settings!: Settings
   private quizTimer: ReturnType<typeof setTimeout> | null = null
   private ladderTimer: ReturnType<typeof setTimeout> | null = null
+  private phaseTimers: Map<GameId, ReturnType<typeof setTimeout>> = new Map()
   private slotRunId = 0
+  private fishRecorder: FishRecorder = (_u, f) => ({ count: 1, totalPoints: f.points })
+
+  /** 낚시 누적 기록 저장소 연결 (메인에서 fishlog 주입 — 엔진은 파일을 모른다) */
+  setFishRecorder(fn: FishRecorder) { this.fishRecorder = fn }
+
+  private setPhaseTimer(id: GameId, fn: () => void, ms: number) {
+    const prev = this.phaseTimers.get(id)
+    if (prev) clearTimeout(prev)
+    this.phaseTimers.set(id, setTimeout(() => { this.phaseTimers.delete(id); fn() }, ms))
+  }
 
   // Today stats
   todayRuns     = 0
@@ -290,10 +410,15 @@ export class GameEngine extends EventEmitter {
       const cmd = (cfg.chatCommand as string | undefined)?.trim()
       if (!cmd || !msg.startsWith(cmd)) continue
       // 참가·정답 명령은 모집 중인 판이 있으면 게임 활성화 여부와 상관없이 받는다 (수동 출제 퀴즈 포함)
+      const arg = msg.slice(cmd.length).trim()
       if (id === 'ladder') {
         this.ladderJoin(username)
       } else if (id === 'quiz') {
-        this.quizAnswer(username, msg.slice(cmd.length).trim())
+        this.quizAnswer(username, arg)
+      } else if (id === 'rps') {
+        this.rpsChat(username, arg, cfg.enabled)
+      } else if (id === 'race') {
+        this.raceChat(username, arg, cfg.enabled)
       } else if (cfg.enabled) {
         this.trigger(id as GameId, username, 0)
       }
@@ -549,68 +674,157 @@ export class GameEngine extends EventEmitter {
     return true
   }
 
+  // ── Race (경주: 시청자가 1등을 맞힌다) ─────────────────────────────────────
+
+  private raceRacers(): RaceRacer[] {
+    const list = (this.settings.games.race?.racers as RaceRacer[] | undefined)?.filter(r => r?.name) ?? []
+    return list.length >= 2 ? list.slice(0, 8) : [
+      { name: '말', emoji: '🐎' }, { name: '토끼', emoji: '🐇' }, { name: '거북이', emoji: '🐢' },
+      { name: '악어', emoji: '🐊' }, { name: '여우', emoji: '🦊' }, { name: '치타', emoji: '🐆' },
+    ]
+  }
+
+  private raceChat(username: string, arg: string, enabled: boolean) {
+    const state = this.getState('race')
+    if (state.status === 'idle' && enabled) {
+      if (this.trigger('race', username, 0) !== 'started') return
+    }
+    if (state.status !== 'collecting' || !state.race) return
+    const pick = parseRacerPick(arg, state.race.racers)
+    if (pick === null) return
+    state.race.bets[username] = pick          // 마감 전에는 바꿀 수 있음
+    this.emit('game:update', 'race', state)
+  }
+
   private runRace(by: string, balloon: number): boolean {
-    const ANIMALS = ['🐎','🐇','🐢','🐊','🦊','🐆']
-    const state  = this.getState('race')
-    state.status = 'running'
+    const cfg     = this.settings.games.race
+    const joinSec = Math.max(5, Number(cfg?.joinDuration) || 20)
+    const raceMs  = Math.max(3000, Number(cfg?.raceDuration) || 8000)
+    const state   = this.getState('race')
+    state.status  = 'collecting'
+    state.race    = {
+      racers:   this.raceRacers(),
+      bets:     {},
+      deadline: Date.now() + joinSec * 1000,
+      joinMs:   joinSec * 1000,
+      command:  String(cfg?.chatCommand ?? '!경주'),
+    }
     this.emit('game:update', 'race', state)
 
-    setTimeout(() => {
-      const winner = ANIMALS[Math.floor(Math.random() * ANIMALS.length)]
-      this.finishGame('race', {
-        gameId: 'race', triggeredBy: by, balloon,
-        result: `${winner} 1등!`,
-        detail: `${by}님이 시작한 레이스 - ${winner} 우승!`,
-        ts:     Date.now(),
-      })
-    }, 4000)
+    this.setPhaseTimer('race', () => {
+      const s = this.getState('race')
+      if (!s.race) return
+      const { curves, order } = buildRaceCurves(s.race.racers.length)
+      s.status = 'running'
+      s.race.curves = curves
+      s.race.order = order
+      s.race.raceMs = raceMs
+      s.race.startedAt = Date.now()
+      this.emit('game:update', 'race', s)
+
+      this.setPhaseTimer('race', () => {
+        const r = s.race!
+        const winner = r.racers[order[0]]
+        const hits = Object.entries(r.bets).filter(([, i]) => i === order[0]).map(([u]) => u)
+        const betCount = Object.keys(r.bets).length
+        this.finishGame('race', {
+          gameId: 'race', triggeredBy: by, balloon,
+          result: `${winner.emoji} ${winner.name} 1등!`,
+          detail: betCount === 0
+            ? `순위: ${order.map(i => r.racers[i].emoji).join(' ')} · 예측 참가자 없음`
+            : `적중 ${hits.length}/${betCount}명${hits.length ? ` — ${hits.slice(0, 20).join(', ')}${hits.length > 20 ? ' …' : ''}` : ''} · 순위: ${order.map(i => r.racers[i].emoji).join(' ')}`,
+          ts: Date.now(),
+        })
+      }, raceMs + 600)
+    }, joinSec * 1000)
     return true
+  }
+
+  // ── RPS (가위바위보: 채팅으로 손을 내고 스트리머와 대결) ───────────────────
+
+  private rpsChat(username: string, arg: string, enabled: boolean) {
+    const state = this.getState('rps')
+    const hand = parseHand(arg)
+    if (state.status === 'idle' && enabled) {
+      if (this.trigger('rps', username, 0) !== 'started') return
+    }
+    if (state.status !== 'collecting' || !state.rps || !hand) return
+    state.rps.picks[username] = hand          // 마감 전에는 바꿀 수 있음
+    this.emit('game:update', 'rps', state)
   }
 
   private runRps(by: string, balloon: number): boolean {
-    const CHOICES = ['✊ 주먹', '✌️ 가위', '🖐️ 보']
-    const state  = this.getState('rps')
-    state.status = 'running'
+    const cfg     = this.settings.games.rps
+    const joinSec = Math.max(5, Number(cfg?.joinDuration) || 15)
+    const state   = this.getState('rps')
+    state.status  = 'collecting'
+    state.rps     = {
+      picks: {}, deadline: Date.now() + joinSec * 1000, joinMs: joinSec * 1000,
+      command: String(cfg?.chatCommand ?? '!묵찌빠'),
+    }
     this.emit('game:update', 'rps', state)
 
-    setTimeout(() => {
-      const streamer = Math.floor(Math.random() * 3)
-      const viewer   = Math.floor(Math.random() * 3)
-      let outcome: string
-      if (streamer === viewer) outcome = '무승부'
-      else if ((streamer - viewer + 3) % 3 === 1) outcome = '스트리머 승'
-      else outcome = '시청자 승'
+    this.setPhaseTimer('rps', () => {
+      const s = this.getState('rps')
+      if (!s.rps) return
+      const hands: RpsHand[] = ['rock', 'paper', 'scissors']
+      const streamer = hands[Math.floor(Math.random() * 3)]
+      const winners: string[] = [], draws: string[] = [], losers: string[] = []
+      for (const [u, h] of Object.entries(s.rps.picks)) {
+        const o = rpsOutcome(h, streamer)
+        ;(o === 'win' ? winners : o === 'draw' ? draws : losers).push(u)
+      }
+      const revealMs = 2200
+      Object.assign(s.rps, { streamer, winners, draws, losers, startedAt: Date.now(), revealMs })
+      s.status = 'running'
+      this.emit('game:update', 'rps', s)
 
-      this.finishGame('rps', {
-        gameId: 'rps', triggeredBy: by, balloon,
-        result: outcome,
-        detail: `스트리머: ${CHOICES[streamer]} vs 시청자: ${CHOICES[viewer]} → ${outcome}`,
-        ts:     Date.now(),
-      })
-    }, 2000)
+      this.setPhaseTimer('rps', () => {
+        const total = winners.length + draws.length + losers.length
+        this.finishGame('rps', {
+          gameId: 'rps', triggeredBy: by, balloon,
+          result: `스트리머 ${RPS_EMOJI[streamer]} ${RPS_LABEL[streamer]}`
+                + (total ? ` — 승 ${winners.length} · 무 ${draws.length} · 패 ${losers.length}` : ' — 참가자 없음'),
+          detail: winners.length
+            ? `이긴 시청자: ${winners.slice(0, 30).join(', ')}${winners.length > 30 ? ' …' : ''}`
+            : total ? '스트리머 승! 이긴 시청자가 없습니다' : `채팅으로 ${s.rps!.command} 가위/바위/보 를 입력해 참가하세요`,
+          ts: Date.now(),
+        })
+      }, revealMs)
+    }, joinSec * 1000)
     return true
   }
 
+  // ── Fish (낚시: 물고기를 낚아 점수를 모은다, 누적 기록) ─────────────────────
+
   private runFish(by: string, balloon: number): boolean {
-    const FISH = [
-      { name: '고등어 🐟',   rarity: 'common',    probability: 50 },
-      { name: '참치 🐠',     rarity: 'uncommon',  probability: 30 },
-      { name: '복어 🐡',     rarity: 'rare',      probability: 15 },
-      { name: '황금어 🐟✨', rarity: 'legendary', probability:  5 },
+    const cfg    = this.settings.games.fish
+    const saved  = (cfg?.fishes as FishItem[] | undefined) ?? []
+    const fishes: FishItem[] = saved.length ? saved : [
+      { name: '고등어', emoji: '🐟', probability: 50, rarity: 'common',    points: 1 },
+      { name: '참치',   emoji: '🐠', probability: 30, rarity: 'uncommon',  points: 3 },
+      { name: '복어',   emoji: '🐡', probability: 15, rarity: 'rare',      points: 10 },
+      { name: '황금어', emoji: '🐉', probability:  5, rarity: 'legendary', points: 50 },
     ]
+    const fish = weightedRandom(fishes)
+    if (!fish) { this.emit('log', '낚시 물고기 목록이 없거나 확률 합이 0입니다'); return false }
+    const castMs = Math.max(2000, Number(cfg?.castDuration) || 4000)
+
+    const { count, totalPoints } = this.fishRecorder(by, fish)
     const state  = this.getState('fish')
     state.status = 'running'
+    state.fish   = { triggeredBy: by, fish, castMs, startedAt: Date.now(), count, totalPoints }
     this.emit('game:update', 'fish', state)
 
-    setTimeout(() => {
-      const catch_ = weightedRandom(FISH)!
+    this.setPhaseTimer('fish', () => {
+      const label = FISH_RARITY_LABEL[fish.rarity] ?? fish.rarity
       this.finishGame('fish', {
         gameId: 'fish', triggeredBy: by, balloon,
-        result: catch_.name,
-        detail: `${by}님이 ${catch_.name} 낚시 성공! (${catch_.rarity})`,
-        ts:     Date.now(),
+        result: `${fish.emoji} ${fish.name}`,
+        detail: `${by}님이 ${fish.name} 낚시 성공! (${label}, +${fish.points}점) · 누적 ${count}마리 · 총 ${totalPoints}점`,
+        ts: Date.now(),
       })
-    }, 3000)
+    }, castMs)
     return true
   }
 
@@ -706,6 +920,7 @@ export class GameEngine extends EventEmitter {
       s2.result = null
       s2.roulette = undefined; s2.ladder = undefined; s2.quiz = undefined
       s2.slot = undefined; s2.number = undefined; s2.lottery = undefined
+      s2.race = undefined; s2.rps = undefined; s2.fish = undefined
       this.emit('game:update', id, s2)
       this.drainQueue(id)
     }, RESULT_SHOW_MS)
