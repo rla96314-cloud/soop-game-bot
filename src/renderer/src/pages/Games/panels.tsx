@@ -1032,6 +1032,11 @@ export function QuizPanel({
 
 interface SlotSpinState { symbols: string[]; jackpot: boolean; twoKind: boolean; triggeredBy: string }
 
+// 슬롯 기본 캐릭터 심볼 — 이름이 곧 심볼 문자열 (오버레이도 같은 이름으로 그림을 찾는다)
+const SLOT_CHAR_FILES: Record<string, string> = { '나노': 'nano', '루첼': 'ruchel', '설홍': 'seolhong', '여우연': 'yeouyeon', '최애리': 'choiaeri', '눈요': 'nunyo' }
+const slotCharPngs = import.meta.glob('../../assets/slot/*.png', { eager: true, import: 'default' }) as Record<string, string>
+const slotCharUrl = (s: string) => SLOT_CHAR_FILES[s] ? slotCharPngs[`../../assets/slot/${SLOT_CHAR_FILES[s]}.png`] : undefined
+
 export function SlotPanel({
   gSettings, gameStates, saveSetting,
 }: {
@@ -1043,7 +1048,7 @@ export function SlotPanel({
   const status = (state?.status as string) ?? 'idle'
   const spin   = state?.slot as SlotSpinState | undefined
 
-  const defaultSymbols = ['🍒', '🍋', '🍊', '⭐', '🎰', '💎', '7️⃣', '🔔']
+  const defaultSymbols = Object.keys(SLOT_CHAR_FILES)
   const [symbols, setSymbols] = useState<string[]>(
     (gSettings.symbols as string[]) ?? defaultSymbols
   )
@@ -1071,10 +1076,12 @@ export function SlotPanel({
 
   const isUrl = (s: string) => s.startsWith('http') || s.startsWith('data:')
 
-  const renderSymbol = (s: string, cls?: string) =>
-    isUrl(s)
-      ? <img src={s} alt="심볼" className={cls ?? styles.slSymbolImg} />
+  const renderSymbol = (s: string, cls?: string) => {
+    const src = slotCharUrl(s) ?? (isUrl(s) ? s : undefined)
+    return src
+      ? <img src={src} alt={s} title={s} className={cls ?? styles.slSymbolImg} />
       : <span>{s}</span>
+  }
 
   return (
     <div className={styles.slPanel}>
@@ -1116,11 +1123,7 @@ export function SlotPanel({
         <div className={styles.slSymbolGrid}>
           {symbols.map((s, i) => (
             <div key={i} className={styles.slSymbolItem}>
-              <span className={styles.slSymbolEmoji}>
-                {isUrl(s)
-                  ? <img src={s} alt="심볼" className={styles.slSymbolImg} />
-                  : s}
-              </span>
+              <span className={styles.slSymbolEmoji}>{renderSymbol(s)}</span>
               <button
                 className={styles.slSymbolRemove}
                 onClick={() => removeSym(i)}
@@ -1134,10 +1137,12 @@ export function SlotPanel({
             className={styles.slAddInput}
             value={newSym}
             onChange={e => setNewSym(e.target.value)}
-            placeholder="이모지 또는 이미지 URL (http://...)"
+            placeholder="이모지·캐릭터 이름 또는 이미지 URL (http://...)"
             onKeyDown={e => e.key === 'Enter' && addSym()}
           />
           <button className={styles.slAddBtn} onClick={addSym}>추가</button>
+          <button className="btn btn-sm" title="나노·루첼·설홍·여우연·최애리·눈요"
+            onClick={() => { setSymbols(defaultSymbols); saveSetting('symbols', defaultSymbols) }}>기본 캐릭터로</button>
         </div>
         <p className={styles.slSymbolHint}>최소 3개 필요 · 이모지 또는 이미지 URL 지원</p>
       </div>

@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events'
 import type { Settings } from '../store/settings'
+import { SLOT_DEFAULT_SYMBOLS } from '../store/settings'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -644,7 +645,7 @@ export class GameEngine extends EventEmitter {
   private runSlot(by: string, balloon: number): boolean {
     const cfg     = this.settings.games.slot
     const custom  = (cfg?.symbols as string[] | undefined)?.filter(Boolean)
-    const symbols = custom && custom.length >= 3 ? custom : ['🍒', '🍋', '🍊', '⭐', '🎰', '💎']
+    const symbols = custom && custom.length >= 3 ? custom : [...SLOT_DEFAULT_SYMBOLS]
     const spinMs  = Number(cfg?.spinDuration) || 3000
 
     // Pre-determine result so overlay can animate to it

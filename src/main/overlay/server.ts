@@ -6,6 +6,7 @@ import { join, extname, basename } from 'path'
 import type { GameResult, GameState } from '../games/engine'
 import { loadSettings } from '../store/settings'
 import { listMedia, mediaDir, MEDIA_TYPES } from './media'
+import { OVERLAY_ASSETS } from './assets'
 
 import { QUIZ_OVERLAY_HTML } from './pages/quiz'
 import { LADDER_OVERLAY_HTML } from './pages/ladder'
@@ -78,6 +79,17 @@ export class OverlayServer extends EventEmitter {
       if (path === '/api/overlay-config') {
         res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' })
         res.end(JSON.stringify({ sound: loadSettings().overlay.sound }))
+        return
+      }
+
+      // ── 내장 이미지 (슬롯 캐릭터·가위바위보 손) ──
+      const aFile = /^\/assets\/([a-z-]+)\.png$/.exec(path)
+      if (aFile) {
+        const b64 = OVERLAY_ASSETS[aFile[1]]
+        if (!b64) { res.writeHead(404); res.end(); return }
+        const buf = Buffer.from(b64, 'base64')
+        res.writeHead(200, { 'Content-Type': 'image/png', 'Content-Length': buf.length, 'Cache-Control': 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff' })
+        res.end(req.method === 'HEAD' ? undefined : buf)
         return
       }
 

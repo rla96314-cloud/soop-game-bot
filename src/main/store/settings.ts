@@ -3,6 +3,14 @@ import { join } from 'path'
 import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, copyFileSync } from 'fs'
 import type { DonationSource } from '../donation/gate'
 
+/** 슬롯 기본 심볼 — 캐릭터 이름(오버레이·앱이 이름으로 내장 그림을 찾는다) */
+export const SLOT_DEFAULT_SYMBOLS = ['나노', '루첼', '설홍', '여우연', '최애리', '눈요']
+/** 예전 기본값(이모지) — 저장된 값이 이것과 같으면 새 기본값으로 바꾼다 */
+const OLD_SLOT_DEFAULTS = [
+  ['🍒', '🍋', '🍊', '⭐', '🎰', '💎', '7️⃣', '🔔'],
+  ['🍒', '🍋', '🍊', '⭐', '🎰', '💎'],
+]
+
 export interface RouletteItem { name: string; probability: number }
 export interface QuizQuestion { question: string; answer: string }
 export interface Prize        { name: string; description: string }
@@ -109,7 +117,7 @@ export const DEFAULTS: Settings = {
     slot: {
       enabled: false, balloonThreshold: 100, chatCommand: '!슬롯',
       spinDuration: 3000,
-      symbols: ['🍒', '🍋', '🍊', '⭐', '🎰', '💎', '7️⃣', '🔔'],
+      symbols: [...SLOT_DEFAULT_SYMBOLS],
     },
     race: {
       enabled: false, balloonThreshold: 0, chatCommand: '!경주',
@@ -219,7 +227,8 @@ function sanitizeGame(id: string, g: GameConfig, def: GameConfig): GameConfig {
   }
   if (id === 'slot') {
     const syms = strArr(g.symbols)
-    out.symbols = syms.length >= 3 ? syms : def.symbols
+    const isOld = OLD_SLOT_DEFAULTS.some(o => o.length === syms.length && o.every((v, i) => v === syms[i]))
+    out.symbols = syms.length >= 3 && !isOld ? syms : def.symbols
   }
   if (id === 'lottery' && Array.isArray(g.prizes)) {
     out.prizes = (g.prizes as unknown[]).map(p => {

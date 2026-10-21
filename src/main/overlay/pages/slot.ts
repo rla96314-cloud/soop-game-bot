@@ -55,10 +55,14 @@ const CELL=170, REEL_X=[-270,0,270], REEL_W=244, REEL_H=330;
 const VS=String.fromCharCode(0xFE0F);
 const norm=s=>String(s==null?'':s).split(VS).join('');
 const DEFAULTS=['🍒','🍋','🍊','⭐','🎰','💎'];
+/* 기본 캐릭터 심볼 (이름 = 심볼 문자열, 그림은 서버 /assets) */
+const CHARS={'나노':'nano','루첼':'ruchel','설홍':'seolhong','여우연':'yeouyeon','최애리':'choiaeri','눈요':'nunyo'};
+const CHAR_LIST=Object.keys(CHARS);
 const SYMNAME={'🍒':'체리','🍋':'레몬','🍊':'오렌지','⭐':'별','🎰':'세븐','💎':'다이아'};
 const isUrl=s=>!!s&&(s.indexOf('http')===0||s.indexOf('data:')===0);
 const imgs={};
 function img(src){ if(!imgs[src]){ const im=new Image(); im.src=src; imgs[src]=im; } return imgs[src]; }
+CHAR_LIST.forEach(n=>img('/assets/slot-'+CHARS[n]+'.png'));
 function symName(s){ const n=norm(s); if(SYMNAME[n]) return SYMNAME[n]; if(isUrl(n)) return '그림'; return n.length>6?n.slice(0,6):n; }
 
 function star(c,n,ro,ri){ c.beginPath(); for(let i=0;i<n*2;i++){const r=i%2?ri:ro,a=-Math.PI/2+i*Math.PI/n; i?c.lineTo(Math.cos(a)*r,Math.sin(a)*r):c.moveTo(Math.cos(a)*r,Math.sin(a)*r);} c.closePath(); }
@@ -66,7 +70,11 @@ function star(c,n,ro,ri){ c.beginPath(); for(let i=0;i<n*2;i++){const r=i%2?ri:r
 function glyph(c,sym,R){
   const s=norm(sym);
   c.save(); c.lineJoin='round'; c.lineCap='round'; c.strokeStyle=NAVY;
-  if(s==='🍒'){
+  if(CHARS[s]){
+    const im=img('/assets/slot-'+CHARS[s]+'.png');
+    if(im.complete&&im.naturalWidth){ const k=Math.min(R*1.9/im.naturalWidth,R*1.9/im.naturalHeight); c.drawImage(im,-im.naturalWidth*k/2,-im.naturalHeight*k/2,im.naturalWidth*k,im.naturalHeight*k); }
+    else { c.fillStyle='rgba(23,36,55,.15)'; c.beginPath(); c.arc(0,0,R*.6,0,Math.PI*2); c.fill(); }
+  } else if(s==='🍒'){
     c.lineWidth=R*.1; c.strokeStyle='#0E7A4F';
     c.beginPath(); c.moveTo(-R*.4,R*.05); c.quadraticCurveTo(-R*.32,-R*.5,R*.1,-R*.78); c.stroke();
     c.beginPath(); c.moveTo(R*.4,R*.18); c.quadraticCurveTo(R*.28,-R*.36,R*.1,-R*.78); c.stroke();
@@ -119,7 +127,7 @@ function glyph(c,sym,R){
 }
 
 /* ---------- 판 데이터 + 타임라인 (기준 spinMs 3000) ---------- */
-let D = { sym:['🍒','🍋','🍊'], out:'miss', rich:false, nick:'', gift:'', no:'001', win:[false,false,false] };
+let D = { sym:['나노','루첼','설홍'], out:'miss', rich:false, nick:'', gift:'', no:'001', win:[false,false,false] };
 let T = { open:0, spin:520, S0:1350, S1:1850, R:2600, H:2680, end:6980 };
 let REELS=[], STEPS=[], K=1;
 const OUT = {
@@ -178,8 +186,8 @@ function build(slot){
   while(tg.length<3) tg.push(tg[0]||'⭐');
   const jackpot=!!slot.jackpot, two=!jackpot&&!!slot.twoKind;
   const rich=tg[0]!=null&&tg[0]===tg[1];
-  const allDef=tg.every(s=>DEFAULTS.indexOf(s)>=0);
-  const pool=allDef?DEFAULTS.slice():tg.filter((s,i)=>tg.indexOf(s)===i);
+  const allDef=tg.every(s=>DEFAULTS.indexOf(s)>=0), allChar=tg.every(s=>!!CHARS[s]);
+  const pool=allChar?CHAR_LIST.slice():allDef?DEFAULTS.slice():tg.filter((s,i)=>tg.indexOf(s)===i);
   const pick=(ex,seed)=>{ for(let n=0;n<24;n++){ const s=pool[Math.floor(rnd(seed+n*7.3)*pool.length)]; if(ex.indexOf(s)<0) return s; } return pool[Math.floor(rnd(seed)*pool.length)]; };
   // 타임라인
   T={ open:0, spin:520, S0:1350, S1:1850 };

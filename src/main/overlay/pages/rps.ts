@@ -74,12 +74,23 @@ function finger(c,bx,by,ang,len,wd){
 }
 function knuckle(c,x){ rr(c,x-19,-82,38,66,19); c.strokeStyle='rgba(23,36,55,.35)'; c.lineWidth=4; c.beginPath(); c.moveTo(x-9,-48); c.lineTo(x+9,-48); c.stroke(); c.strokeStyle=NAVY; c.lineWidth=7; }
 /* 손 (손끝이 위, 손목이 아래 y=+110 기준). kind: rock/paper/scissors, side: 소매 색 */
+/* 손 그림 (서버 /assets/rps-*.png). 못 불러오면 아래 벡터 손으로 그린다 */
+var HIMG={};
+['rock','paper','scissors'].forEach(function(k){ var im=new Image(); im.src='/assets/rps-'+k+'.png'; HIMG[k]=im; });
 function drawHand(c,kind,side,skin,mini){
   c.lineJoin='round'; c.lineCap='round'; c.strokeStyle=NAVY; c.lineWidth=7;
   // 소매
   var sl=mini?40:900;
   c.fillStyle=side; c.fillRect(-74,128,148,sl); c.strokeRect(-74,128,148,sl);
   if(!mini){ c.fillStyle='rgba(0,0,0,.18)'; c.fillRect(-74,170,148,16); }
+  var im=HIMG[kind];
+  if(im&&im.complete&&im.naturalWidth){
+    var h=340, w=h*im.naturalWidth/im.naturalHeight;
+    if(skin&&skin!==CR) c.filter='grayscale(.85) brightness(.8)';
+    c.drawImage(im,-w/2,150-h,w,h);
+    c.filter='none';
+    return;
+  }
   c.fillStyle=skin||CR;
   if(kind==='paper'){
     finger(c,-54,-24,-.24,104,32); finger(c,-18,-34,-.08,126,34); finger(c,18,-34,.07,122,34); finger(c,52,-24,.22,100,30);
