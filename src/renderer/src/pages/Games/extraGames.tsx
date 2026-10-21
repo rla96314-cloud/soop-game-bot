@@ -2,6 +2,9 @@
 import { useEffect, useState } from 'react'
 import styles from './Games.module.css'
 import NumberField from '../../components/NumberField'
+import rockPng from '../../assets/rps/rock.png'
+import paperPng from '../../assets/rps/paper.png'
+import scissorsPng from '../../assets/rps/scissors.png'
 
 export interface RaceRacer { name: string; emoji: string }
 export type FishRarity = 'common' | 'uncommon' | 'rare' | 'legendary'
@@ -13,7 +16,17 @@ const electron = () => (window as unknown as { electron?: El }).electron
 
 const RARITY_LABEL: Record<FishRarity, string> = { common: '일반', uncommon: '고급', rare: '희귀', legendary: '레전드' }
 const RARITY_COLOR: Record<FishRarity, string> = { common: '#8A94A6', uncommon: '#12A866', rare: '#2F6BFF', legendary: '#F2A600' }
-const HAND: Record<string, string> = { rock: '✊ 바위', paper: '🖐️ 보', scissors: '✌️ 가위' }
+const HAND_LABEL: Record<string, string> = { rock: '바위', paper: '보', scissors: '가위' }
+const HAND_IMG: Record<string, string> = { rock: rockPng, paper: paperPng, scissors: scissorsPng }
+/** 손 그림 + 이름 (오버레이와 같은 그림) */
+function Hand({ h, size = 24 }: { h: string; size?: number }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, verticalAlign: 'middle' }}>
+      {HAND_IMG[h] && <img src={HAND_IMG[h]} alt="" style={{ width: size, height: size, objectFit: 'contain' }} />}
+      {HAND_LABEL[h] ?? h}
+    </span>
+  )
+}
 
 function useCountdown(deadline: number | undefined, active: boolean) {
   const [, setTick] = useState(0)
@@ -162,12 +175,12 @@ export function RpsPanel({ state }: { state?: GameState }) {
         <b style={{ fontSize: 18 }}>참가 접수 중 · {left}초</b>
         <div style={{ display: 'flex', gap: 10 }}>
           {['scissors', 'rock', 'paper'].map(h => (
-            <div key={h} style={{ padding: '8px 14px', borderRadius: 10, background: '#fff', fontWeight: 900 }}>{HAND[h]} <span style={{ color: 'var(--muted)' }}>{tally(h)}</span></div>
+            <div key={h} style={{ padding: '8px 14px', borderRadius: 10, background: '#fff', fontWeight: 900 }}><Hand h={h} /> <span style={{ color: 'var(--muted)' }}>{tally(h)}</span></div>
           ))}
         </div>
         <small style={{ color: 'var(--muted)' }}>채팅: {rps.command} 가위 / 바위 / 보 (오버레이에는 손별 인원이 표시되지 않습니다)</small>
       </>) : (<>
-        <div style={{ fontSize: 34, fontWeight: 900 }}>스트리머 {rps.streamer ? HAND[rps.streamer] : '…'}</div>
+        <div style={{ fontSize: 34, fontWeight: 900 }}>스트리머 {rps.streamer ? <Hand h={rps.streamer} size={44} /> : '…'}</div>
         <div style={{ display: 'flex', gap: 14, fontWeight: 900 }}>
           <span style={{ color: '#12A866' }}>승 {rps.winners?.length ?? 0}</span>
           <span style={{ color: 'var(--muted)' }}>무 {rps.draws?.length ?? 0}</span>

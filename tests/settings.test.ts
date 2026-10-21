@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 
 vi.mock('electron', () => ({ app: { getPath: () => '/tmp/soop-test' } }))
 
-import { sanitizeSettings, DEFAULTS, clampNum, LIMITS } from '../src/main/store/settings'
+import { sanitizeSettings, DEFAULTS, clampNum, LIMITS, SLOT_DEFAULT_SYMBOLS } from '../src/main/store/settings'
 import { parseBalloonParts } from '../src/main/soop/client'
 import { isAllowedWeflabUrl, parseDonationFrame } from '../src/main/weflab/watcher'
 
@@ -98,5 +98,17 @@ describe('weflab', () => {
     expect(d).toMatchObject({ donor: 'kim', balloons: 1000, amount: 0, message: 'hi' })
     expect(parseDonationFrame('2')).toBeNull()
     expect(parseDonationFrame('42["msg",{"type":"chat","data":{}}]')).toBeNull()
+  })
+})
+
+describe('슬롯 기본 심볼 마이그레이션', () => {
+  const slotOf = (symbols: string[]) =>
+    (sanitizeSettings({ games: { slot: { ...DEFAULTS.games.slot, symbols } } } as never).games.slot.symbols as string[])
+  it('예전 기본 이모지 목록은 캐릭터로 바뀐다 (변형 선택자 유무 무관)', () => {
+    expect(slotOf(['🍒', '🍋', '🍊', '⭐', '🎰', '💎', '7️⃣', '🔔'])).toEqual(SLOT_DEFAULT_SYMBOLS)
+    expect(slotOf(['🍒', '⭐', '💎', '7⃣'])).toEqual(SLOT_DEFAULT_SYMBOLS)
+  })
+  it('사용자가 넣은 심볼이 섞여 있으면 그대로 둔다', () => {
+    expect(slotOf(['🍒', '나노', 'http://x/a.png'])).toEqual(['🍒', '나노', 'http://x/a.png'])
   })
 })

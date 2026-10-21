@@ -5,11 +5,9 @@ import type { DonationSource } from '../donation/gate'
 
 /** 슬롯 기본 심볼 — 캐릭터 이름(오버레이·앱이 이름으로 내장 그림을 찾는다) */
 export const SLOT_DEFAULT_SYMBOLS = ['나노', '루첼', '설홍', '여우연', '최애리', '눈요']
-/** 예전 기본값(이모지) — 저장된 값이 이것과 같으면 새 기본값으로 바꾼다 */
-const OLD_SLOT_DEFAULTS = [
-  ['🍒', '🍋', '🍊', '⭐', '🎰', '💎', '7️⃣', '🔔'],
-  ['🍒', '🍋', '🍊', '⭐', '🎰', '💎'],
-]
+/** 예전 기본 이모지 — 저장된 심볼이 전부 이 중에서만 나왔으면 새 기본값(캐릭터)으로 바꾼다 */
+const OLD_SLOT_EMOJI = new Set(['🍒', '🍋', '🍊', '⭐', '🎰', '💎', '7⃣', '🔔', '🍇', '🍉', '🍀', '💰', '👑', '🎁', '🔥'])
+const stripVs = (x: string) => x.replace(/[\uFE0E\uFE0F]/g, '')
 
 export interface RouletteItem { name: string; probability: number }
 export interface QuizQuestion { question: string; answer: string }
@@ -227,7 +225,7 @@ function sanitizeGame(id: string, g: GameConfig, def: GameConfig): GameConfig {
   }
   if (id === 'slot') {
     const syms = strArr(g.symbols)
-    const isOld = OLD_SLOT_DEFAULTS.some(o => o.length === syms.length && o.every((v, i) => v === syms[i]))
+    const isOld = syms.length > 0 && syms.every(v => OLD_SLOT_EMOJI.has(stripVs(v)))
     out.symbols = syms.length >= 3 && !isOld ? syms : def.symbols
   }
   if (id === 'lottery' && Array.isArray(g.prizes)) {
