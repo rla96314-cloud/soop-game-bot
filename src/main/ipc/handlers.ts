@@ -7,6 +7,7 @@ import { verifyUser }              from '../auth/allowlist'
 import { openSoopLoginWindow }     from '../auth/soopLogin'
 import { weflabWatcher }           from '../weflab/watcher'
 import { applyAutoZoom }           from '../zoom'
+import { mediaDir }                from '../overlay/media'
 
 export function registerIpcHandlers(win: BrowserWindow) {
   const send = (ch: string, ...args: unknown[]) => {
@@ -61,6 +62,10 @@ export function registerIpcHandlers(win: BrowserWindow) {
     gameEngine.updateSettings(next)
     // UI 배율 즉시 반영 (자동 맞춤 × 사용자 배율)
     applyAutoZoom(win)
+    // 오버레이 효과음 설정 즉시 반영
+    if ((patch as { overlay?: { sound?: unknown } })?.overlay?.sound) {
+      overlayServer.broadcast('overlay:config', { sound: next.overlay.sound })
+    }
     return next
   })
 
@@ -96,6 +101,13 @@ export function registerIpcHandlers(win: BrowserWindow) {
   ipcMain.handle('overlay:open', (_, gameId: string)  => {
     shell.openExternal(overlayServer.getUrl(gameId))
     return { ok: true }
+  })
+
+  // 사용자 미디어 폴더 열기 (예: 낚시 영상 클립)
+  ipcMain.handle('media:openFolder', async (_, game: string) => {
+    const dir = mediaDir(String(game))
+    await shell.openPath(dir)
+    return { ok: true, dir }
   })
 
   // Stats snapshot

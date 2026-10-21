@@ -138,6 +138,17 @@ export default function Settings({ user }: { user?: { id: string; name: string }
             </div>
           </div>
         </div>
+        <div className={styles.soundRow}>
+          <label className="switch-row">
+            <Switch checked={(s.overlay?.sound as { enabled?: boolean } | undefined)?.enabled !== false} onChange={v => patchSettings({ overlay: { sound: { enabled: v } } } as P)} />
+            <b>오버레이 효과음</b>
+          </label>
+          <span className={styles.wfLabel} style={{ fontSize: 13 }}>볼륨</span>
+          <input type="range" min={0} max={100} step={5} className={styles.range}
+            value={Math.round((((s.overlay?.sound as { volume?: number } | undefined)?.volume ?? 0.7)) * 100)}
+            onChange={e => patchSettings({ overlay: { sound: { volume: Number(e.target.value) / 100 } } } as P)} />
+          <b className="num" style={{ width: 44 }}>{Math.round((((s.overlay?.sound as { volume?: number } | undefined)?.volume ?? 0.7)) * 100)}%</b>
+        </div>
         <div className="field-hint">앱이 켜지면 이 포트로 오버레이 웹서버가 열리고, OBS의 브라우저 소스가 여기서 게임 화면을 받아 그립니다. 다른 프로그램과 포트가 겹칠 때만 바꾸면 되고, 바꾼 뒤에는 앱을 다시 시작하고 OBS 소스 URL도 새 포트로 고쳐야 합니다. 게임별 URL은 OBS 오버레이 화면에 있습니다.</div>
       </Row>
 

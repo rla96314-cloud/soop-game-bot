@@ -1,4 +1,5 @@
 // OBS 오버레이 페이지: number (HTML 템플릿 문자열)
+import { FX_SCRIPT } from './_fx'
 export const NUMBER_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -83,6 +84,13 @@ html,body{background:transparent !important;overflow:hidden;font-family:'Noto Sa
 .mchip{width:50px;height:50px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:var(--navy);background:radial-gradient(circle at 40% 35%,#FFE27A,#FFC61A 70%);border:3px solid var(--navy);position:relative;animation:chIn 0.4s cubic-bezier(0.34,1.56,0.64,1)}
 .mchip::after{content:'';position:absolute;top:9%;left:20%;width:30%;height:22%;background:rgba(255,255,255,0.65);border-radius:50%}
 @keyframes chIn{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
+/* FX: 공 착지 바운스 (칩은 transform 애니메이션이 끝난 뒤 적용) */
+@keyframes landB{0%{transform:scale(1) translateY(0)}30%{transform:scale(1.22,0.82) translateY(5px)}60%{transform:scale(0.94,1.1) translateY(-4px)}100%{transform:scale(1) translateY(0)}}
+.mchip.land{animation:landB 0.4s cubic-bezier(0.2,0.8,0.3,1)}
+.bay.land{animation:landB 0.4s cubic-bezier(0.2,0.8,0.3,1)}
+/* FX: 공 굴리는 동안 구체 흔들림 */
+@keyframes sphShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px) rotate(-1deg)}75%{transform:translateX(3px) rotate(1deg)}}
+.scene.rolling .sph{animation:sphShake 0.22s ease-in-out infinite}
 </style>
 </head>
 <body>
@@ -135,6 +143,7 @@ html,body{background:transparent !important;overflow:hidden;font-family:'Noto Sa
     </div>
   </div>
 </div>
+<script>${FX_SCRIPT}<\/script>
 <script>
 // Build LEDs
 const pled=document.getElementById('pleds')
@@ -144,24 +153,42 @@ setInterval(()=>{document.querySelectorAll('.sdot').forEach(d=>d.classList.toggl
 // Ball refs
 const BALLS=[...Array(8)].map((_,i)=>document.getElementById('bl'+i))
 const wrap=document.getElementById('nw'),wball=document.getElementById('wball'),mchips=document.getElementById('mchips'),bayRow=document.getElementById('bay-row')
+const bay=document.getElementById('bay'),machine=document.querySelector('.mc'),scene=document.querySelector('.scene')
 let rolling=false,rollIv=null
 function rnd(a,b){return Math.floor(Math.random()*(b-a+1))+a}
 function tickBalls(a,b){BALLS.forEach(bl=>{bl.textContent=rnd(a,b)})}
+// keep=true: 클래스를 유지 (칩은 기본 chIn 애니메이션이 있어 클래스를 떼면 재생이 다시 시작됨; hide 때 통째로 비움)
+function landBounce(el,keep){el.classList.remove('land');void el.offsetWidth;el.classList.add('land');if(!keep)el.addEventListener('animationend',()=>el.classList.remove('land'),{once:true})}
+// 공 하나 착지: 팝 소리 + 바운스
+function onLand(el,keep){FX.sound('pop');landBounce(el,keep)}
+// 마지막 공까지 착지: 두구두구 종료 → 당첨음 + 빛 터짐 (+ 색종이) + 당첨자 배너
+function onAllLanded(targets,max,triggeredBy){
+  scene.classList.remove('rolling')
+  FX.drumStop();FX.sound('win');FX.burst(bay,'#FFC928')
+  if(targets.length>=3||targets.some(n=>Number(n)===Number(max))){
+    const r=bay.getBoundingClientRect()
+    FX.confetti({count:180,x:r.left+r.width/2,y:r.top})
+  }
+  FX.winner({nick:triggeredBy||'',sub:'숫자 추첨 · '+targets.join(', '),anchor:machine,ms:4800})
+}
 function rollAnimation(min,max,targets,spinMs,triggeredBy){
   if(rolling)return;rolling=true
+  FX.hideWinner()
   wrap.classList.add('show')
   bayRow.classList.remove('hit')
   wball.textContent='';wball.classList.remove('show');wball.style.display=''
   mchips.style.display='none';mchips.innerHTML=''
   tickBalls(min,max)
+  scene.classList.add('rolling')
+  FX.drumStart(110)
   if(targets.length>1){
     rollIv=setInterval(()=>tickBalls(min,max),25)
     mchips.style.display='flex';wball.style.display='none'
     let idx=0
     function landNext(){
-      if(idx>=targets.length){clearInterval(rollIv);bayRow.classList.add('hit');setTimeout(hide,5000);rolling=false;return}
+      if(idx>=targets.length){clearInterval(rollIv);bayRow.classList.add('hit');onAllLanded(targets,max,triggeredBy);setTimeout(hide,5000);rolling=false;return}
       const chip=document.createElement('div');chip.className='mchip';chip.textContent='?';mchips.appendChild(chip)
-      let f=0;const iv=setInterval(()=>{chip.textContent=rnd(min,max);if(++f>=18){clearInterval(iv);chip.textContent=targets[idx];idx++;setTimeout(landNext,500)}},40)
+      let f=0;const iv=setInterval(()=>{chip.textContent=rnd(min,max);if(++f>=18){clearInterval(iv);chip.textContent=targets[idx];onLand(chip,true);idx++;setTimeout(landNext,500)}},40)
     }
     landNext()
   } else {
@@ -169,16 +196,19 @@ function rollAnimation(min,max,targets,spinMs,triggeredBy){
     setTimeout(()=>{
       clearInterval(rollIv)
       wball.textContent=targets[0];wball.classList.add('show');bayRow.classList.add('hit')
+      onLand(bay)
+      onAllLanded(targets,max,triggeredBy)
       rolling=false;setTimeout(hide,5000)
     },Math.max(spinMs-800,500))
   }
 }
-function hide(){wrap.classList.remove('show');clearInterval(rollIv);rolling=false;setTimeout(()=>{wball.classList.remove('show');wball.style.display='';mchips.innerHTML='';mchips.style.display='none';bayRow.classList.remove('hit')},600)}
+function hide(){wrap.classList.remove('show');clearInterval(rollIv);rolling=false;FX.hideWinner();FX.drumStop();scene.classList.remove('rolling');setTimeout(()=>{wball.classList.remove('show');wball.style.display='';mchips.innerHTML='';mchips.style.display='none';bayRow.classList.remove('hit')},600)}
 function connect(){
   const ws=new WebSocket('ws://localhost:${port}/__overlay_ws__')
   ws.onmessage=e=>{
     try{
       const msg=JSON.parse(e.data)
+      FX.handle(msg)
       if(msg.type==='game:state'&&msg.data?.id==='number'&&msg.data?.status==='running'){
         const ns=msg.data.number;if(ns?.result)rollAnimation(ns.min,ns.max,ns.result,ns.spinMs??3000,ns.triggeredBy??'')
       }

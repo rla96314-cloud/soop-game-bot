@@ -1,4 +1,5 @@
 // OBS 오버레이 페이지: slot (HTML 템플릿 문자열)
+import { FX_SCRIPT } from './_fx'
 export const SLOT_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -148,8 +149,25 @@ export const SLOT_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
   .start-btn.active { transform: translateY(3px); box-shadow: 0 1px 0 var(--orange-dk); }
 
   @keyframes jackpotPulse { from { text-shadow: 0 3px 0 rgba(23,36,55,0.55), 0 0 14px rgba(255,198,26,0.6); } to { text-shadow: 0 3px 0 rgba(23,36,55,0.55), 0 0 30px rgba(255,198,26,1), 0 0 60px rgba(255,91,23,0.8); } }
-  @keyframes confettiFall { to { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
-  .confetti-piece { position: fixed; top: -20px; width: 9px; height: 15px; border-radius: 2px; animation: confettiFall 2.5s ease-in forwards; }
+
+  /* ── FX: 릴 정지 바운스 ── */
+  @keyframes reelBounce { 0% { transform: translateY(0); } 35% { transform: translateY(7px); } 70% { transform: translateY(-3px); } 100% { transform: translateY(0); } }
+  .reel.bounce { animation: reelBounce 0.36s cubic-bezier(0.2,0.8,0.3,1); }
+  /* ── FX: 리치 (앞 두 릴 일치) — 캐비닛 테두리 펄스 + 3번째 릴 강조 ── */
+  @keyframes richPulse {
+    from { border-color: var(--navy); box-shadow: -12px 12px 0 var(--navy), 0 0 0 0 rgba(255,198,26,0), 0 26px 60px rgba(23,36,55,0.45); }
+    to   { border-color: var(--yellow); box-shadow: -12px 12px 0 var(--navy), 0 0 0 8px rgba(255,198,26,0.85), 0 0 50px rgba(255,198,26,0.8), 0 26px 60px rgba(23,36,55,0.45); }
+  }
+  .machine.rich { animation: richPulse 0.38s ease-in-out infinite alternate; }
+  @keyframes reelSlow { from { box-shadow: inset 0 0 0 2px #FFD9C4; } to { box-shadow: inset 0 0 0 3px var(--yellow), 0 0 18px rgba(255,198,26,0.9); } }
+  .reel.slow { animation: reelSlow 0.3s ease-in-out infinite alternate; }
+  /* ── FX: 꽝 흔들림 ── */
+  @keyframes cabShake { 0%,100% { transform: translateX(0); } 15% { transform: translateX(-10px) rotate(-0.6deg); } 35% { transform: translateX(9px) rotate(0.5deg); } 55% { transform: translateX(-6px); } 75% { transform: translateX(4px); } }
+  .machine.shake { animation: cabShake 0.5s ease-out; }
+  /* ── FX: JACKPOT 밴드 점멸 ── */
+  @keyframes bandFlash { 0%,100% { background: rgba(255,255,255,0); } 50% { background: rgba(255,255,255,0.42); } }
+  .result-bar { border-radius: 12px; }
+  .result-bar.jackpot { animation: bandFlash 0.3s steps(1,end) 8; }
 </style>
 </head>
 <body>
@@ -202,13 +220,24 @@ export const SLOT_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
     <button class="start-btn" id="start-btn"><span class="chev">&raquo;</span><span>START</span><span class="chev">&raquo;</span></button>
   </div>
 </div>
+<script>${FX_SCRIPT}<\/script>
 <script>
 const wrap      = document.getElementById('slot-wrap')
 const resultBar = document.getElementById('result-bar')
 const rbText    = document.getElementById('rb-text')
 const startBtn  = document.getElementById('start-btn')
 const leverKnob = document.getElementById('lever-knob')
+const machine   = document.querySelector('.machine')
+const reelsEl   = document.querySelector('.reels-frame')
 let spinning = false
+// 리치 연출: 3번째 릴이 느리게 추가로 도는 시간 / 최종 정지 시간
+const RICH_SLOW_MS = 1200, RICH_SETTLE_MS = 700
+
+function bounce(el, cls) {
+  cls = cls || 'bounce'
+  el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls)
+  el.addEventListener('animationend', () => el.classList.remove(cls), { once: true })
+}
 
 // Dot twinkle
 setInterval(() => {
@@ -231,33 +260,49 @@ function buildReel(innerEl, target, symbols, rows) {
   for (let i = 0; i < rows - 1; i++) innerEl.appendChild(makeCell(rand(symbols)))
   innerEl.appendChild(makeCell(target))
 }
-function spinReel(reelEl, innerEl, target, symbols, stopMs) {
+// 릴 회전. 기본: 빠르게(stopMs*0.75) → 0.5s 감속 정지.
+// rich 옵션: 빠르게(fastMs) → RICH_SLOW_MS 동안 눈에 띄게 느리게 → RICH_SETTLE_MS 감속 정지 (리치 연출용 3번째 릴)
+// onPhase('slow') 느린 구간 진입, onPhase('stop') 완전 정지 시점에 호출
+function spinReel(reelEl, innerEl, target, symbols, stopMs, opts, onPhase) {
   const rows = 32, cellH = 108
+  const rich = !!(opts && opts.rich)
   buildReel(innerEl, target, symbols, rows)
   innerEl.style.transition = 'none'
   innerEl.style.transform  = 'translateY(0)'
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    innerEl.style.transition = 'transform ' + (stopMs * 0.75 / 1000).toFixed(2) + 's cubic-bezier(0.2,0,0.5,1)'
-    innerEl.style.transform  = 'translateY(-' + ((rows - 5) * cellH) + 'px)'
-    setTimeout(() => {
-      innerEl.style.transition = 'transform 0.5s cubic-bezier(0,0,0.15,1)'
-      innerEl.style.transform  = 'translateY(-' + ((rows - 1) * cellH) + 'px)'
-      reelEl.classList.add('lit')
-    }, stopMs * 0.75)
-  }))
-}
-
-function showConfetti() {
-  const colors = ['#FF5B17','#00CB84','#FFC61A','#F5F3EF','#172437','#FF8C5A']
-  for (let i = 0; i < 80; i++) {
-    const el = document.createElement('div'); el.className = 'confetti-piece'
-    el.style.left = Math.random() * 100 + 'vw'
-    el.style.background = colors[Math.floor(Math.random() * colors.length)]
-    el.style.animationDelay = Math.random() + 's'
-    el.style.animationDuration = (2 + Math.random() * 1.5) + 's'
-    document.body.appendChild(el)
-    el.addEventListener('animationend', () => el.remove())
+  const go = (cells, ms, ease) => {
+    innerEl.style.transition = 'transform ' + (ms / 1000).toFixed(2) + 's ' + ease
+    innerEl.style.transform  = 'translateY(-' + (cells * cellH) + 'px)'
   }
+  const settle = () => {
+    reelEl.classList.remove('slow')
+    bounce(reelEl)
+    FX.sound('stop')
+    if (onPhase) onPhase('stop')
+  }
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (!rich) {
+      go(rows - 5, stopMs * 0.75, 'cubic-bezier(0.2,0,0.5,1)')
+      setTimeout(() => {
+        go(rows - 1, 500, 'cubic-bezier(0,0,0.15,1)')
+        reelEl.classList.add('lit')
+        setTimeout(settle, 500)
+      }, stopMs * 0.75)
+    } else {
+      const fastMs = opts.fastMs
+      // 끝 속도가 느린 구간 속도와 비슷해지도록 브레이크 곡선
+      go(rows - 7, fastMs, 'cubic-bezier(0.25,0.1,0.6,0.9)')
+      setTimeout(() => {
+        reelEl.classList.add('slow')
+        if (onPhase) onPhase('slow')
+        go(rows - 3, RICH_SLOW_MS, 'linear')
+        setTimeout(() => {
+          go(rows - 1, RICH_SETTLE_MS, 'cubic-bezier(0.1,0.5,0.2,1)')
+          reelEl.classList.add('lit')
+          setTimeout(settle, RICH_SETTLE_MS)
+        }, RICH_SLOW_MS)
+      }, fastMs)
+    }
+  }))
 }
 
 function startSpin(slot) {
@@ -267,10 +312,18 @@ function startSpin(slot) {
   const spinMs  = slot.spinMs ?? 3000
   const ratio   = spinMs / 3000
   const stops   = [Math.round(1100 * ratio), Math.round(1700 * ratio), Math.round(2300 * ratio)]
-  const hideAt  = stops[2] + Math.round(4500 * ratio)
+  // 릴 i 가 완전히 멈추는 시각 (왼쪽→오른쪽 순차)
+  const settleAt = stops.map(s => Math.round(s * 0.75) + 500)
+  // 리치: 앞 두 릴이 같으면 3번째 릴은 2번째 릴이 멈춘 뒤 느리게 더 돌다 멈춤
+  const rich      = targets.length >= 3 && targets[0] != null && targets[0] === targets[1]
+  const richExtra = rich ? (settleAt[1] + RICH_SLOW_MS + RICH_SETTLE_MS) - settleAt[2] : 0
+  const resultAt  = stops[2] + 600 + richExtra
+  const hideAt    = stops[2] + Math.round(4500 * ratio) + richExtra
 
+  FX.hideWinner()
   resultBar.className = 'result-bar'; rbText.textContent = ''
-  ;[0,1,2].forEach(i => document.getElementById('reel' + i).classList.remove('lit'))
+  machine.classList.remove('rich', 'shake')
+  ;[0,1,2].forEach(i => document.getElementById('reel' + i).classList.remove('lit', 'slow', 'bounce'))
 
   leverKnob.classList.add('pulled')
   setTimeout(() => leverKnob.classList.remove('pulled'), 600)
@@ -278,20 +331,45 @@ function startSpin(slot) {
   setTimeout(() => startBtn.classList.remove('active'), 300)
 
   wrap.classList.add('show')
+  FX.spinStart()
   ;[0,1,2].forEach(i => spinReel(
     document.getElementById('reel' + i), document.getElementById('inner' + i),
-    targets[i], symbols, stops[i]
+    targets[i], symbols, stops[i],
+    (rich && i === 2) ? { rich: true, fastMs: settleAt[1] } : null,
+    phase => {
+      if (i !== 2) return
+      if (phase === 'slow') { machine.classList.add('rich'); FX.drumStart(160) }
+      if (phase === 'stop') { machine.classList.remove('rich'); FX.drumStop(); FX.spinStop() }
+    }
   ))
 
   setTimeout(() => {
-    if (slot.jackpot)      { resultBar.className = 'result-bar show jackpot'; rbText.textContent = 'JACKPOT!'; showConfetti() }
-    else if (slot.twoKind) { resultBar.className = 'result-bar show twoKind'; rbText.textContent = '2개 일치!' }
-    else                   { resultBar.className = 'result-bar show miss';    rbText.textContent = '꽝' }
-  }, stops[2] + 600)
+    if (slot.jackpot) {
+      resultBar.className = 'result-bar show jackpot'; rbText.textContent = 'JACKPOT!'
+      FX.sound('jackpot')
+      FX.flash('rgba(255,200,40,.7)')
+      const r = reelsEl.getBoundingClientRect()
+      FX.confetti({ count: 220, x: r.left + r.width / 2, y: r.top })
+    } else if (slot.twoKind) {
+      resultBar.className = 'result-bar show twoKind'; rbText.textContent = '2개 일치!'
+      FX.sound('win'); FX.burst(reelsEl, '#FFC928')
+    } else {
+      resultBar.className = 'result-bar show miss'; rbText.textContent = '꽝'
+      FX.sound('lose'); bounce(machine, 'shake')
+    }
+    FX.winner({
+      nick: slot.triggeredBy || '',
+      sub: slot.jackpot ? '잭팟!' : slot.twoKind ? '2개 일치' : '슬롯 결과',
+      anchor: machine, above: true,
+      ms: Math.max(1500, hideAt - resultAt - 150),
+    })
+  }, resultAt)
 
   setTimeout(() => {
     wrap.classList.remove('show'); spinning = false
-    ;[0,1,2].forEach(i => document.getElementById('reel' + i).classList.remove('lit'))
+    FX.hideWinner(); FX.drumStop(); FX.spinStop()
+    machine.classList.remove('rich', 'shake')
+    ;[0,1,2].forEach(i => document.getElementById('reel' + i).classList.remove('lit', 'slow'))
   }, hideAt)
 }
 
@@ -300,6 +378,7 @@ function connect() {
   ws.onmessage = e => {
     try {
       const msg = JSON.parse(e.data)
+      FX.handle(msg)
       if (msg.type === 'game:state' && msg.data?.id === 'slot' && msg.data?.status === 'running' && msg.data.slot?.symbols)
         startSpin(msg.data.slot)
       if (msg.type === 'ping') ws.send(JSON.stringify({type:'pong'}))

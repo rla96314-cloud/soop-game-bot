@@ -41,7 +41,7 @@ export interface Settings {
     balloonAutoTrigger: boolean
   }
   games:   Record<string, GameConfig>
-  overlay: { port: number; theme: string }
+  overlay: { port: number; theme: string; sound: { enabled: boolean; volume: number } }   // sound: 오버레이 효과음 (0~1)
   ui:      { scale: number; autoFit?: boolean }   // scale: 자동 맞춤 위에 곱하는 사용자 배율(%), autoFit: 자동 맞춤 도입 후 마이그레이션 표시
 
   weflab: {
@@ -113,7 +113,7 @@ const DEFAULTS: Settings = {
       excludeList: [] as number[],
     },
   },
-  overlay: { port: 3939, theme: 'purple' },
+  overlay: { port: 3939, theme: 'purple', sound: { enabled: true, volume: 0.7 } },
   ui:      { scale: 100, autoFit: true },
   weflab:  { url: '' },
 }
@@ -133,7 +133,7 @@ export function loadSettings(): Settings {
       ...DEFAULTS,
       ...raw,
       soop:    { ...DEFAULTS.soop,    ...(raw.soop    ?? {}) },
-      overlay: { ...DEFAULTS.overlay, ...(raw.overlay ?? {}) },
+      overlay: { ...DEFAULTS.overlay, ...(raw.overlay ?? {}), sound: { ...DEFAULTS.overlay.sound, ...(raw.overlay?.sound ?? {}) } },
       ui:      { ...DEFAULTS.ui,      ...(raw.ui      ?? {}) },
       weflab:  { ...DEFAULTS.weflab,  ...(raw.weflab  ?? {}) },
       games: Object.fromEntries(
@@ -157,7 +157,7 @@ export function patchSettings(patch: Partial<Settings>): Settings {
     ...current,
     ...patch,
     soop:    { ...current.soop,    ...(patch.soop    ?? {}) },
-    overlay: { ...current.overlay, ...(patch.overlay ?? {}) },
+    overlay: { ...current.overlay, ...(patch.overlay ?? {}), sound: { ...current.overlay.sound, ...((patch.overlay as Partial<Settings['overlay']> | undefined)?.sound ?? {}) } },
     ui:      { ...current.ui,      ...(patch.ui      ?? {}) },
     weflab:  { ...current.weflab,  ...(patch.weflab  ?? {}) },
     games:   {

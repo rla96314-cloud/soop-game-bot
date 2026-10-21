@@ -1,4 +1,5 @@
 // OBS 오버레이 페이지: lottery (HTML 템플릿 문자열)
+import { FX_SCRIPT } from './_fx'
 export const LOTTERY_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -59,6 +60,12 @@ html,body{background:transparent !important;overflow:hidden;font-family:'Noto Sa
 /* Jackpot shimmer */
 @keyframes shimmer{0%{filter:brightness(1)}50%{filter:brightness(1.25) drop-shadow(0 0 10px rgba(255,198,26,0.6))}100%{filter:brightness(1)}}
 .shimmer{animation:shimmer 1.2s ease-in-out infinite}
+/* FX: 공개 직전(두구두구) 카드 테두리 펄스 */
+@keyframes cardPulse{from{box-shadow:0 26px 70px rgba(23,36,55,0.45),0 0 0 0 rgba(255,198,26,0)}to{box-shadow:0 26px 70px rgba(23,36,55,0.45),0 0 0 8px rgba(255,198,26,0.8),0 0 44px rgba(255,198,26,0.7)}}
+.card.tense{animation:cardPulse 0.34s ease-in-out infinite alternate}
+/* FX: 꽝 흔들림 */
+@keyframes cardShake{0%,100%{transform:translateX(0)}15%{transform:translateX(-9px) rotate(-0.5deg)}35%{transform:translateX(8px) rotate(0.5deg)}55%{transform:translateX(-5px)}75%{transform:translateX(3px)}}
+.card.shake{animation:cardShake 0.5s ease-out}
 </style>
 </head>
 <body>
@@ -108,12 +115,21 @@ html,body{background:transparent !important;overflow:hidden;font-family:'Noto Sa
     </div>
   </div>
 </div>
+<script>${FX_SCRIPT}<\/script>
 <script>
 const cvs=document.getElementById('sc'),ctx=cvs.getContext('2d')
-const swEl=document.getElementById('sw'),wrap=document.getElementById('lw')
+const swEl=document.getElementById('sw'),wrap=document.getElementById('lw'),cardEl=document.querySelector('.card')
 const pmEl=document.getElementById('pm'),pdEl=document.getElementById('pd'),pbEl=document.getElementById('pb')
 const shEl=document.getElementById('sh'),cspEl=document.getElementById('csp'),pmRow=document.getElementById('pm-row')
 let active=false,activeTimer=null
+// '#RGB' / '#RRGGBB' → 'rgba(r,g,b,a)' (파싱 실패 시 노랑)
+function withAlpha(hex,a){
+  const m=/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(hex||'').trim())
+  if(!m)return 'rgba(255,198,26,'+a+')'
+  let h=m[1];if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2]
+  const n=parseInt(h,16)
+  return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')'
+}
 
 function initCanvas(){
   // clientWidth/Height ignores CSS transform (scale) and the panel border, so always correct
@@ -173,11 +189,12 @@ function genStrokes(w,h){
   return strokes
 }
 
+// 긁는 동안: 점마다 FX.scratch() (자체 스로틀), 진행 60% 지점부터 두구두구 + 카드 펄스
 function animateScratch(strokes,totalMs,onDone){
   const totalPts=strokes.reduce((s,st)=>s+st.length,0)
   const msPerPt=totalMs/totalPts
   ctx.globalCompositeOperation='destination-out'
-  let si=0,pi=0,lastT=null,accT=0,r0=22
+  let si=0,pi=0,lastT=null,accT=0,r0=22,done=0,tense=false
   function step(t){
     if(lastT!==null)accT+=t-lastT;lastT=t
     const want=Math.ceil(accT/msPerPt)
@@ -189,6 +206,10 @@ function animateScratch(strokes,totalMs,onDone){
       if(pi>=strokes[si].length){si++;pi=0}
     }
     accT-=drew*msPerPt
+    if(drew>0){
+      FX.scratch();done+=drew
+      if(!tense&&done/totalPts>=0.6){tense=true;cardEl.classList.add('tense');FX.drumStart(90)}
+    }
     if(si<strokes.length){requestAnimationFrame(step)}
     else{
       // Ensure full clear
@@ -200,9 +221,10 @@ function animateScratch(strokes,totalMs,onDone){
   requestAnimationFrame(step)
 }
 
-function showLottery(prize,color,detail,by,scratchMs){
+function showLottery(prize,color,detail,by,scratchMs,isWin){
   if(active)return;active=true
   if(activeTimer){clearTimeout(activeTimer);activeTimer=null}
+  FX.hideWinner();cardEl.classList.remove('tense','shake')
   pmEl.textContent=prize;pmEl.style.color=color;pmEl.className=''
   pmRow.classList.remove('on')
   pdEl.textContent=detail||'';pbEl.textContent=by?by+'님의 복권':''
@@ -217,6 +239,24 @@ function showLottery(prize,color,detail,by,scratchMs){
         shEl.style.display='none';cspEl.style.display='none'
         pmEl.classList.add('popin')
         if(prize!=='꽝'){pmEl.classList.add('shimmer');pmRow.classList.add('on')}
+        // ── 공개 연출 ──
+        FX.drumStop();cardEl.classList.remove('tense')
+        if(isWin){
+          FX.sound('win')
+          const big=/200개|500개|대박|초대박/.test(String(prize||''))
+          if(big){
+            FX.sound('jackpot')
+            const r=swEl.getBoundingClientRect()
+            FX.confetti({count:200,x:r.left+r.width/2,y:r.top})
+          }
+          FX.flash(withAlpha(color,0.5))
+          FX.burst(swEl,color||'#FFC928')
+        } else {
+          FX.sound('lose')
+          cardEl.classList.remove('shake');void cardEl.offsetWidth;cardEl.classList.add('shake')
+          cardEl.addEventListener('animationend',()=>cardEl.classList.remove('shake'),{once:true})
+        }
+        FX.winner({nick:by||'',text:prize,sub:isWin?'복권 당첨':'복권 결과',anchor:cardEl,ms:4800})
         activeTimer=setTimeout(hide,5000)
       })
     },600)
@@ -225,6 +265,7 @@ function showLottery(prize,color,detail,by,scratchMs){
 
 function hide(){
   wrap.classList.remove('show')
+  FX.hideWinner();FX.drumStop();cardEl.classList.remove('tense','shake')
   setTimeout(()=>{
     active=false
     pmEl.classList.remove('popin','shimmer');pmRow.classList.remove('on')
@@ -238,9 +279,10 @@ function connect(){
   ws.onmessage=e=>{
     try{
       const msg=JSON.parse(e.data)
+      FX.handle(msg)
       if(msg.type==='game:state'&&msg.data?.id==='lottery'&&msg.data?.status==='running'){
         const ls=msg.data.lottery
-        if(ls)showLottery(ls.prize,ls.color,ls.detail,ls.triggeredBy,ls.scratchMs??3000)
+        if(ls)showLottery(ls.prize,ls.color,ls.detail,ls.triggeredBy,ls.scratchMs??3000,ls.isWin??(ls.prize!=='꽝'))
       }
       if(msg.type==='ping')ws.send(JSON.stringify({type:'pong'}))
     }catch{}

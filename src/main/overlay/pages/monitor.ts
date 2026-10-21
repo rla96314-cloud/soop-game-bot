@@ -28,6 +28,13 @@ body{background:radial-gradient(90% 70% at 50% 0%,#101a2c 0%,#0a0f19 70%)}
 .card.waiting{border-color:#F3D08A}
 .card.finished{border-color:#9CC3FF;box-shadow:0 0 0 3px rgba(46,123,255,.25),0 10px 28px rgba(0,0,0,.45)}
 @keyframes pl{0%,100%{opacity:.5}50%{opacity:1}}
+/* 상태 전환 연출: 진행/모집 진입 시 테두리 1회 플래시, 완료 시 1초 글로우 + 결과 팝인 */
+.card.fx-flash{animation:cflash .7s ease-out}
+@keyframes cflash{0%{border-color:#fff;box-shadow:0 0 0 6px rgba(255,255,255,.55),0 10px 28px rgba(0,0,0,.45)}100%{}}
+.card.fx-glow{animation:cglow 1s ease-out}
+@keyframes cglow{0%{box-shadow:0 0 0 8px rgba(255,200,61,.6),0 0 40px rgba(255,200,61,.6),0 10px 28px rgba(0,0,0,.45);border-color:#FFC83D}100%{}}
+.cresult.fx-pop{animation:cpop .4s cubic-bezier(.2,1.4,.3,1) both}
+@keyframes cpop{from{transform:scale(.9);opacity:.3}to{transform:scale(1);opacity:1}}
 
 /* 크림 헤더 스트립 */
 .ch{display:flex;align-items:center;justify-content:space-between;background:var(--cream);height:48px;padding:0 14px 0 22px;flex:none}
@@ -75,9 +82,16 @@ GAMES.forEach(g=>{
   el.innerHTML='<div class="ch"><span class="cname">'+g.name+'</span><span class="cbadge badge-idle" id="b-'+g.id+'">대기</span></div><div class="cbody"><div class="cresult empty" id="r-'+g.id+'">—</div><div class="cmeta" id="m-'+g.id+'">대기 중</div></div>'
   grid.appendChild(el);cards[g.id]=el
 })
+const prevSt={}
+function pulse(el,cls){el.classList.remove(cls);void el.offsetWidth;el.classList.add(cls);el.addEventListener('animationend',()=>el.classList.remove(cls),{once:true})}
 function upd(id,st,res,by,meta){
   const c=cards[id];if(!c)return
+  const was=prevSt[id];prevSt[id]=st
   c.className='card c-'+id+(st!=='idle'?' '+st:'')
+  if(st!==was){
+    if(st==='running'||st==='collecting'||st==='waiting')pulse(c,'fx-flash')
+    if(st==='finished'||st==='showing_result'){pulse(c,'fx-glow');pulse(document.getElementById('r-'+id),'fx-pop')}
+  }
   const b=document.getElementById('b-'+id);b.className='cbadge '+(BL[st]||BL.idle);b.textContent=BT[st]||st
   const r=document.getElementById('r-'+id)
   if(res){r.textContent=res;r.className='cresult'}else{r.textContent='—';r.className='cresult empty'}

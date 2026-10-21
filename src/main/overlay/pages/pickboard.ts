@@ -1,5 +1,6 @@
 // OBS 오버레이 페이지: pickboard (HTML 템플릿 문자열)
 import { app } from 'electron'
+import { FX_SCRIPT } from './_fx'
 export const PICKBOARD_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -72,6 +73,21 @@ export const PICKBOARD_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
     padding: 6px 18px; line-height: 1.2; letter-spacing: 0.02em;
     white-space: nowrap;
   }
+  /* 카운터 팝 (칸 공개 시) */
+  .pb-count.pop { animation: countPop 0.4s cubic-bezier(0.2,1.6,0.4,1); }
+  @keyframes countPop {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.22); background: var(--orange); }
+    100% { transform: scale(1); }
+  }
+  /* 전부 공개 → 보드 바운스 */
+  #pb-board.done { animation: boardBounce 0.7s cubic-bezier(0.34,1.56,0.64,1); }
+  @keyframes boardBounce {
+    0%   { transform: scale(1); }
+    35%  { transform: scale(1.04); }
+    70%  { transform: scale(0.985); }
+    100% { transform: scale(1); }
+  }
 
   /* Grid — 행 높이를 그리드에서 강제 고정 (엔진별 콘텐츠 기반 축소 방지) */
   #pb-grid {
@@ -87,6 +103,28 @@ export const PICKBOARD_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
     padding-top: 10px;
     height: 106px;
     min-width: 0;   /* 그리드 아이템이 콘텐츠 폭으로 늘어나는 것 방지 */
+    perspective: 520px;   /* 3D 플립 원근 — 레이아웃엔 영향 없음 */
+  }
+  /* 빛살 회전 중엔 이웃 칸 위로 (카드 자체는 z-index:1 로 빛살보다 위) */
+  .pb-ticket-wrap.raying { z-index: 5; }
+  .pb-ray-spin {
+    --c: 0,203,132;
+    position: absolute; left: 50%; top: 55%;
+    width: 260px; height: 260px; margin: -130px 0 0 -130px;
+    z-index: 0; pointer-events: none;
+    /* 크림색 빛살 + 상품색 후광 — 오렌지 보드 위에서 또렷하게 */
+    background:
+      repeating-conic-gradient(from 0deg at 50% 50%, rgba(255,250,240,0.95) 0deg 8deg, rgba(255,250,240,0) 8deg 22.5deg),
+      radial-gradient(circle, rgba(var(--c),0.75) 0%, rgba(var(--c),0.35) 30%, rgba(var(--c),0) 55%);
+    -webkit-mask: radial-gradient(circle, #000 0%, rgba(0,0,0,0.85) 30%, transparent 58%);
+            mask: radial-gradient(circle, #000 0%, rgba(0,0,0,0.85) 30%, transparent 58%);
+    animation: raySpin 1.1s ease-out forwards;
+  }
+  @keyframes raySpin {
+    0%   { transform: rotate(0deg) scale(0.45); opacity: 0; }
+    12%  { opacity: 1; }
+    70%  { opacity: 0.8; }
+    100% { transform: rotate(160deg) scale(1.25); opacity: 0; }
   }
   /* Notch circle - 보드 배경색(오렌지) + 네이비 테두리로 잘린 듯한 홈 */
   .pb-ticket-wrap::before {
@@ -110,10 +148,25 @@ export const PICKBOARD_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
     min-height: 96px;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    position: relative; overflow: hidden;
+    position: relative; overflow: hidden; z-index: 1;
     box-shadow: 0 3px 0 rgba(23,36,55,0.35);
     transition: transform 0.3s ease, background 0.4s ease, box-shadow 0.3s;
     cursor: default;
+    backface-visibility: hidden;
+  }
+  /* 3D 플립: 앞면(번호) 0→90° 로 사라진 뒤 내용 교체, 뒷면(상품) -90→0° 로 등장 (총 ~450ms) */
+  .pb-ticket.flip-out { animation: flipOut 0.225s ease-in forwards; }
+  .pb-ticket.flip-in  { animation: flipIn 0.225s ease-out both; }
+  @keyframes flipOut { from { transform: rotateY(0deg); }   to { transform: rotateY(90deg); } }
+  @keyframes flipIn  { from { transform: rotateY(-90deg); } to { transform: rotateY(0deg); } }
+  /* 꽝: 작은 흔들림 */
+  .pb-ticket.shake { animation: pbShake 0.45s ease; }
+  @keyframes pbShake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-6px) rotate(-2deg); }
+    40% { transform: translateX(6px) rotate(2deg); }
+    60% { transform: translateX(-4px) rotate(-1deg); }
+    80% { transform: translateX(4px) rotate(1deg); }
   }
 
   /* Star watermark */
@@ -147,14 +200,6 @@ export const PICKBOARD_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
     -webkit-mask: radial-gradient(circle, #000 20%, transparent 70%);
             mask: radial-gradient(circle, #000 20%, transparent 70%);
   }
-  .pb-ticket.just-revealed {
-    animation: ticketFlip 0.5s cubic-bezier(0.4,0,0.2,1);
-  }
-  @keyframes ticketFlip {
-    0%   { transform: scaleX(1); }
-    40%  { transform: scaleX(0); }
-    100% { transform: scaleX(1); }
-  }
 
   /* Prize content */
   .pb-ticket-content {
@@ -172,13 +217,13 @@ export const PICKBOARD_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
     word-break: keep-all; overflow-wrap: anywhere; width: 100%;
   }
 
-  /* Highlight animation for just-revealed */
+  /* Highlight animation for just-revealed (플립 종료 후) */
   .pb-ticket.revealed {
     outline: 3px solid transparent;
   }
-  .pb-ticket.just-revealed.revealed {
+  .pb-ticket.revealed.glow {
     outline-color: rgba(var(--c),0.7);
-    animation: ticketFlip 0.5s, ticketGlow 2s ease-out 0.5s;
+    animation: ticketGlow 2s ease-out;
   }
   @keyframes ticketGlow {
     0%   { outline-color: rgba(var(--c),0.9); box-shadow: 0 0 28px rgba(var(--c),0.9); }
@@ -210,12 +255,15 @@ export const PICKBOARD_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
   </div>
 </div>
 
+<script>${FX_SCRIPT}</script>
 <script>
 const wrap   = document.getElementById('pb-wrap')
+const board  = document.getElementById('pb-board')
 const grid   = document.getElementById('pb-grid')
 const countEl= document.getElementById('pb-count')
 let currentCells = [], currentRows = 4, currentCols = 5
 let gridGen = 0   // 그리드 재구성 세대 — 재구성 후 이전 공개 타이머 무효화
+let allDone = false   // 전부 공개 피날레 1회 가드 (재구성/초기화 시 갱신)
 
 const NAVY = [23, 36, 55]
 const MINT = [0, 203, 132]
@@ -323,13 +371,76 @@ function buildGrid(cells, rows, cols) {
     grid.appendChild(ticketWrap)
   })
   const revealed = cells.filter(c => c.revealed).length
-  countEl.textContent = revealed + ' / ' + cells.length + ' 오픈'
+  setCount(revealed, cells.length, false)
+  allDone = revealed === cells.length   // 이미 다 열린 상태로 (재)로드되면 피날레 안 함
+  board.classList.remove('done')
   if (cells.length > 0) wrap.classList.add('show')
   else wrap.classList.remove('show')
 }
 
+function setCount(n, total, pop) {
+  countEl.textContent = n + ' / ' + total + ' 오픈'
+  if (!pop) return
+  countEl.classList.remove('pop'); void countEl.offsetWidth; countEl.classList.add('pop')
+}
+
+const isLoseName = name => /꽝/.test(String(name || ''))
+const isJackName = name => /1등|대박|특별/.test(String(name || ''))
+
+// 한 칸 공개 연출: 3D 플립(0→90° 앞면 → 내용 교체 → -90→0° 상품면) → 당첨/꽝 피드백
+// batch: 같은 메시지로 여러 칸이 동시에 열릴 때 효과음은 종류별 1회만 (시각 연출은 칸마다)
+function revealCell(ticket, cell, finalCount, total, batch) {
+  const gen = gridGen
+  const wrapEl = ticket.parentElement
+  const col = parseColor(cell.color)
+  const lose = isLoseName(cell.name), jack = isJackName(cell.name)
+  const mySound = lose ? 'lose' : jack ? 'jackpot' : 'win'
+  ticket.classList.remove('glow', 'shake', 'flip-in')
+  ticket.classList.add('flip-out')
+  if (!batch.flip) { batch.flip = true; FX.sound('flip') }
+  setTimeout(() => {
+    if (gen !== gridGen) return   // 그 사이 초기화됐으면 무시
+    ticket.innerHTML = ''
+    ticket.classList.remove('flip-out')
+    ticket.classList.add('revealed', 'flip-in')
+    applyTint(ticket, cell)
+    ticket.appendChild(makeTicketContent(cell, currentCols))
+    setCount(finalCount, total, true)
+    if (!batch.pop) { batch.pop = true; FX.sound('pop') }
+  }, 225)
+  setTimeout(() => {
+    if (gen !== gridGen) return
+    ticket.classList.remove('flip-in')
+    if (mySound === batch.kind && !batch.played) { batch.played = true; FX.sound(mySound) }
+    if (lose) { ticket.classList.add('shake'); return }
+    ticket.classList.add('glow')
+    FX.burst(ticket, rgb(col))
+    // 카드 뒤 빛살 회전
+    const ray = document.createElement('div')
+    ray.className = 'pb-ray-spin'
+    ray.style.setProperty('--c', col.join(','))
+    wrapEl.classList.add('raying')
+    wrapEl.insertBefore(ray, ticket)
+    setTimeout(() => { ray.remove(); wrapEl.classList.remove('raying') }, 1150)
+    const r = ticket.getBoundingClientRect()
+    FX.confetti({ x: r.left + r.width / 2, y: r.top + r.height / 2, count: jack ? 160 : 60, spread: 0.8,
+                  colors: [rgb(col), '#FFC928', '#F5F3EF', rgb(mix(col, [255,255,255], 0.5)), '#FF5B17'] })
+  }, 450)
+}
+
+// 전부 공개 피날레
+function finale(total) {
+  FX.sound('jackpot')
+  board.classList.remove('done'); void board.offsetWidth; board.classList.add('done')
+  const r = board.getBoundingClientRect()
+  FX.confetti({ x: r.left + r.width / 2, y: r.top + 30, count: 320, spread: 1.5 })
+  FX.confetti({ x: r.left + 20, y: r.top + r.height * 0.6, count: 90, spread: 0.7 })
+  FX.confetti({ x: r.right - 20, y: r.top + r.height * 0.6, count: 90, spread: 0.7 })
+  FX.winner({ text: '뽑기판 종료', sub: total + '칸 모두 공개', anchor: board, ms: 6000, icon: '🎯' })
+}
+
 function updateGrid(cells, rows, cols) {
-  if (cells.length === 0) { wrap.classList.remove('show'); return }
+  if (cells.length === 0) { wrap.classList.remove('show'); FX.hideWinner(); return }
 
   // 초기화 감지: 공개됐던 칸이 미공개로 돌아가면 전체 재구성
   // (증분 업데이트는 미공개→공개 전환만 처리하므로 초기화가 반영 안 됨)
@@ -344,25 +455,28 @@ function updateGrid(cells, rows, cols) {
   }
 
   // Otherwise update incrementally (just-revealed cells)
+  const revealed = cells.filter(c => c.revealed).length
+  const fresh = cells.filter((cell, i) => !currentCells[i].revealed && cell.revealed)
+  // 이번 배치의 대표 효과음: 1등급 > 당첨 > 꽝
+  const batch = { flip: false, pop: false, played: false,
+    kind: fresh.some(c => isJackName(c.name)) ? 'jackpot' : fresh.some(c => !isLoseName(c.name)) ? 'win' : 'lose' }
+  let flipped = 0
   cells.forEach((cell, i) => {
     if (!currentCells[i].revealed && cell.revealed) {
       const ticket = document.getElementById('ticket-' + i)
       if (!ticket) return
-      ticket.classList.add('just-revealed')
-      const gen = gridGen
-      setTimeout(() => {
-        if (gen !== gridGen) return   // 그 사이 초기화됐으면 무시
-        ticket.innerHTML = ''
-        ticket.classList.add('revealed')
-        applyTint(ticket, cell)
-        ticket.appendChild(makeTicketContent(cell, currentCols))
-      }, 200)
+      flipped++
+      revealCell(ticket, cell, revealed, cells.length, batch)
     }
   })
   currentCells = cells
+  if (flipped === 0) setCount(revealed, cells.length, false)   // 플립이 있으면 내용 교체 시점에 팝과 함께 갱신
 
-  const revealed = cells.filter(c => c.revealed).length
-  countEl.textContent = revealed + ' / ' + cells.length + ' 오픈'
+  if (revealed === cells.length && !allDone) {
+    allDone = true
+    const gen = gridGen
+    setTimeout(() => { if (gen === gridGen) finale(cells.length) }, flipped ? 1000 : 0)
+  }
 }
 
 function connect() {
@@ -370,6 +484,7 @@ function connect() {
   ws.onmessage = e => {
     try {
       const msg = JSON.parse(e.data)
+      FX.handle(msg)
       if (msg.type === 'pickboard:state') {
         updateGrid(msg.data.cells, msg.data.rows, msg.data.cols)
       }

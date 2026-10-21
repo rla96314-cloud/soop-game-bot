@@ -33,6 +33,9 @@ contextBridge.exposeInMainWorld('electron', {
   overlayOpen:      (gameId: string)                  => ipcRenderer.invoke('overlay:open', gameId),
   overlayBroadcast: (type: string, data: unknown)     => ipcRenderer.invoke('overlay:broadcast', type, data),
 
+  // Media
+  mediaOpenFolder: (game: string) => ipcRenderer.invoke('media:openFolder', game),
+
   // Stats
   statsGet: () => ipcRenderer.invoke('stats:get'),
 

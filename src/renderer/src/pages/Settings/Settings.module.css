@@ -25,4 +25,6 @@
 .logTitle { font-weight: 700; color: #fff; margin-bottom: 6px; font-family: 'Noto Sans KR', sans-serif; }
 .logEmpty { color: #8e9bb0; }
 .logLine { padding: 2px 0; border-top: 1px solid rgba(255,255,255,.06); }
+.soundRow { display: flex; align-items: center; gap: 14px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.range { width: 220px; accent-color: var(--orange); }
 .scaleRow { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }

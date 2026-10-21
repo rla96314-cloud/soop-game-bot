@@ -86,6 +86,17 @@ export interface LotteryPickState {
   isWin:       boolean
 }
 
+export type FishRarity = 'common' | 'uncommon' | 'rare' | 'legendary'
+export interface FishState {
+  name:        string
+  rarity:      FishRarity
+  triggeredBy: string
+  balloon:     number
+  startedAt:   number
+  /** 단계별 길이(ms): 찌 던지기 → 대기 → 입질 → 챔질 → 결과 */
+  timeline:    { cast: number; wait: number; bite: number; hook: number; reveal: number }
+}
+
 export interface GameState {
   id:       GameId
   status:   GameStatus
@@ -96,6 +107,7 @@ export interface GameState {
   slot?:    SlotSpinState
   number?:  NumberPickState
   lottery?: LotteryPickState
+  fish?:    FishState
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -531,18 +543,26 @@ export class GameEngine extends EventEmitter {
   }
 
   private runFish(by: string, balloon: number) {
-    const FISH = [
+    const cfg = this.settings.games.fish
+    const DEFAULT_FISH: Array<{ name: string; rarity: FishRarity; prob: number }> = [
       { name: '고등어 🐟', rarity: 'common',    prob: 50 },
       { name: '참치 🐠',   rarity: 'uncommon',  prob: 30 },
       { name: '복어 🐡',   rarity: 'rare',      prob: 15 },
       { name: '황금어 🐟✨', rarity: 'legendary', prob:  5 },
     ]
+    const custom = (cfg?.fishItems as Array<{ name: string; rarity: FishRarity; prob: number }> | undefined)
+    const FISH   = custom?.length ? custom : DEFAULT_FISH
+    // 결과를 먼저 뽑고, 오버레이가 "찌 던지기 → 입질 → 챔질 → 결과" 를 영상처럼 재생할 수 있게 타임라인과 함께 보낸다
+    const catch_   = weightedRandom(FISH.map(f => ({ ...f, probability: f.prob })))
+    const timeline = { cast: 1400, wait: 1600, bite: 1400, hook: 700, reveal: 2600 }
+    const total    = timeline.cast + timeline.wait + timeline.bite + timeline.hook + timeline.reveal
+
     const state  = this.getState('fish')
     state.status = 'running'
+    state.fish   = { name: catch_.name, rarity: catch_.rarity, triggeredBy: by, balloon, startedAt: Date.now(), timeline }
     this.emit('game:update', 'fish', state)
 
     setTimeout(() => {
-      const catch_ = weightedRandom(FISH)
       const result: GameResult = {
         gameId:      'fish',
         triggeredBy: by,
@@ -552,7 +572,7 @@ export class GameEngine extends EventEmitter {
         ts:          Date.now(),
       }
       this.finishGame('fish', result)
-    }, 3000)
+    }, total)
   }
 
   private runLottery(by: string, balloon: number) {
@@ -662,6 +682,7 @@ export class GameEngine extends EventEmitter {
         if (id === 'slot')    s2.slot     = undefined
         if (id === 'number')  s2.number   = undefined
         if (id === 'lottery') s2.lottery  = undefined
+        if (id === 'fish')    s2.fish     = undefined
         this.emit('game:update', id, s2)
       }
     }, 5000)

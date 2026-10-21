@@ -1,5 +1,5 @@
 // 가운데 설정 카드: 게임 설정 / 항목 설정 / 화면 설정 탭 + 자동 실행 토글 + 테스트 실행
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useApp } from '../../contexts/AppContext'
 import { gameById } from '../../games'
 import Icon from '../../components/Icon'
@@ -156,6 +156,7 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
             </div>
             <div className="field-hint">OBS에서 '브라우저' 소스를 추가하고 위 URL을 입력하세요. 권장 크기 1920 × 1080, 배경 투명 허용.</div>
           </div>
+          {gameId === 'fish' && <FishMediaPanel port={port} />}
           <div className={styles.note}>오버레이 색상·위치는 OBS 소스의 크기와 위치로 조정합니다. 앱을 업데이트하면 OBS의 브라우저 소스를 새로고침하세요.</div>
         </>)}
       </div>
@@ -173,6 +174,40 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
             <Icon name="play" size={14} />{busy ? '진행 중…' : '테스트 실행'}
           </button>
         )}
+      </div>
+    </div>
+  )
+}
+
+/** 낚시 영상 클립 폴더 — 클립을 넣으면 내장 애니메이션 대신 영상을 단계별로 재생 */
+const FISH_CLIPS: Array<[string, string]> = [
+  ['cast', '찌 던지기'], ['wait', '기다리기'], ['bite', '입질'], ['hook', '챔질'],
+  ['result-common', '결과 · 일반'], ['result-uncommon', '결과 · 고급'], ['result-rare', '결과 · 희귀'], ['result-legendary', '결과 · 전설'],
+]
+function FishMediaPanel({ port }: { port: number }) {
+  const [info, setInfo] = useState<{ dir: string; files: string[] } | null>(null)
+  const el = (window as unknown as Record<string, Record<string, unknown>>).electron
+  const load = () => fetch(`http://localhost:${port}/api/media/fish`).then(r => r.json()).then(setInfo).catch(() => setInfo(null))
+  useEffect(() => { load() }, [port])
+  const has = (name: string) => (info?.files ?? []).some(f => new RegExp(`^${name}\\.(mp4|webm|mov)$`, 'i').test(f))
+  const videoMode = has('cast') && (has('result') || FISH_CLIPS.slice(4).some(([n]) => has(n)))
+  return (
+    <div className={styles.field}>
+      <label>낚시 영상 클립 <span style={{ fontWeight: 500, color: videoMode ? 'var(--ok)' : 'var(--muted)' }}>· {videoMode ? '영상 모드' : '내장 애니메이션 모드'}</span></label>
+      <div className={styles.note} style={{ marginBottom: 10 }}>
+        아래 이름으로 mp4/webm 파일을 폴더에 넣으면 "찌 던지기 → 입질 → 챔질 → 결과"를 그 영상으로 재생합니다. <b>cast</b>와 <b>result</b>(또는 등급별 result-*)만 있어도 영상 모드가 되고, 빠진 단계는 내장 애니메이션으로 대체됩니다. 단계 길이보다 긴 영상은 잘리고 짧으면 마지막 화면에서 멈춥니다.
+      </div>
+      <div className={styles.kwRow} style={{ marginBottom: 10 }}>
+        {FISH_CLIPS.map(([n, label]) => (
+          <span key={n} className={styles.kw} style={{ background: has(n) ? 'var(--ok)' : 'var(--surface2)', color: has(n) ? '#fff' : 'var(--muted)', border: '1px solid var(--line)' }} title={`${n}.mp4`}>
+            {has(n) ? '✓ ' : ''}{label}
+          </span>
+        ))}
+      </div>
+      <div className={styles.pvUrlRow}>
+        <div className={styles.pvUrlBox} style={{ color: 'var(--text2)' }}>{info?.dir ?? '폴더 정보를 불러오는 중…'}</div>
+        <button className="btn btn-dark" onClick={() => (el?.mediaOpenFolder as (g: string) => Promise<unknown>)?.('fish')}><Icon name="external" size={14} />폴더 열기</button>
+        <button className="btn" onClick={load}><Icon name="refresh" size={14} /></button>
       </div>
     </div>
   )

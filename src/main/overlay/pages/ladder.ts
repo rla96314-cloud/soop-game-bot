@@ -1,4 +1,6 @@
 // OBS 오버레이 페이지: ladder (HTML 템플릿 문자열)
+import { FX_SCRIPT } from './_fx'
+
 export const LADDER_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -129,6 +131,16 @@ export const LADDER_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
     padding: 9px 18px; font-size: 22px; font-weight: 900; color: var(--navy);
     line-height: 1.1;
   }
+  /* 새 참가자 칩 팝인 */
+  @keyframes chipPop {
+    0%   { transform: scale(0.6); opacity: 0; }
+    60%  { transform: scale(1.12); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .chip.new { animation: chipPop 0.42s cubic-bezier(0.34,1.56,0.64,1) both; }
+  /* 마감 임박 타이머 바 */
+  @keyframes timerUrgent { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }
+  .timer-fill.urgent { background: #E0342C; animation: timerUrgent 0.5s ease-in-out infinite; }
   .timer-wrap {
     height: 28px; background: #e6e5e3; border: 3px solid var(--navy); border-radius: 14px;
     overflow: hidden; margin: 4px 0 6px; padding: 3px;
@@ -143,6 +155,24 @@ export const LADDER_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
   #phase-result { display: none; flex-direction: column; }
   #phase-result.on { display: flex; }
   #lsvg { width: 100%; display: block; }
+  /* 경로를 이끄는 점 */
+  #lsvg .lead-dot { filter: drop-shadow(0 0 4px rgba(255,255,255,0.9)); }
+  /* 상품 박스 착지 바운스 */
+  @keyframes prizeBounce {
+    0%   { transform: scale(1); }
+    30%  { transform: scale(1.35) translateY(4px); }
+    60%  { transform: scale(0.92); }
+    80%  { transform: scale(1.08); }
+    100% { transform: scale(1); }
+  }
+  #lsvg .prize-box { transform-box: fill-box; transform-origin: 50% 50%; }
+  #lsvg .prize-box.land { animation: prizeBounce 0.6s cubic-bezier(0.34,1.56,0.64,1) both; }
+  #lsvg .prize-box rect, #lsvg .prize-box text { transition: fill 0.25s, stroke 0.25s; }
+  @keyframes prizeTop {
+    0%,100% { transform: scale(1); }
+    50% { transform: scale(1.12); }
+  }
+  #lsvg .prize-box.top { animation: prizeTop 0.7s ease-in-out infinite; }
 
   /* 결과 리스트 박스 (종이 아래, 프레임 안) */
   .res-box {
@@ -158,6 +188,17 @@ export const LADDER_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
     border-bottom: 2px dashed rgba(23,36,55,0.18);
   }
   .res-row:last-child { border-bottom: none; }
+  /* 아직 착지 안 한 결과 행 */
+  .res-row.pending { opacity: 0.22; }
+  .res-row.pending .res-prize { color: transparent; }
+  /* 착지 순간 강조 */
+  @keyframes rowHl {
+    0%   { background: rgba(255,91,23,0.55); transform: translateX(14px); }
+    100% { background: transparent; transform: translateX(0); }
+  }
+  .res-row { transition: opacity 0.25s; border-radius: 8px; }
+  .res-row.hl { animation: rowHl 0.9s ease-out both; }
+  .res-row.top .res-prize { color: var(--orange); }
   .res-user {
     color: #fff; border-radius: 8px; padding: 5px 20px; font-size: 20px; min-width: 120px; text-align: center;
     line-height: 1.15;
@@ -202,6 +243,7 @@ export const LADDER_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 
   <div class="banner"><div class="banner-in"><span class="star">★</span><span>사다리게임!</span><span class="star">★</span></div></div>
 </div>
+<script>${FX_SCRIPT}<\/script>
 <script>
 const PEN = ['#E0342C','#2F6BFF','#12A866','#B8860B','#6A2CB0','#0E8A8A','#D8358A','#8B4A1E']
 const NAVY = '#172437'
@@ -218,6 +260,20 @@ const svgEl   = document.getElementById('lsvg')
 const resList = document.getElementById('res-list')
 let hideTimer = null
 let _revealLd = null
+
+// ── 연출 상태 ──────────────────────────────────────────────
+let _prevParts   = []      // 모집 중 직전 참가자 목록 (새 칩 감지용)
+let _collDeadline= 0       // 모집 마감 시각 (로컬 타이머 바/임박음)
+let _collTick    = null    // 모집 타이머 바 로컬 갱신 interval
+let _lastTimerSec= -1      // 임박음 중복 방지 (남은 초 단위)
+let _topPrize    = null    // 1등 상품 이름 (설정 prizes[0])
+let _prizeBoxes  = []      // 하단 상품 박스 {g, rect, text, prize} (열 index)
+let _seq         = 0       // 착지 시퀀스 토큰 (새 렌더 시 이전 시퀀스 무효화)
+let _seqTimers   = []      // 착지 시퀀스 타이머
+
+function _clearSeq() { _seq++; _seqTimers.forEach(clearTimeout); _seqTimers = [] }
+function _stopCollTick() { if (_collTick) { clearInterval(_collTick); _collTick = null } _lastTimerSec = -1; tfill.classList.remove('urgent') }
+function _fx(fn) { try { if (window.FX) fn(window.FX) } catch {} }
 
 function _mkSvgEl(tag, attrs) {
   const el = document.createElementNS('http://www.w3.org/2000/svg', tag)
@@ -293,27 +349,98 @@ function _drawNames(ld, xp) {
 
 // 하단 상품 박스 (흰 배경 + 네이비 테두리)
 function _drawPrizes(ld, rows, PAD_T, ROW_H, xp, hidden) {
+  _prizeBoxes = []
   ld.prizes.forEach((prize, c) => {
     const label = hidden ? '?' : (prize.length > 5 ? prize.slice(0,4)+'…' : prize)
     const tw = Math.max(46, label.length * 13 + 22)
     const py = PAD_T + rows * ROW_H + 12
     const g = document.createElementNS('http://www.w3.org/2000/svg','g')
-    g.appendChild(_mkSvgEl('rect',{x:xp(c)-tw/2,y:py,width:tw,height:30,rx:6,
-      fill:'#fff',stroke:NAVY,'stroke-width':2.4}))
+    g.setAttribute('class', 'prize-box')
+    const rect = _mkSvgEl('rect',{x:xp(c)-tw/2,y:py,width:tw,height:30,rx:6,
+      fill:'#fff',stroke:NAVY,'stroke-width':2.4})
+    g.appendChild(rect)
     const t = _mkSvgEl('text',{x:xp(c),y:py+21,'text-anchor':'middle',
       'font-size':hidden ? 16 : 13.5,'font-weight':900,fill:hidden ? 'rgba(23,36,55,0.4)' : NAVY,'font-family':FONT})
     t.textContent = label; g.appendChild(t); svgEl.appendChild(g)
+    _prizeBoxes[c] = { g, rect, text: t, prize, hidden: !!hidden }
   })
 }
 
-function _addResRow(user, prize, color) {
+function _addResRow(user, prize, color, pending) {
   const row = document.createElement('div')
-  row.className = 'res-row'
+  row.className = 'res-row' + (pending ? ' pending' : '')
   const u = document.createElement('span'); u.className = 'res-user'; u.style.background = color; u.textContent = user
   const a = document.createElement('span'); a.className = 'res-arrow'; a.textContent = '➜'
   const p = document.createElement('span'); p.className = 'res-prize'; p.textContent = prize
   row.appendChild(u); row.appendChild(a); row.appendChild(p)
   resList.appendChild(row)
+  return row
+}
+
+function _isTop(prize) { return _topPrize != null && prize === _topPrize }
+function _isLose(prize) { return typeof prize === 'string' && prize.indexOf('꽝') >= 0 }
+
+// 경로 착지 연출: 정지음 + 상품 박스 바운스/참가자 색 + 결과 행 강조 + 1등이면 잭팟
+function _landPath(ld, idx, color, row) {
+  const res = ld.results.find(r => r.startCol === idx)
+  const path = ld.paths[idx]
+  const endCol = res ? res.endCol : (path ? path.cols[ld.rows] : -1)
+  const prize = res ? res.prize : (ld.prizes[endCol] ?? '')
+  const box = _prizeBoxes[endCol]
+  const top = _isTop(prize)
+
+  _fx(F => F.sound('stop'))
+
+  if (box) {
+    // 가려진('?') 박스였다면 실제 상품 공개
+    if (box.hidden) {
+      const label = prize.length > 5 ? prize.slice(0,4)+'…' : prize
+      box.text.textContent = label
+      box.text.setAttribute('font-size', 13.5)
+      const tw = Math.max(46, label.length * 13 + 22)
+      const cx = parseFloat(box.text.getAttribute('x'))
+      box.rect.setAttribute('x', cx - tw/2); box.rect.setAttribute('width', tw)
+      box.hidden = false
+    }
+    box.rect.setAttribute('fill', color); box.rect.setAttribute('stroke', color)
+    box.text.setAttribute('fill', '#fff')
+    box.g.classList.remove('land'); void box.g.getBoundingClientRect(); box.g.classList.add('land')
+    const seq = _seq
+    _seqTimers.push(setTimeout(() => {
+      if (seq !== _seq) return
+      box.rect.setAttribute('fill', '#fff'); box.text.setAttribute('fill', color)
+      box.g.classList.remove('land')
+    }, 900))
+  }
+
+  if (row) {
+    row.classList.remove('pending', 'hl'); void row.offsetWidth; row.classList.add('hl')
+    if (top) row.classList.add('top')
+  }
+
+  if (top) {
+    _fx(F => {
+      F.sound('jackpot')
+      F.flash('rgba(255,255,255,.5)')
+      let x, y
+      if (box) { const r = box.rect.getBoundingClientRect(); x = r.left + r.width/2; y = r.top + r.height/2 }
+      F.confetti({ x, y, count: 180 })
+      if (box) { F.burst(box.rect, '#FF5B17'); box.g.classList.add('top') }
+    })
+  } else if (_isLose(prize)) {
+    _fx(F => F.sound('lose'))
+  } else {
+    _fx(F => F.sound('win'))
+  }
+  return { res, prize, top }
+}
+
+// 여운: 1등 당첨자 배너 (1등이 없으면 생략)
+function _showWinnerBanner(ld) {
+  if (_topPrize == null) return
+  const w = ld.results.find(r => r.prize === _topPrize)
+  if (!w) return
+  _fx(F => F.winner({ nick: w.user, text: _topPrize, sub: '사다리 1등', anchor: card, ms: 6000 }))
 }
 
 function revealSinglePath(ld, idx) {
@@ -331,20 +458,26 @@ function revealSinglePath(ld, idx) {
     'stroke-linecap': 'round', 'stroke-linejoin': 'round',
     points: xp(path.cols[0]) + ',' + PAD_T })
   svgEl.appendChild(pl)
-  const dot = _mkSvgEl('circle', { r: 6.5, fill: '#fff', cx: xp(path.cols[0]), cy: PAD_T, stroke: penColor, 'stroke-width': 3.5 })
+  const dot = _mkSvgEl('circle', { r: 6.5, fill: '#fff', cx: xp(path.cols[0]), cy: PAD_T, stroke: penColor, 'stroke-width': 3.5, class: 'lead-dot' })
   svgEl.appendChild(dot)
+  // 상품 박스는 점보다 위에 보이도록 맨 뒤로
+  _prizeBoxes.forEach(b => { if (b) svgEl.appendChild(b.g) })
 
   let step = 0
   const tick = setInterval(() => {
     step++
+    _fx(F => F.sound('tick'))
     pl.setAttribute('points', _orthoPts(path.cols, step, rows, COL_W, PAD_X, PAD_T, ROW_H))
     const cr = Math.min(step, rows)
     dot.setAttribute('cx', xp(path.cols[cr]))
     dot.setAttribute('cy', PAD_T + cr * ROW_H)
     if (step >= rows) {
       clearInterval(tick)
-      const res = ld.results[idx]
-      if (res) _addResRow(res.user, res.prize, penColor)
+      const res = ld.results.find(r => r.startCol === idx) ?? ld.results[idx]
+      const row = res ? _addResRow(res.user, res.prize, penColor) : null
+      const landed = _landPath(ld, idx, penColor, row)
+      // 수동 공개: 1등이 공개되는 순간 배너
+      if (landed.top && landed.res) _fx(F => F.winner({ nick: landed.res.user, text: _topPrize, sub: '사다리 1등', anchor: card, ms: 6000 }))
       if (hideTimer) clearTimeout(hideTimer)
       hideTimer = setTimeout(hide, 15000)
     }
@@ -352,37 +485,66 @@ function revealSinglePath(ld, idx) {
 }
 
 function show() { card.classList.add('show') }
-function hide() { card.classList.remove('show') }
+function hide() {
+  card.classList.remove('show')
+  _stopCollTick(); _clearSeq(); _prevParts = []
+  _fx(F => F.hideWinner())
+}
+
+function _collTimerStep() {
+  const remain = _collDeadline - Date.now()
+  const pct = Math.max(0, Math.min(100, (remain / 30000) * 100))
+  tfill.style.width = pct + '%'
+  if (pct <= 20 && remain > 0 && remain <= 5000) {
+    tfill.classList.add('urgent')
+    const sec = Math.ceil(remain / 1000)
+    if (sec !== _lastTimerSec) { _lastTimerSec = sec; _fx(F => F.sound('timer')) }
+  } else {
+    tfill.classList.remove('urgent')
+  }
+  if (remain <= 0) _stopCollTick()
+}
 
 function renderCollecting(ladder) {
+  _clearSeq()
+  _fx(F => F.hideWinner())
   phColl.style.display = ''
   phRes.classList.remove('on')
   resList.innerHTML = ''
+  _topPrize = Array.isArray(ladder.prizes) && ladder.prizes.length ? ladder.prizes[0] : null
   cntLbl.textContent = ladder.participants.length + '/' + ladder.maxSlots + '명'
+  _collDeadline = ladder.deadline
   const pct = Math.max(0, Math.min(100, ((ladder.deadline - Date.now()) / 30000) * 100))
   tfill.style.width = pct + '%'
+  if (!_collTick) _collTick = setInterval(_collTimerStep, 200)
   chips.innerHTML = ''
+  let added = 0
   ladder.participants.forEach((p, i) => {
     const c = document.createElement('span')
     c.className = 'chip'
+    if (!_prevParts.includes(p)) { c.classList.add('new'); added++ }
     c.textContent = p
     c.style.color = PEN[i % PEN.length]
     c.style.borderColor = PEN[i % PEN.length]
     chips.appendChild(c)
   })
+  if (added > 0) _fx(F => F.sound('pop'))
+  _prevParts = ladder.participants.slice()
   waitHint.style.display = ladder.participants.length === 0 ? '' : 'none'
   show()
 }
 
 function renderResult(ld) {
+  _stopCollTick(); _clearSeq()
+  _fx(F => F.hideWinner())
   phColl.style.display = 'none'
   phRes.classList.add('on')
+  resList.innerHTML = ''
 
   const layout = _buildGrid(ld)
   const { rows, PAD_T, ROW_H, xp } = layout
 
   _drawNames(ld, xp)
-  _drawPrizes(ld, rows, PAD_T, ROW_H, xp, false)
 
   // 경로 애니메이션
   let step = 0
@@ -395,9 +557,11 @@ function renderResult(ld) {
   })
   const dots = ld.paths.map((path, pi) => {
     const d = _mkSvgEl('circle', { r: 6.5, fill: '#fff',
-      cx: xp(path.cols[0]), cy: PAD_T, stroke: PEN[pi % PEN.length], 'stroke-width': 3.5 })
+      cx: xp(path.cols[0]), cy: PAD_T, stroke: PEN[pi % PEN.length], 'stroke-width': 3.5, class: 'lead-dot' })
     svgEl.appendChild(d); return d
   })
+  // 상품 박스는 경로/점 위에
+  _drawPrizes(ld, rows, PAD_T, ROW_H, xp, false)
 
   function orthoPts(cols, upTo) {
     const pts = [xp(cols[0]) + ',' + PAD_T]
@@ -410,8 +574,10 @@ function renderResult(ld) {
     return pts.join(' ')
   }
 
+  const seq = _seq
   const tick = setInterval(() => {
     step++
+    _fx(F => F.sound('tick'))
     ld.paths.forEach((path, pi) => {
       lines[pi].setAttribute('points', orthoPts(path.cols, step))
       const cr = Math.min(step, rows)
@@ -420,10 +586,26 @@ function renderResult(ld) {
     })
     if (step >= rows) {
       clearInterval(tick)
+      if (seq !== _seq) return
+      // 결과 행은 순서대로 미리 깔아두고(흐리게), 착지 순서에 따라 하나씩 켠다
       resList.innerHTML = ''
-      ld.results.forEach(r => _addResRow(r.user, r.prize, PEN[r.startCol % PEN.length]))
+      const rowsByStart = {}
+      ld.results.forEach(r => { rowsByStart[r.startCol] = _addResRow(r.user, r.prize, PEN[r.startCol % PEN.length], true) })
+      // 착지 순서: 꽝/하위 상품부터, 1등은 맨 마지막 (클라이맥스)
+      const landOrder = ld.results.slice().reverse()
+      const GAP = 380
+      landOrder.forEach((r, i) => {
+        _seqTimers.push(setTimeout(() => {
+          if (seq !== _seq) return
+          _landPath(ld, r.startCol, PEN[r.startCol % PEN.length], rowsByStart[r.startCol])
+        }, i * GAP))
+      })
+      _seqTimers.push(setTimeout(() => {
+        if (seq !== _seq) return
+        _showWinnerBanner(ld)
+      }, landOrder.length * GAP + 250))
       if (hideTimer) clearTimeout(hideTimer)
-      hideTimer = setTimeout(hide, 12000)
+      hideTimer = setTimeout(hide, 12000 + landOrder.length * GAP)
     }
   }, 55)
 
@@ -431,6 +613,8 @@ function renderResult(ld) {
 }
 
 function renderManualPreview(ld) {
+  _stopCollTick(); _clearSeq()
+  _fx(F => F.hideWinner())
   _revealLd = ld
   phColl.style.display = 'none'
   phRes.classList.add('on')
@@ -450,8 +634,10 @@ function connect() {
   ws.onmessage = e => {
     try {
       const msg = JSON.parse(e.data)
+      _fx(F => F.handle(msg))
       if (msg.type === 'game:state' && msg.data?.id === 'ladder') {
         const s = msg.data
+        if (s.ladder && Array.isArray(s.ladder.prizes) && s.ladder.prizes.length) _topPrize = s.ladder.prizes[0]
         if (s.status === 'collecting' && s.ladder) renderCollecting(s.ladder)
         else if (s.status === 'showing_result' && s.ladder?.ladderData) renderResult(s.ladder.ladderData)
         else if (s.status === 'manual_preview' && s.ladder?.ladderData) renderManualPreview(s.ladder.ladderData)
