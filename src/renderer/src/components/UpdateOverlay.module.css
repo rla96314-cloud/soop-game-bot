@@ -1,0 +1,15 @@
+.backdrop {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(23, 36, 55, .86);
+  display: flex; align-items: center; justify-content: center;
+}
+.box {
+  width: 420px; padding: 28px 32px; border-radius: var(--radius);
+  background: var(--paper); border-top: 4px solid var(--orange);
+  box-shadow: 0 20px 60px rgba(0,0,0,.35);
+}
+.title { font-size: 20px; font-weight: 800; color: var(--ink); }
+.ver { margin-top: 4px; font-size: 14px; font-weight: 700; color: var(--orange); }
+.bar { margin-top: 18px; height: 10px; border-radius: 5px; background: var(--line); overflow: hidden; }
+.fill { height: 100%; background: var(--orange); transition: width .3s ease; }
+.note { margin-top: 10px; font-size: 13px; color: #657084; }

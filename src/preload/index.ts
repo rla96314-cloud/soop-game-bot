@@ -68,6 +68,10 @@ contextBridge.exposeInMainWorld('electron', {
   weflabStop:   ()            => ipcRenderer.invoke('weflab:stop'),
   weflabStatus: ()            => ipcRenderer.invoke('weflab:status'),
 
+  // Auto update
+  updateStatus:   ()                                  => ipcRenderer.invoke('update:status'),
+  onUpdateStatus: (cb: (s: unknown) => void)          => on('update:status', cb),
+
   // Event subscriptions
   onSoopConnected:    (cb: () => void)                        => on('soop:connected',    cb),
   onSoopDisconnected: (cb: () => void)                        => on('soop:disconnected', cb),

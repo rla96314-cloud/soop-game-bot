@@ -35,5 +35,8 @@ nsis:
   shortcutName: SOOP Game Bot
   license: null
 
-# 자동 업데이트(electron-updater)는 쓰지 않음 — publish 설정은 플레이스홀더였으므로 제거. GitHub Release 는 workflow 가 올린다.
-publish: null
+# 자동 업데이트(electron-updater): latest.yml 을 만들기 위한 설정. 업로드 자체는 workflow 가 한다(--publish never).
+publish:
+  provider: github
+  owner: rla96314-cloud
+  repo: soop-game-bot

@@ -63,6 +63,8 @@ jobs:
         with:
           files: |
             dist/*.exe
+            dist/*.exe.blockmap
+            dist/latest.yml
           name: SOOP Game Bot ${{ github.ref_name }}
           body: |
             ## SOOP Game Bot ${{ github.ref_name }}

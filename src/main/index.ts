@@ -6,6 +6,7 @@ import { overlayServer }        from './overlay/server'
 import { registerIpcHandlers, startServices, stopServices } from './ipc/handlers'
 import { isAuthed }             from './auth/gate'
 import { applyAutoZoom }        from './zoom'
+import { initAutoUpdate }       from './updater'
 
 const isDev = !app.isPackaged
 
@@ -100,6 +101,9 @@ app.whenReady().then(() => {
 
   // Register IPC
   registerIpcHandlers(win)
+
+  // 최신 버전이 아니면 시작하자마자 업데이트
+  initAutoUpdate(win)
 
   // SOOP 자동연결·위플랩 감시는 로그인(허용 목록 통과) 상태일 때만.
   // 미인증 상태의 재검증은 렌더러가 auth:recheck 로 요청하고, 통과하면 그때 시작된다.
