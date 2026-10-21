@@ -37,6 +37,14 @@ export interface WeflabDonation {
 // 별풍선으로 취급할 후원 type 문자열 (weflab-obs-trigger/parse.js와 동일)
 const BALLOON_TYPES = ['sendballoon', 'balloon', '별풍선', 'star', 'adballoon']
 
+/** 허용하는 위플랩 URL — 임의 URL 을 숨김 창에서 열지 않는다 */
+export function isAllowedWeflabUrl(url: string): boolean {
+  try {
+    const u = new URL(url)
+    return u.protocol === 'https:' && (u.hostname === 'weflab.com' || u.hostname.endsWith('.weflab.com'))
+  } catch { return false }
+}
+
 function toNum(v: unknown): number {
   if (typeof v === 'number' && isFinite(v)) return v
   if (typeof v === 'string') {
@@ -49,7 +57,7 @@ function toNum(v: unknown): number {
 
 // socket.io 텍스트 프레임 → 후원 이벤트 | null
 // weflab 표준 형태: 42["msg",{ type:"donation", data:{ platform, type, value, uname, uid, msg } }]
-function parseDonationFrame(raw: string): WeflabDonation | null {
+export function parseDonationFrame(raw: string): WeflabDonation | null {
   if (!/^4[0-9]/.test(raw)) return null
   const i = raw.indexOf('[')
   if (i < 0) return null
@@ -206,12 +214,15 @@ export class WeflabWatcher extends EventEmitter {
   get url()       { return this._url }
   get isRunning() { return this._active && this.win !== null && !this.win.isDestroyed() }
 
-  start(url: string) {
+  /** 반환: 시작했으면 null, 거부했으면 이유 */
+  start(url: string): string | null {
+    if (!isAllowedWeflabUrl(url)) return '위플랩 URL 은 https://weflab.com/... 형식만 사용할 수 있습니다'
     this.stop()
     this._url    = url
     this._active = true
     this.lastDonor = null
     this._launch()
+    return null
   }
 
   stop() {
@@ -222,11 +233,14 @@ export class WeflabWatcher extends EventEmitter {
   }
 
   private _destroyWin() {
-    if (this.win && !this.win.isDestroyed()) {
-      try { this.win.webContents.debugger.detach() } catch {}
-      this.win.destroy()
-    }
+    const w = this.win
     this.win = null
+    if (w && !w.isDestroyed()) {
+      // destroy() 도 'closed' 를 발생시킨다 — 우리가 닫는 창의 closed 가 재시도를 예약하지 않게 리스너를 먼저 뗀다
+      w.removeAllListeners('closed')
+      try { w.webContents.debugger.detach() } catch {}
+      w.destroy()
+    }
   }
 
   private _launch() {
@@ -234,16 +248,23 @@ export class WeflabWatcher extends EventEmitter {
     this._clearRetry()
     this._destroyWin()
 
-    this.win = new BrowserWindow({
+    const win = new BrowserWindow({
       show: false,
       webPreferences: {
         nodeIntegration:     false,
         contextIsolation:    true,
+        sandbox:             true,
         javascript:          true,
         backgroundThrottling: false,   // 숨김 창에서도 타이머/애니메이션 유지
+        partition:           'persist:weflab',   // 메인 창(SOOP 로그인 쿠키)과 세션 분리
       },
     })
-    const wc = this.win.webContents
+    this.win = win
+    const wc = win.webContents
+    // 이 창의 이벤트인지 확인 — 이전 창의 늦은 이벤트가 새 창 상태를 덮어쓰지 않게
+    const mine = () => this.win === win
+
+    wc.setWindowOpenHandler(() => ({ action: 'deny' }))
 
     // CDP: socket.io 웹소켓 프레임 캡처 + 결과 바인딩
     this.cdpOk = false
@@ -253,6 +274,7 @@ export class WeflabWatcher extends EventEmitter {
       wc.debugger.sendCommand('Runtime.enable').catch(() => {})
       wc.debugger.sendCommand('Runtime.addBinding', { name: '__weflabEmit' }).catch(() => {})
       wc.debugger.on('message', (_e, method, params: Record<string, any>) => {
+        if (!mine()) return
         if (method === 'Network.webSocketFrameReceived') {
           this._handleFrame(String(params?.response?.payloadData ?? ''))
         } else if (method === 'Runtime.bindingCalled' && params?.name === '__weflabEmit') {
@@ -266,6 +288,7 @@ export class WeflabWatcher extends EventEmitter {
     }
 
     wc.on('did-finish-load', () => {
+      if (!mine()) return
       this.emit('loaded')
       this.lastActivityAt = Date.now()
       wc.executeJavaScript(OBSERVER_SCRIPT, true).catch(() => {})
@@ -273,6 +296,7 @@ export class WeflabWatcher extends EventEmitter {
     })
 
     wc.on('did-fail-load', (_e, code, desc, _validatedUrl, isMainFrame) => {
+      if (!mine()) return
       // -3 = aborted (탐색 중 새 요청으로 취소) → 무시. 서브프레임(iframe) 실패도 무시.
       if (code === -3 || !isMainFrame) return
       this.emit('error', `페이지 로드 실패: ${desc} (${code}) — ${RETRY_MS / 1000}초 후 재시도`)
@@ -281,13 +305,14 @@ export class WeflabWatcher extends EventEmitter {
 
     // 렌더러 크래시 복구
     wc.on('render-process-gone', (_e, details) => {
-      if (!this._active) return
+      if (!mine() || !this._active) return
       this.emit('error', `렌더러 종료 (${details.reason}) — 재시도`)
       this._scheduleRetry()
     })
 
-    // 창이 예기치않게 닫혔을 때 재연결
-    this.win.on('closed', () => {
+    // 창이 예기치않게 닫혔을 때 재연결 (우리가 destroy 하는 경우는 _destroyWin 에서 리스너를 떼므로 오지 않음)
+    win.on('closed', () => {
+      if (!mine()) return
       this.win = null
       if (this._active) {
         this.emit('error', '창이 닫혔습니다 — 재연결 시도 중')
@@ -295,7 +320,8 @@ export class WeflabWatcher extends EventEmitter {
       }
     })
 
-    this.win.loadURL(this._url).catch(err => {
+    win.loadURL(this._url).catch(err => {
+      if (!mine()) return
       this.emit('error', String(err))
       this._scheduleRetry()
     })
@@ -306,8 +332,10 @@ export class WeflabWatcher extends EventEmitter {
   // ── 수신 처리 ──────────────────────────────────────────────
 
   private _handleFrame(raw: string) {
-    if (!raw || !/^4[0-9]/.test(raw)) return
+    if (!raw) return
+    // engine.io 핑/퐁('2'/'3')도 살아있다는 신호 — 조용한 시간대에 워치독이 멀쩡한 페이지를 새로고침하지 않게
     this.lastActivityAt = Date.now()
+    if (!/^4[0-9]/.test(raw)) return
     const don = parseDonationFrame(raw)
     if (!don) return
     if (don.donor) this.lastDonor = { uname: don.donor, time: Date.now() }
@@ -369,6 +397,7 @@ export class WeflabWatcher extends EventEmitter {
     if (!this._active) return
     this._clearRetry()
     this.retryTimer = setTimeout(() => {
+      this.retryTimer = null
       if (this._active) {
         this.emit('retrying', '재연결 시도 중')
         this._launch()

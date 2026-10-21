@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
-const on = (channel: string, cb: (...args: unknown[]) => void) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const on = (channel: string, cb: (...args: any[]) => void) => {
   const handler = (_: Electron.IpcRendererEvent, ...args: unknown[]) => cb(...args)
   ipcRenderer.on(channel, handler)
   return () => ipcRenderer.removeListener(channel, handler)
@@ -23,24 +24,36 @@ contextBridge.exposeInMainWorld('electron', {
   soopStatus:     ()               => ipcRenderer.invoke('soop:status'),
 
   // Games
-  gameTrigger: (gameId: string)        => ipcRenderer.invoke('game:trigger', gameId),
-  gameState:   (gameId: string)        => ipcRenderer.invoke('game:state', gameId),
-  gameAll:     ()                      => ipcRenderer.invoke('game:all'),
-  gameHistory: (limit?: number)        => ipcRenderer.invoke('game:history', limit),
+  gameTrigger:    (gameId: string)        => ipcRenderer.invoke('game:trigger', gameId),
+  gameClearQueue: (gameId: string)        => ipcRenderer.invoke('game:clearQueue', gameId),
+  gameState:      (gameId: string)        => ipcRenderer.invoke('game:state', gameId),
+  gameAll:        ()                      => ipcRenderer.invoke('game:all'),
+  gameHistory:    (limit?: number)        => ipcRenderer.invoke('game:history', limit),
+
+  // Fish log
+  fishRanking:  (limit?: number) => ipcRenderer.invoke('fish:ranking', limit),
+  fishResetLog: ()               => ipcRenderer.invoke('fish:resetLog'),
+
+  // Pickboard (상태는 메인 프로세스)
+  pickboardGet:    ()            => ipcRenderer.invoke('pickboard:get'),
+  pickboardReveal: (idx: number) => ipcRenderer.invoke('pickboard:reveal', idx),
+  pickboardReset:  ()            => ipcRenderer.invoke('pickboard:reset'),
+  pickboardShow:   ()            => ipcRenderer.invoke('pickboard:show'),
 
   // Overlay
   overlayUrl:       (gameId: string)                  => ipcRenderer.invoke('overlay:url', gameId),
   overlayOpen:      (gameId: string)                  => ipcRenderer.invoke('overlay:open', gameId),
   overlayBroadcast: (type: string, data: unknown)     => ipcRenderer.invoke('overlay:broadcast', type, data),
+  overlayStatus:    ()                                => ipcRenderer.invoke('overlay:status'),
 
   // Media
+  mediaList:       (game: string) => ipcRenderer.invoke('media:list', game),
   mediaOpenFolder: (game: string) => ipcRenderer.invoke('media:openFolder', game),
 
   // Stats
   statsGet: () => ipcRenderer.invoke('stats:get'),
 
-  // Auth
-  authVerify:    (id: string) => ipcRenderer.invoke('auth:verify', id),
+  // Auth (auth:verify 는 제거됨 — SOOP 로그인만)
   authGetUser:   ()           => ipcRenderer.invoke('auth:getUser'),
   authLogout:    ()           => ipcRenderer.invoke('auth:logout'),
   authRecheck:   ()           => ipcRenderer.invoke('auth:recheck'),
@@ -67,6 +80,9 @@ contextBridge.exposeInMainWorld('electron', {
   onGameResult:       (cb: (id: string, r: unknown) => void)  => on('game:result',       cb),
   onQuizQuestion:     (cb: (q: unknown) => void)              => on('quiz:question',      cb),
   onStatsUpdate:      (cb: (s: StatsSnapshot) => void)        => on('stats:update',      cb),
+  onSettingsChanged:  (cb: (s: unknown) => void)              => on('settings:changed',  cb),
+  onPickboardUpdate:  (cb: (s: unknown) => void)              => on('pickboard:update',  cb),
+  onAppNotice:        (cb: (n: AppNotice) => void)            => on('app:notice',        cb),
   onWeflabResult:     (cb: (text: string, nick: string) => void) => on('weflab:result',   cb),
   onWeflabDonation:   (cb: (d: WeflabDonationEvent) => void)  => on('weflab:donation',   cb),
   onWeflabLoaded:     (cb: () => void)                        => on('weflab:loaded',     cb),
@@ -78,3 +94,4 @@ interface SoopBalloonEvent { user: string; amount: number; ts: number }
 interface WeflabDonationEvent { donor: string; balloons: number; amount: number; message: string; event: string; ts: number }
 interface SoopChatEvent    { user: string; message: string; ts: number }
 interface StatsSnapshot    { todayRuns: number; todayBalloons: number; todayViewers: number }
+interface AppNotice        { level: 'info' | 'warn' | 'error'; message: string }

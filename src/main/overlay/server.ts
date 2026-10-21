@@ -1,10 +1,12 @@
 import { createServer, IncomingMessage, ServerResponse } from 'http'
 import { WebSocketServer, WebSocket } from 'ws'
-import { app } from 'electron'
+import { EventEmitter } from 'events'
+import { createReadStream, statSync } from 'fs'
+import { join, extname, basename } from 'path'
 import type { GameResult, GameState } from '../games/engine'
 import { loadSettings } from '../store/settings'
+import { listMedia, mediaDir, MEDIA_TYPES } from './media'
 
-// ── Quiz overlay ──────────────────────────────────────────────────────────────
 import { QUIZ_OVERLAY_HTML } from './pages/quiz'
 import { LADDER_OVERLAY_HTML } from './pages/ladder'
 import { ROULETTE_OVERLAY_HTML } from './pages/roulette'
@@ -14,95 +16,163 @@ import { PREVIEW_OVERLAY_HTML } from './pages/preview'
 import { MONITOR_OVERLAY_HTML } from './pages/monitor'
 import { LOTTERY_OVERLAY_HTML } from './pages/lottery'
 import { SLOT_OVERLAY_HTML } from './pages/slot'
-import { OVERLAY_HTML } from './pages/generic'
+import { RACE_OVERLAY_HTML } from './pages/race'
+import { RPS_OVERLAY_HTML } from './pages/rps'
 import { FISH_OVERLAY_HTML } from './pages/fish'
 import { FISH_VIDEO_OVERLAY_HTML } from './pages/fish-video'
-import { listMedia, mediaDir, MEDIA_TYPES } from './media'
-import { createReadStream, statSync } from 'fs'
-import { join, extname, basename } from 'path'
 
-// 낚시 영상 클립(cast + result*)이 폴더에 있으면 영상 모드 페이지를 서빙
+// 사용자 미디어를 둘 수 있는 게임 (폴더 이름 = gameId, 이 목록 밖은 404)
+const MEDIA_GAMES = new Set(['fish'])
+
+/** 낚시 영상 클립(cast + result*)이 폴더에 있으면 영상 모드 페이지를 서빙 */
 function hasFishClips(): boolean {
   const f = listMedia('fish')
   const has = (n: string) => f.some(x => new RegExp(`^${n}\\.(mp4|webm|mov)$`, 'i').test(x))
   return has('cast') && ['result', 'result-common', 'result-uncommon', 'result-rare', 'result-legendary'].some(has)
 }
 
-export class OverlayServer {
+// URL 경로의 gameId 는 허용 목록으로만 — HTML/스크립트 안에 그대로 들어가므로 반사형 XSS 차단
+const PAGES: Record<string, (port: number) => string> = {
+  quiz:      QUIZ_OVERLAY_HTML,
+  ladder:    LADDER_OVERLAY_HTML,
+  roulette:  ROULETTE_OVERLAY_HTML,
+  slot:      SLOT_OVERLAY_HTML,
+  number:    NUMBER_OVERLAY_HTML,
+  lottery:   LOTTERY_OVERLAY_HTML,
+  pickboard: PICKBOARD_OVERLAY_HTML,
+  monitor:   MONITOR_OVERLAY_HTML,
+  preview:   PREVIEW_OVERLAY_HTML,
+  race:      RACE_OVERLAY_HTML,
+  rps:       RPS_OVERLAY_HTML,
+  fish:      (port) => hasFishClips() ? FISH_VIDEO_OVERLAY_HTML(port) : FISH_OVERLAY_HTML(port),
+}
+export const OVERLAY_IDS = Object.keys(PAGES)
+
+/** 새 WS 클라이언트에게 현재 상태를 보내기 위한 공급자 — 엔진을 직접 참조하지 않는다 */
+export type SnapshotProvider = () => Array<{ type: string; data: unknown }>
+
+/**
+ * 이벤트:
+ *  'listening' (port)
+ *  'error' (message)   — 포트 충돌 등. 앱은 죽지 않고 렌더러에 알림
+ */
+export class OverlayServer extends EventEmitter {
   private httpServer: ReturnType<typeof createServer> | null = null
   private wss: WebSocketServer | null = null
   private clients: Set<WebSocket> = new Set()
   private port = 3939
+  private snapshot: SnapshotProvider = () => []
+  listening = false
+
+  setSnapshotProvider(p: SnapshotProvider) { this.snapshot = p }
 
   start(port = 3939) {
+    this.stop()
     this.port = port
 
-    this.httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
-      const url = (req.url ?? '/').split('?')[0]  // strip query string
+    const server = createServer((req: IncomingMessage, res: ServerResponse) => {
+      const path = (req.url ?? '/').split('?')[0]
+      if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); res.end(); return }
 
-      // ── 사용자 미디어 (예: 낚시 영상 클립) ─────────────────────────────────
-      const mList = url.match(/^\/api\/media\/([a-z]+)$/)
+      // ── 오버레이 공통 설정 (효과음 on/off·볼륨) ──
+      if (path === '/api/overlay-config') {
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' })
+        res.end(JSON.stringify({ sound: loadSettings().overlay.sound }))
+        return
+      }
+
+      // ── 사용자 미디어 (읽기 전용, 허용된 게임 폴더의 파일 이름만) ──
+      const mList = /^\/api\/media\/([a-z]+)$/.exec(path)
       if (mList) {
-        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
-        res.end(JSON.stringify({ dir: mediaDir(mList[1]), files: listMedia(mList[1]) }))
+        if (!MEDIA_GAMES.has(mList[1])) { res.writeHead(404); res.end(); return }
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' })
+        res.end(JSON.stringify({ files: listMedia(mList[1]) }))
         return
       }
-      const mFile = url.match(/^\/media\/([a-z]+)\/([^/]+)$/)
-      if (mFile) {
-        const file = join(mediaDir(mFile[1]), basename(decodeURIComponent(mFile[2])))
-        const type = MEDIA_TYPES[extname(file).slice(1).toLowerCase()]
-        let st: ReturnType<typeof statSync> | null = null
-        try { st = statSync(file) } catch { st = null }
-        if (!type || !st || !st.isFile()) { res.writeHead(404); res.end(); return }
-        const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? '')
-        if (range) {
-          const start = range[1] ? Number(range[1]) : 0
-          const end   = range[2] ? Math.min(Number(range[2]), st.size - 1) : st.size - 1
-          res.writeHead(206, { 'Content-Type': type, 'Content-Range': `bytes ${start}-${end}/${st.size}`, 'Accept-Ranges': 'bytes', 'Content-Length': end - start + 1 })
-          createReadStream(file, { start, end }).pipe(res)
-        } else {
-          res.writeHead(200, { 'Content-Type': type, 'Content-Length': st.size, 'Accept-Ranges': 'bytes' })
-          createReadStream(file).pipe(res)
-        }
+      const mFile = /^\/media\/([a-z]+)\/([^/]+)$/.exec(path)
+      if (mFile) { this.serveMedia(req, res, mFile[1], mFile[2]); return }
+
+      const m = /^\/overlay\/([a-z]+)\/?$/.exec(path)
+      const gameId = m ? m[1] : (path === '/' ? 'roulette' : '')
+      const page = PAGES[gameId]
+      if (!page) {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
+        res.end('Not found')
         return
       }
-
-      // ── 오버레이 공통 설정 (효과음 on/off·볼륨) ──────────────────────────
-      if (url === '/api/overlay-config') {
-        const s = loadSettings()
-        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
-        res.end(JSON.stringify({ sound: s.overlay.sound ?? { enabled: true, volume: 0.7 } }))
-        return
-      }
-
-      // ── Overlay pages ─────────────────────────────────────────────────────
-      const gameId = url.replace('/overlay/', '').split('?')[0] || 'roulette'
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
-
-      let html: string
-      if      (gameId === 'quiz')      html = QUIZ_OVERLAY_HTML(port)
-      else if (gameId === 'ladder')    html = LADDER_OVERLAY_HTML(port)
-      else if (gameId === 'roulette')  html = ROULETTE_OVERLAY_HTML(port)
-      else if (gameId === 'slot')      html = SLOT_OVERLAY_HTML(port)
-      else if (gameId === 'number')    html = NUMBER_OVERLAY_HTML(port)
-      else if (gameId === 'lottery')   html = LOTTERY_OVERLAY_HTML(port)
-      else if (gameId === 'fish')      html = hasFishClips() ? FISH_VIDEO_OVERLAY_HTML(port) : FISH_OVERLAY_HTML(port)
-      else if (gameId === 'pickboard') html = PICKBOARD_OVERLAY_HTML(port)
-      else if (gameId === 'monitor')   html = MONITOR_OVERLAY_HTML(port)
-      else if (gameId === 'preview')   html = PREVIEW_OVERLAY_HTML(port)
-      else html = OVERLAY_HTML(gameId, 'purple', port)
-
-      res.end(html)
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+      })
+      res.end(page(port))
     })
 
-    this.wss = new WebSocketServer({ server: this.httpServer, path: '/__overlay_ws__' })
-    this.wss.on('connection', (ws) => {
+    const wss = new WebSocketServer({
+      server,
+      path: '/__overlay_ws__',
+      // OBS 브라우저 소스는 Origin 이 http://localhost:PORT, 앱 내 미리보기도 동일.
+      // 스트리머 PC 의 다른 웹페이지가 붙어 방송 상태를 읽어가는 것을 막는다.
+      verifyClient: ({ origin }: { origin: string }) => {
+        if (!origin) return true
+        return origin === `http://localhost:${port}` || origin === `http://127.0.0.1:${port}`
+      },
+    })
+    wss.on('connection', (ws) => {
       this.clients.add(ws)
       ws.on('close', () => this.clients.delete(ws))
       ws.on('error', () => this.clients.delete(ws))
+      // 접속 직후 현재 상태 — OBS "장면 활성화 시 새로고침" 뒤에도 빈 화면이 아니게
+      for (const { type, data } of this.snapshot()) {
+        try { ws.send(JSON.stringify({ type, data })) } catch {}
+      }
     })
+    wss.on('error', (err) => this.emit('error', `오버레이 WS 오류: ${err.message}`))
 
-    this.httpServer.listen(port, '127.0.0.1')
+    server.on('error', (err: NodeJS.ErrnoException) => {
+      this.listening = false
+      const msg = err.code === 'EADDRINUSE'
+        ? `오버레이 포트 ${port} 가 이미 사용 중입니다. 다른 프로그램(또는 이 앱의 다른 창)을 닫거나 설정에서 포트를 바꾸세요.`
+        : `오버레이 서버 오류: ${err.message}`
+      this.emit('error', msg)
+    })
+    server.on('listening', () => { this.listening = true; this.emit('listening', port) })
+
+    this.httpServer = server
+    this.wss = wss
+    try {
+      server.listen(port, '127.0.0.1')
+    } catch (err) {
+      this.emit('error', `오버레이 서버를 열 수 없습니다: ${String(err)}`)
+    }
+  }
+
+  private serveMedia(req: IncomingMessage, res: ServerResponse, game: string, rawName: string) {
+    const notFound = () => { res.writeHead(404); res.end() }
+    if (!MEDIA_GAMES.has(game)) return notFound()
+    let name: string
+    try { name = basename(decodeURIComponent(rawName)) } catch { return notFound() }
+    if (!name || name.startsWith('.')) return notFound()
+    const file = join(mediaDir(game), name)
+    const type = MEDIA_TYPES[extname(file).slice(1).toLowerCase()]
+    let st: ReturnType<typeof statSync> | null = null
+    try { st = statSync(file) } catch { st = null }
+    if (!type || !st || !st.isFile()) return notFound()
+    const base = { 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }
+    const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? '')
+    if (range && (range[1] || range[2])) {
+      let start = range[1] ? Number(range[1]) : st.size - Number(range[2])   // "bytes=-N" = 끝에서 N 바이트
+      let end   = range[1] && range[2] ? Number(range[2]) : st.size - 1
+      start = Math.max(0, start); end = Math.min(end, st.size - 1)
+      if (start > end) { res.writeHead(416, { 'Content-Range': `bytes */${st.size}` }); res.end(); return }
+      res.writeHead(206, { ...base, 'Content-Range': `bytes ${start}-${end}/${st.size}`, 'Content-Length': end - start + 1 })
+      if (req.method === 'HEAD') { res.end(); return }
+      createReadStream(file, { start, end }).on('error', () => res.destroy()).pipe(res)
+    } else {
+      res.writeHead(200, { ...base, 'Content-Length': st.size })
+      if (req.method === 'HEAD') { res.end(); return }
+      createReadStream(file).on('error', () => res.destroy()).pipe(res)
+    }
   }
 
   broadcast(type: string, data: unknown) {
@@ -119,7 +189,15 @@ export class OverlayServer {
   }
 
   sendState(state: GameState) {
-    this.broadcast('game:state', state)
+    this.broadcast('game:state', OverlayServer.publicState(state))
+  }
+
+  /** 오버레이로 나가는 상태에서 퀴즈 정답 제거 */
+  static publicState(state: GameState): GameState {
+    if (!state.quiz) return state
+    const { answer: _a, ...quiz } = state.quiz
+    void _a
+    return { ...state, quiz: { ...quiz, answer: '' } }
   }
 
   getUrl(gameId: string) {
@@ -127,8 +205,13 @@ export class OverlayServer {
   }
 
   stop() {
-    this.wss?.close()
-    this.httpServer?.close()
+    for (const c of this.clients) { try { c.terminate() } catch {} }
+    this.clients.clear()
+    try { this.wss?.close() } catch {}
+    try { this.httpServer?.close() } catch {}
+    this.wss = null
+    this.httpServer = null
+    this.listening = false
   }
 }
 

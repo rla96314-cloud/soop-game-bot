@@ -23,7 +23,7 @@ function toCSV(rows: HistoryItem[]) {
 }
 
 export default function HistoryPage() {
-  const { history } = useApp()
+  const { history, stats } = useApp()
   const [game, setGame]   = useState('all')
   const [kind, setKind]   = useState<'all' | 'ok' | 'jackpot' | 'fail'>('all')
   const [q, setQ]         = useState('')
@@ -77,7 +77,7 @@ export default function HistoryPage() {
         <div className={`card ${styles.head}`}>
           <div>
             <div className="sec-title" style={{ fontSize: 22 }}>게임 활동 기록</div>
-            <div className="sec-desc">방송 중 실행된 모든 게임 이벤트 내역을 확인할 수 있습니다.</div>
+            <div className="sec-desc">방송 중 실행된 게임 이벤트 내역입니다 (최근 1,000건, 앱을 켠 뒤부터).</div>
           </div>
         </div>
 
@@ -149,7 +149,7 @@ export default function HistoryPage() {
         <div className="card">
           <div className="card-head"><div className="sec-title" style={{ fontSize: 18 }}>전체 요약</div><span className="badge badge-idle">오늘</span></div>
           <div className={styles.summary}>
-            <div><span className={styles.sIc} style={{ color: 'var(--orange)' }}><Icon name="play" size={16} /></span><span>총 실행 횟수</span><b className="num">{history.length} <small>회</small></b></div>
+            <div><span className={styles.sIc} style={{ color: 'var(--orange)' }}><Icon name="play" size={16} /></span><span>총 실행 횟수</span><b className="num">{stats.todayRuns.toLocaleString()} <small>회</small></b></div>
             <div><span className={styles.sIc}><Icon name="users" size={16} /></span><span>참여한 시청자</span><b className="num">{summary.viewers} <small>명</small></b></div>
             <div><span className={styles.sIc} style={{ color: 'var(--blue)' }}><Icon name="gift" size={16} /></span><span>소모 별풍선</span><b className="num">{summary.balloons.toLocaleString()} <small>개</small></b></div>
             <div><span className={styles.sIc} style={{ color: '#f2a600' }}><Icon name="check" size={16} /></span><span>성공 횟수</span><b className="num">{summary.cnt.ok} <small>회 ({pct(summary.cnt.ok)}%)</small></b></div>

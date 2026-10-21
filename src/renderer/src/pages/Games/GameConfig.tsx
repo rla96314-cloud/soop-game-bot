@@ -3,16 +3,18 @@ import { useEffect, useState } from 'react'
 import { useApp } from '../../contexts/AppContext'
 import { gameById } from '../../games'
 import Icon from '../../components/Icon'
+import NumberField from '../../components/NumberField'
 import styles from './Games.module.css'
 import {
   RouletteEditor, LotteryEditor, LadderEditor, QuizEditor, PickBoardEditor, PickBoardPanel, NumberPanel, Field,
   type RouletteItem, type LotteryPrize, type Prize, type QuizQuestion, type PickItem,
 } from './panels'
+import { RaceEditor, FishEditor, type RaceRacer, type FishItem } from './extraGames'
 
 type Tab = 'game' | 'items' | 'screen'
 
 const HAS_ITEMS: Record<string, string> = {
-  roulette: 'items', ladder: 'prizes', lottery: 'prizes', quiz: 'questions', pickboard: 'pickItems',
+  roulette: 'items', ladder: 'prizes', lottery: 'prizes', quiz: 'questions', pickboard: 'pickItems', race: 'racers', fish: 'fishes',
 }
 
 export default function GameConfig({ gameId, onHelp, port }: { gameId: string; onHelp?: () => void; port: number }) {
@@ -22,6 +24,7 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
   const g = (settings?.games as Record<string, Record<string, unknown>> | undefined)?.[gameId] ?? {}
   const status = gameStates[gameId]?.status ?? 'idle'
   const busy = status === 'running' || status === 'collecting'
+  const queued = (gameStates[gameId]?.queued as number | undefined) ?? 0
   const save = (key: string, value: unknown) => patchSettings({ games: { [gameId]: { [key]: value } } })
   const enabled = (g.enabled as boolean) ?? true
 
@@ -55,37 +58,55 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
             {game.engine && (
               <Field label="별풍선 트리거 (0=비활성)">
                 <div className={styles.unitField}>
-                  <input type="number" min={0} value={(g.balloonThreshold as number) ?? 0} onChange={e => save('balloonThreshold', Number(e.target.value))} />
+                  <NumberField min={0} max={1000000} value={(g.balloonThreshold as number) ?? 0} onCommit={v => save('balloonThreshold', v)} />
                   <span>개</span>
                 </div>
               </Field>
             )}
             {gameId === 'roulette' && (
               <Field label="스핀 시간 (ms)">
-                <input type="number" min={1000} step={500} value={(g.spinDuration as number) ?? 3000} onChange={e => save('spinDuration', Number(e.target.value))} />
+                <NumberField min={1000} max={15000} step={500} value={(g.spinDuration as number) ?? 3000} onCommit={v => save('spinDuration', v)} />
               </Field>
             )}
             {gameId === 'slot' && (
               <Field label="스핀 시간 (ms)">
-                <input type="number" min={2000} max={6000} step={500} value={(g.spinDuration as number) ?? 3000} onChange={e => save('spinDuration', Number(e.target.value))} />
+                <NumberField min={2000} max={8000} step={500} value={(g.spinDuration as number) ?? 3000} onCommit={v => save('spinDuration', v)} />
               </Field>
             )}
             {gameId === 'lottery' && (
               <Field label="스크래치 시간 (ms)">
-                <input type="number" min={1000} max={8000} step={500} value={(g.scratchDuration as number) ?? 3000} onChange={e => save('scratchDuration', Number(e.target.value))} />
+                <NumberField min={1000} max={8000} step={500} value={(g.scratchDuration as number) ?? 3000} onCommit={v => save('scratchDuration', v)} />
               </Field>
             )}
             {gameId === 'ladder' && (<>
               <Field label="참가 시간 (초)">
-                <input type="number" min={5} value={(g.joinDuration as number) ?? 30} onChange={e => save('joinDuration', Number(e.target.value))} />
+                <NumberField min={5} max={600} value={(g.joinDuration as number) ?? 30} onCommit={v => save('joinDuration', v)} />
               </Field>
               <Field label="최대 참가 인원">
-                <input type="number" min={2} value={(g.maxParticipants as number) ?? 8} onChange={e => save('maxParticipants', Number(e.target.value))} />
+                <NumberField min={2} max={50} value={(g.maxParticipants as number) ?? 8} onCommit={v => save('maxParticipants', v)} />
               </Field>
             </>)}
+            {gameId === 'race' && (<>
+              <Field label="예측 접수 시간 (초)">
+                <NumberField min={5} max={600} value={(g.joinDuration as number) ?? 20} onCommit={v => save('joinDuration', v)} />
+              </Field>
+              <Field label="경주 시간 (ms)">
+                <NumberField min={3000} max={30000} step={500} value={(g.raceDuration as number) ?? 8000} onCommit={v => save('raceDuration', v)} />
+              </Field>
+            </>)}
+            {gameId === 'rps' && (
+              <Field label="참가 접수 시간 (초)">
+                <NumberField min={5} max={600} value={(g.joinDuration as number) ?? 15} onCommit={v => save('joinDuration', v)} />
+              </Field>
+            )}
+            {gameId === 'fish' && (
+              <Field label="낚시 연출 시간 (ms)">
+                <NumberField min={2000} max={15000} step={500} value={(g.castDuration as number) ?? 4000} onCommit={v => save('castDuration', v)} />
+              </Field>
+            )}
             {gameId === 'quiz' && (
               <Field label="자동 출제 제한 시간 (초)">
-                <input type="number" min={5} max={300} value={(g.timeLimit as number) ?? 30} onChange={e => save('timeLimit', Number(e.target.value))} />
+                <NumberField min={5} max={600} value={(g.timeLimit as number) ?? 30} onCommit={v => save('timeLimit', v)} />
               </Field>
             )}
             {game.engine && (
@@ -107,16 +128,15 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
             <NumberPanel key="number" gSettings={g} gameStates={gameStates} saveSetting={save} />
           )}
           {gameId === 'pickboard' && (<>
-            <PickBoardPanel key={`${(g.pickRows as number) ?? 4}x${(g.pickCols as number) ?? 5}`}
-              rows={(g.pickRows as number) ?? 4} cols={(g.pickCols as number) ?? 5} items={(g.pickItems as PickItem[]) ?? []} />
+            <PickBoardPanel />
             <div className={styles.note}>칸을 누르면 하나씩 공개되고 OBS 오버레이에 바로 반영됩니다. 칸 크기와 상품은 <b>항목 설정</b> 탭에서 바꿉니다.</div>
           </>)}
           {game.engine && (
             <KeywordEditor keywords={(g.weflabKeywords as string[]) ?? []} onSave={v => save('weflabKeywords', v)} />
           )}
-          {['race', 'rps', 'fish'].includes(gameId) && (
-            <div className={styles.note}>이 게임은 추가 설정이 없습니다. 별풍선 트리거 개수와 채팅 명령어만 정하면 됩니다.</div>
-          )}
+          {gameId === 'race' && <div className={styles.note}>실행하면 예측 접수가 열리고, 시청자가 <b>{cmdValue || '!경주'} 번호</b>로 1등을 예측합니다. 접수가 닫히면 경주가 시작되고 적중자가 발표됩니다. 대기 중에 시청자가 명령어를 치면 바로 시작됩니다.</div>}
+          {gameId === 'rps' && <div className={styles.note}>실행하면 참가 접수가 열리고, 시청자가 <b>{cmdValue || '!묵찌빠'} 가위/바위/보</b>로 손을 냅니다. 마감되면 스트리머의 손이 무작위로 정해지고 이긴 시청자가 발표됩니다. 대기 중에 시청자가 명령어를 치면 바로 시작됩니다.</div>}
+          {gameId === 'fish' && <div className={styles.note}>실행할 때마다 한 마리를 낚습니다. 시청자별 점수와 마리 수는 앱을 껐다 켜도 유지되며, 오른쪽 미리보기에서 랭킹을 볼 수 있습니다.</div>}
         </>)}
 
         {/* ── 항목 설정 ── */}
@@ -125,13 +145,15 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
           {gameId === 'ladder'    && <LadderEditor    key="l" prizes={(g.prizes as Prize[]) ?? []} onSave={v => save('prizes', v)} />}
           {gameId === 'lottery'   && <LotteryEditor   key="lo" prizes={(g.prizes as LotteryPrize[]) ?? []} onSave={v => save('prizes', v)} />}
           {gameId === 'quiz'      && <QuizEditor      key="q" questions={(g.questions as QuizQuestion[]) ?? []} onSave={v => save('questions', v)} />}
+          {gameId === 'race'      && <RaceEditor key="ra" racers={(g.racers as RaceRacer[]) ?? []} onSave={v => save('racers', v)} />}
+          {gameId === 'fish'      && <FishEditor key="fi" fishes={(g.fishes as FishItem[]) ?? []} onSave={v => save('fishes', v)} />}
           {gameId === 'pickboard' && (
             <PickBoardEditor key="p" items={(g.pickItems as PickItem[]) ?? []} rows={(g.pickRows as number) ?? 4} cols={(g.pickCols as number) ?? 5}
               onSave={v => save('pickItems', v)} onSaveSize={(r, c) => { save('pickRows', r); save('pickCols', c) }} />
           )}
           {gameId === 'slot'   && <div className={styles.note}>슬롯 심볼은 오른쪽 미리보기 패널에서 추가·삭제합니다. (이모지 또는 이미지 URL, 최소 3개)</div>}
           {gameId === 'number' && <div className={styles.note}>추첨 범위와 제외 번호는 <b>게임 설정</b> 탭에서 관리합니다.</div>}
-          {['race', 'rps', 'fish'].includes(gameId) && <div className={styles.note}>이 게임은 편집할 항목이 없습니다.</div>}
+          {gameId === 'rps' && <div className={styles.note}>가위바위보는 편집할 항목이 없습니다. 접수 시간은 <b>게임 설정</b> 탭에서 바꿉니다.</div>}
         </>)}
 
         {/* ── 화면 설정 ── */}
@@ -156,7 +178,7 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
             </div>
             <div className="field-hint">OBS에서 '브라우저' 소스를 추가하고 위 URL을 입력하세요. 권장 크기 1920 × 1080, 배경 투명 허용.</div>
           </div>
-          {gameId === 'fish' && <FishMediaPanel port={port} />}
+          {gameId === 'fish' && <FishMediaPanel />}
           <div className={styles.note}>오버레이 색상·위치는 OBS 소스의 크기와 위치로 조정합니다. 앱을 업데이트하면 OBS의 브라우저 소스를 새로고침하세요.</div>
         </>)}
       </div>
@@ -171,7 +193,7 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
         </label>
         {game.engine && (
           <button className="btn btn-dark" disabled={busy || !enabled} onClick={() => triggerGame(gameId)}>
-            <Icon name="play" size={14} />{busy ? '진행 중…' : '테스트 실행'}
+            <Icon name="play" size={14} />{busy ? (queued > 0 ? `진행 중… (대기 ${queued})` : '진행 중…') : '테스트 실행'}
           </button>
         )}
       </div>
@@ -184,11 +206,14 @@ const FISH_CLIPS: Array<[string, string]> = [
   ['cast', '찌 던지기'], ['wait', '기다리기'], ['bite', '입질'], ['hook', '챔질'],
   ['result-common', '결과 · 일반'], ['result-uncommon', '결과 · 고급'], ['result-rare', '결과 · 희귀'], ['result-legendary', '결과 · 전설'],
 ]
-function FishMediaPanel({ port }: { port: number }) {
+function FishMediaPanel() {
   const [info, setInfo] = useState<{ dir: string; files: string[] } | null>(null)
   const el = (window as unknown as Record<string, Record<string, unknown>>).electron
-  const load = () => fetch(`http://localhost:${port}/api/media/fish`).then(r => r.json()).then(setInfo).catch(() => setInfo(null))
-  useEffect(() => { load() }, [port])
+  const load = () => {
+    const list = el?.mediaList as ((g: string) => Promise<{ dir: string; files: string[] } | null>) | undefined
+    list?.('fish').then(setInfo).catch(() => setInfo(null))
+  }
+  useEffect(() => { load() }, [])
   const has = (name: string) => (info?.files ?? []).some(f => new RegExp(`^${name}\\.(mp4|webm|mov)$`, 'i').test(f))
   const videoMode = has('cast') && (has('result') || FISH_CLIPS.slice(4).some(([n]) => has(n)))
   return (

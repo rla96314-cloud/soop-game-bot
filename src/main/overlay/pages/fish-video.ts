@@ -91,7 +91,9 @@ export const FISH_VIDEO_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 <script>
 const $ = id => document.getElementById(id)
 const stage = $('stage'), video = $('video'), scene = $('scene'), line = $('line'), bobber = $('bobber'), rod = $('rod'), ripples = $('ripples'), splash = $('splash')
-const RAR = { common:['일반','#9DD3F5'], uncommon:['고급','#00CB84'], rare:['희귀','#C9B6FF'], legendary:['전설','#FFC928'] }
+const RAR = { common:['일반','#9DD3F5'], uncommon:['고급','#00CB84'], rare:['희귀','#C9B6FF'], legendary:['레전드','#FFC928'] }
+// 기준 단계 길이(ms) — 엔진 castMs(던지기~챔질 전체)에 맞춰 비율대로 늘이고 줄인다
+const BASE_TL = { cast:1400, wait:1600, bite:1400, hook:700 }, BASE_PRE = 5100, REVEAL_MS = 2600
 const TIP0 = { x: 1180 - 322, y: 690 - 436 }          // 로드 끝(기본 자세)
 let media = null, token = 0, raf = null, hideT = null, cur = null
 
@@ -108,7 +110,7 @@ function setStep(p){ document.querySelectorAll('.step').forEach(s => { const ord
 function cap(main, sub, bang){ $('capMain').innerHTML = (bang ? '<span class="bang">!</span> ' : '') + main; $('capSub').textContent = sub || '' }
 function svgEl(tag, attrs){ const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e }
 function ripple(x, y, big){ const r = svgEl('ellipse', { cx:x, cy:y, rx:4, ry:1.5, fill:'none', stroke:'rgba(255,255,255,.8)', 'stroke-width':2 }); ripples.appendChild(r)
-  const t0 = performance.now(), dur = big ? 900 : 650; (function f(n){ const k = Math.min(1, (n - t0) / dur); r.setAttribute('rx', 4 + k * (big ? 90 : 46)); r.setAttribute('ry', 1.5 + k * (big ? 26 : 13)); r.setAttribute('opacity', 1 - k); if (k < 1) requestAnimationFrame(f); else r.remove() })(t0) }
+  const t0 = performance.now(), dur = big ? 900 : 650; (function f(n){ const k = Math.max(0, Math.min(1, (n - t0) / dur)); r.setAttribute('rx', 4 + k * (big ? 90 : 46)); r.setAttribute('ry', 1.5 + k * (big ? 26 : 13)); r.setAttribute('opacity', 1 - k); if (k < 1) requestAnimationFrame(f); else r.remove() })(t0) }
 function splashBurst(x, y, n){ for (let i = 0; i < (n || 14); i++) { const d = svgEl('circle', { cx:x, cy:y, r: 3 + Math.random() * 5, fill: i % 3 ? '#dff3ff' : '#ffffff' }); splash.appendChild(d)
   const vx = (Math.random() - .5) * 9, vy0 = -(5 + Math.random() * 9); let px = x, py = y, vy = vy0; const t0 = performance.now(); let last = t0
   ;(function f(now){ const dt = Math.min(2, (now - last) / 16.7); last = now; vy += .45 * dt; px += vx * dt; py += vy * dt; d.setAttribute('cx', px); d.setAttribute('cy', py); d.setAttribute('opacity', Math.max(0, 1 - (now - t0) / 900)); if (py < y + 60 && now - t0 < 1000) requestAnimationFrame(f); else d.remove() })(t0) } }
@@ -127,11 +129,23 @@ function playClip(name){ if (!media || !media[name]) { video.style.display = 'no
   video.src = '/media/fish/' + encodeURIComponent(media[name]); video.muted = !(FX.config && FX.config.enabled); video.volume = FX.config ? FX.config.volume : .7
   video.style.display = 'block'; scene.style.display = 'none'; video.currentTime = 0; video.play().catch(() => {}); return true }
 
+// 엔진 FishCastState → 재생용 { name, emoji, rarity, points, count, totalPoints, triggeredBy, balloon, startedAt, timeline }
+// 중간 합류: startedAt 이후 지난 단계는 0 으로, 진행 중 단계는 남은 시간만
+function fromState(f, balloon){
+  const fish = f.fish || {}
+  const k = Math.max(200, Number(f.castMs) || BASE_PRE) / BASE_PRE
+  let skip = Math.max(0, Date.now() - (Number(f.startedAt) || Date.now()))
+  const timeline = { reveal: REVEAL_MS }
+  for (const p of ['cast', 'wait', 'bite', 'hook']) { const d = Math.round(BASE_TL[p] * k), cut = Math.min(d, skip); timeline[p] = d - cut; skip -= cut }
+  return { name: String(fish.name || '물고기'), emoji: String(fish.emoji || '🐟'), rarity: fish.rarity || 'common', points: Number(fish.points) || 0,
+    count: Number(f.count) || 1, totalPoints: Number(f.totalPoints) || 0, triggeredBy: f.triggeredBy, balloon: Number(balloon) || 0, startedAt: f.startedAt, timeline }
+}
+
 function run(fs){
   const my = ++token; reset(); show(); cur = fs
-  const tl = fs.timeline || { cast:1400, wait:1600, bite:1400, hook:700, reveal:2600 }
-  const emoji = (String(fs.name).match(/\\p{Extended_Pictographic}+/u) || ['🐟'])[0]
-  const nameOnly = String(fs.name).replace(/\\p{Extended_Pictographic}/gu, '').replace(/\\uFE0F/g, '').trim() || fs.name
+  const tl = fs.timeline
+  const emoji = fs.emoji
+  const nameOnly = fs.name
   const rar = RAR[fs.rarity] || RAR.common
   const WATER = { x: 520, y: 405 }
   const at = (ms, fn) => setTimeout(() => { if (my === token) fn() }, ms)
@@ -142,7 +156,7 @@ function run(fs){
   if (!playClip('cast')) {
     FX.sound('whoosh')
     const t0 = performance.now()
-    ;(function f(n){ if (my !== token) return; const k = Math.min(1, (n - t0) / tl.cast)
+    ;(function f(n){ if (my !== token) return; const k = Math.min(1, (n - t0) / Math.max(1, tl.cast))
       // 로드: 뒤로 젖혔다가(−35°) 앞으로 휘두름(+12°) 후 복귀
       const a = k < .35 ? -35 * ease.out(k / .35) : k < .6 ? -35 + 47 * ease.out((k - .35) / .25) : 12 - 12 * ease.inout((k - .6) / .4)
       rodAngle(a); const tip = tipAt(a)
@@ -176,13 +190,13 @@ function run(fs){
   // ── 4. 챔질 ──
   at(t, () => { setStep('hook'); cap('챔질!', '', true); FX.drumStop(); FX.sound('stop'); FX.flash('rgba(255,255,255,.35)'); stage.classList.remove('shake'); void stage.offsetWidth; stage.classList.add('shake')
     if (!playClip('hook')) { const t0 = performance.now(); splashBurst(WATER.x, WATER.y, 26); ripple(WATER.x, WATER.y, true)
-      ;(function f(n){ if (my !== token) return; const k = Math.min(1, (n - t0) / tl.hook); const a = -28 * Math.sin(Math.PI * Math.min(1, k * 1.2)); rodAngle(a); const tip = tipAt(a)
+      ;(function f(n){ if (my !== token) return; const k = Math.min(1, (n - t0) / Math.max(1, tl.hook)); const a = -28 * Math.sin(Math.PI * Math.min(1, k * 1.2)); rodAngle(a); const tip = tipAt(a)
         const by = WATER.y - 20 * ease.out(k); setBobber(WATER.x + 30 * k, by, -30 * k); setLine(tip.x, tip.y, WATER.x + 30 * k, by, -10)
         if (k < 1) raf = requestAnimationFrame(f) })(t0) } })
   t += tl.hook
 
   // ── 5. 결과 ──
-  at(t, () => { setStep('reveal'); cap(nameOnly + ' 낚았다!', rar[0] + ' 등급')
+  at(t, () => { setStep('reveal'); cap(nameOnly + ' 낚았다!', rar[0] + ' 등급 · +' + fs.points + '점 · 누적 ' + fs.count + '마리 · 총 ' + fs.totalPoints + '점')
     const clip = { common:'rc', uncommon:'ru', rare:'rr', legendary:'rl' }[fs.rarity]
     const usedVideo = playClip(media && media[clip] ? clip : 'result')
     if (!usedVideo) { // 물고기가 물에서 튀어올라 가운데로
@@ -214,9 +228,12 @@ function connect() {
       const msg = JSON.parse(e.data); FX.handle(msg)
       if (msg.type === 'game:state' && msg.data?.id === 'fish') {
         const s = msg.data
-        if (s.status === 'running' && s.fish) { if (!cur || cur.startedAt !== s.fish.startedAt) run(s.fish) }
-        else if (s.status === 'showing_result') { if (!cur && s.result) { // 진행 중에 오버레이가 열린 경우: 결과만 바로
-            run({ name: s.result.result, rarity: (String(s.result.detail).match(/\\((common|uncommon|rare|legendary)\\)/) || [])[1] || 'common', triggeredBy: s.result.triggeredBy, balloon: s.result.balloon, startedAt: s.result.ts, timeline: { cast:0, wait:0, bite:0, hook:0, reveal:2600 } }) }
+        if (s.status === 'running' && s.fish) { if (hideT) { clearTimeout(hideT); hideT = null } if (!cur || cur.startedAt !== s.fish.startedAt) run(fromState(s.fish, 0)) }
+        else if (s.status === 'showing_result') {
+          const bal = s.result ? s.result.balloon : 0
+          // 진행 중에 오버레이가 열린 경우(결과 단계 합류): 결과만 바로
+          if (s.fish && (!cur || cur.startedAt !== s.fish.startedAt)) run(fromState(s.fish, bal))
+          else if (cur) cur.balloon = Number(bal) || 0   // 결과에만 담겨 오는 별풍선 수 → 배너에 표시
           if (hideT) clearTimeout(hideT); hideT = setTimeout(() => { hide(); cur = null }, 6500) }
         else if (s.status === 'idle') { if (hideT) clearTimeout(hideT); hideT = setTimeout(() => { hide(); cur = null }, 1200) }
       }

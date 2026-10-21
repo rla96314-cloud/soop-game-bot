@@ -177,12 +177,14 @@ let dotsBuilt = false
 function setMode(m) {
   wheelWrap.classList.toggle('active', m === 'wheel')
   textWrap.classList.toggle('active', m === 'text')
-  if (m === 'text' && !dotsBuilt) { if (tBody && tBody.offsetWidth > 0) { buildDots(tBody); dotsBuilt = true } }
+  if (m === 'text' && !dotsBuilt) { if (tBody) { buildDots(tBody); dotsBuilt = true } }
 }
 
 // ── LED dots for text frame (캡슐 둘레를 따라 등간격 배치) ─────────────────────
+// .t-body 는 width 660 고정, 높이 = 4(border)+32(pad)+3(inner border)+84(slot)+3+32+4 = 162 → 측정하지 않고 상수 사용
+const T_BODY_W = 660, T_BODY_H = 162
 function buildDots(el) {
-  const W = el.offsetWidth, H = el.offsetHeight
+  const W = T_BODY_W, H = T_BODY_H
   const R = H / 2, inset = 20, r = R - inset, D = 18
   const segs = []
   // top edge, right arc, bottom edge, left arc

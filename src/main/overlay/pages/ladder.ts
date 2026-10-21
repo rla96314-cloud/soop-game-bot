@@ -264,6 +264,7 @@ let _revealLd = null
 // ── 연출 상태 ──────────────────────────────────────────────
 let _prevParts   = []      // 모집 중 직전 참가자 목록 (새 칩 감지용)
 let _collDeadline= 0       // 모집 마감 시각 (로컬 타이머 바/임박음)
+let _collTotal   = 30000   // 모집 전체 길이 (엔진 joinMs)
 let _collTick    = null    // 모집 타이머 바 로컬 갱신 interval
 let _lastTimerSec= -1      // 임박음 중복 방지 (남은 초 단위)
 let _topPrize    = null    // 1등 상품 이름 (설정 prizes[0])
@@ -493,7 +494,7 @@ function hide() {
 
 function _collTimerStep() {
   const remain = _collDeadline - Date.now()
-  const pct = Math.max(0, Math.min(100, (remain / 30000) * 100))
+  const pct = Math.max(0, Math.min(100, (remain / _collTotal) * 100))
   tfill.style.width = pct + '%'
   if (pct <= 20 && remain > 0 && remain <= 5000) {
     tfill.classList.add('urgent')
@@ -506,6 +507,8 @@ function _collTimerStep() {
 }
 
 function renderCollecting(ladder) {
+  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }   // 이전 판 결과 숨김 타이머가 새 모집 화면을 지우지 않게
+  if (pathTick) { clearInterval(pathTick); pathTick = null }
   _clearSeq()
   _fx(F => F.hideWinner())
   phColl.style.display = ''
@@ -514,7 +517,8 @@ function renderCollecting(ladder) {
   _topPrize = Array.isArray(ladder.prizes) && ladder.prizes.length ? ladder.prizes[0] : null
   cntLbl.textContent = ladder.participants.length + '/' + ladder.maxSlots + '명'
   _collDeadline = ladder.deadline
-  const pct = Math.max(0, Math.min(100, ((ladder.deadline - Date.now()) / 30000) * 100))
+  _collTotal = ladder.joinMs || 30000
+  const pct = Math.max(0, Math.min(100, ((ladder.deadline - Date.now()) / _collTotal) * 100))
   tfill.style.width = pct + '%'
   if (!_collTick) _collTick = setInterval(_collTimerStep, 200)
   chips.innerHTML = ''
@@ -534,7 +538,10 @@ function renderCollecting(ladder) {
   show()
 }
 
+let pathTick = null
 function renderResult(ld) {
+  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }
+  if (pathTick) { clearInterval(pathTick); pathTick = null }
   _stopCollTick(); _clearSeq()
   _fx(F => F.hideWinner())
   phColl.style.display = 'none'
@@ -575,7 +582,7 @@ function renderResult(ld) {
   }
 
   const seq = _seq
-  const tick = setInterval(() => {
+  const tick = pathTick = setInterval(() => {
     step++
     _fx(F => F.sound('tick'))
     ld.paths.forEach((path, pi) => {
@@ -585,7 +592,7 @@ function renderResult(ld) {
       dots[pi].setAttribute('cy', PAD_T + cr * ROW_H)
     })
     if (step >= rows) {
-      clearInterval(tick)
+      clearInterval(tick); if (pathTick === tick) pathTick = null
       if (seq !== _seq) return
       // 결과 행은 순서대로 미리 깔아두고(흐리게), 착지 순서에 따라 하나씩 켠다
       resList.innerHTML = ''
@@ -613,6 +620,8 @@ function renderResult(ld) {
 }
 
 function renderManualPreview(ld) {
+  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }
+  if (pathTick) { clearInterval(pathTick); pathTick = null }
   _stopCollTick(); _clearSeq()
   _fx(F => F.hideWinner())
   _revealLd = ld

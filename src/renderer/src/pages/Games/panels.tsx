@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import styles from './Games.module.css'
+import NumberField from '../../components/NumberField'
+import { useManualLadder, setManualLadder } from '../../lib/manualLadderStore'
 
 // 게임별 설정 편집기·진행 패널 모음 (GameConfig / GamePreview 에서 조합)
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -8,7 +10,7 @@ export interface RouletteItem { name: string; probability: number }
 export interface QuizQuestion { question: string; answer: string }
 export interface Prize        { name: string; description: string }
 export interface PickItem     { name: string; description: string; color: string; count: number }
-export interface LotteryPrize { name: string; prob: number; color: string; detail?: string }
+export interface LotteryPrize { name: string; prob: number; color: string; detail?: string; isWin?: boolean }
 
 export interface LadderRung { row: number; leftCol: number }
 export interface LadderPath { cols: number[] }
@@ -69,12 +71,12 @@ export function RouletteEditor({ items: init, onSave }: { items: RouletteItem[];
             onChange={e => setField(i, 'name', e.target.value)}
             onBlur={() => onSave(items)}
           />
-          <input
+          <NumberField
             className={styles.listInput}
             style={{ width: 80, textAlign: 'right' }}
-            type="number" min={0} max={100}
+            min={0} max={100}
             value={it.probability}
-            onChange={e => commit(setField(i, 'probability', Number(e.target.value)))}
+            onCommit={v => commit(setField(i, 'probability', v))}
           />
           <button className={styles.delBtn} onClick={() => commit(items.filter((_, idx) => idx !== i))}>✕</button>
         </div>
@@ -89,13 +91,15 @@ export function RouletteEditor({ items: init, onSave }: { items: RouletteItem[];
 export function LotteryEditor({ prizes: init, onSave }: { prizes: LotteryPrize[]; onSave: (v: LotteryPrize[]) => void }) {
   const [prizes, setPrizes] = useState<LotteryPrize[]>(init)
   const commit = (next: LotteryPrize[]) => { setPrizes(next); onSave(next) }
-  const setField = (i: number, key: keyof LotteryPrize, val: string | number) => {
+  const setField = (i: number, key: keyof LotteryPrize, val: string | number | boolean) => {
     const next = prizes.map((p, idx) => idx === i ? { ...p, [key]: val } : p)
     setPrizes(next); return next
   }
+  // 당첨 여부는 이름이 '꽝'인지가 아니라 체크박스로 — "꽝!"·"다음 기회에" 같은 이름도 꽝으로 둘 수 있게
+  const isWin = (p: LotteryPrize) => typeof p.isWin === 'boolean' ? p.isWin : p.name.trim() !== '꽝'
   const total = prizes.reduce((s, p) => s + (p.prob || 0), 0)
   const DEFAULT: LotteryPrize[] = [
-    { name: '꽝',           prob: 55, color: '#9CA3AF', detail: '다음엔 행운이!' },
+    { name: '꽝',           prob: 55, color: '#9CA3AF', detail: '다음엔 행운이!', isWin: false },
     { name: '별풍선 10개',  prob: 25, color: '#F97316', detail: '소소한 행운!' },
     { name: '별풍선 50개',  prob: 12, color: '#10B981', detail: '행운이 찾아왔어요!' },
     { name: '별풍선 200개', prob: 6,  color: '#8B5CF6', detail: '대박 행운!' },
@@ -114,6 +118,7 @@ export function LotteryEditor({ prizes: init, onSave }: { prizes: LotteryPrize[]
         <span style={{ flex: 1 }}>상품명</span>
         <span style={{ width: 100 }}>설명</span>
         <span style={{ width: 70, textAlign: 'right' }}>확률(%)</span>
+        <span style={{ width: 44, textAlign: 'center' }} title="체크하면 당첨 연출(반짝임)">당첨</span>
         <span style={{ width: 32 }} />
       </div>
       {prizes.map((p, i) => (
@@ -121,7 +126,8 @@ export function LotteryEditor({ prizes: init, onSave }: { prizes: LotteryPrize[]
           <input type="color" className={styles.colorInput} value={p.color} onChange={e => commit(setField(i, 'color', e.target.value))} />
           <input className={styles.listInput} style={{ flex: 1 }} value={p.name} onChange={e => setField(i, 'name', e.target.value)} onBlur={() => onSave(prizes)} />
           <input className={styles.listInput} style={{ width: 100 }} placeholder="설명" value={p.detail ?? ''} onChange={e => setField(i, 'detail', e.target.value)} onBlur={() => onSave(prizes)} />
-          <input className={styles.listInput} style={{ width: 70, textAlign: 'right' }} type="number" min={0} max={100} value={p.prob} onChange={e => commit(setField(i, 'prob', Number(e.target.value)))} />
+          <NumberField className={styles.listInput} style={{ width: 70, textAlign: 'right' }} min={0} max={100} value={p.prob} onCommit={v => commit(setField(i, 'prob', v))} />
+          <input type="checkbox" style={{ width: 44 }} checked={isWin(p)} onChange={e => commit(setField(i, 'isWin', e.target.checked))} title="당첨 연출" />
           <button className={styles.delBtn} onClick={() => commit(prizes.filter((_, idx) => idx !== i))}>✕</button>
         </div>
       ))}
@@ -272,14 +278,14 @@ export function PickBoardEditor({
         <span className={styles.listTitle}>뽑기판 설정</span>
         <div className={styles.pbSizeRow}>
           <label>크기</label>
-          <input className={styles.pbSizeInput} type="number" min={1} max={10}
+          <NumberField className={styles.pbSizeInput} min={1} max={10}
             value={rows}
-            onChange={e => { const v = Number(e.target.value); setRows(v); onSaveSize(v, cols) }}
+            onCommit={v => { setRows(v); onSaveSize(v, cols) }}
           />
           <span>×</span>
-          <input className={styles.pbSizeInput} type="number" min={1} max={10}
+          <NumberField className={styles.pbSizeInput} min={1} max={10}
             value={cols}
-            onChange={e => { const v = Number(e.target.value); setCols(v); onSaveSize(rows, v) }}
+            onCommit={v => { setCols(v); onSaveSize(rows, v) }}
           />
           <span className={`${styles.totalBadge} ${total !== cells ? styles.totalWarn : ''}`}>
             {total}/{cells}칸
@@ -316,14 +322,11 @@ export function PickBoardEditor({
             onChange={e => setItems(items.map((x, j) => j === i ? { ...x, description: e.target.value } : x))}
             onBlur={() => onSave(items)}
           />
-          <input
-            type="number" min={0} style={{ width: 50 }}
+          <NumberField
+            min={0} max={100} style={{ width: 50 }}
             className={styles.listInput}
             value={item.count}
-            onChange={e => {
-              const next = items.map((x, j) => j === i ? { ...x, count: Number(e.target.value) } : x)
-              save(next)
-            }}
+            onCommit={v => save(items.map((x, j) => j === i ? { ...x, count: v } : x))}
           />
           <button className={styles.delBtn} onClick={() => save(items.filter((_, j) => j !== i))}>✕</button>
         </div>
@@ -337,63 +340,32 @@ export function PickBoardEditor({
 }
 
 // ── PickBoard panel ───────────────────────────────────────────────────────────
+// 판 상태(섞인 칸·공개 여부)는 메인 프로세스(pickboard store)에 있다.
+// 탭을 옮겨 패널이 다시 마운트돼도 진행 중인 판이 유지되고, 새 판이 OBS 로 송출되는 일이 없다.
 
 interface Cell { prize: PickItem; revealed: boolean }
+interface PickboardState { rows: number; cols: number; cells: Cell[]; lastResult: PickItem | null }
 
-function buildCells(rows: number, cols: number, items: PickItem[]): Cell[] {
-  const total = rows * cols
-  const prizes: PickItem[] = []
-  for (const item of items) {
-    for (let k = 0; k < item.count && prizes.length < total; k++) prizes.push(item)
-  }
-  while (prizes.length < total) {
-    prizes.push({ name: '꽝', description: '', color: '#6B7280', count: 1 })
-  }
-  // Fisher-Yates shuffle
-  for (let i = prizes.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[prizes[i], prizes[j]] = [prizes[j], prizes[i]]
-  }
-  return prizes.slice(0, total).map(prize => ({ prize, revealed: false }))
-}
+type El = Record<string, (...args: never[]) => unknown>
+const electron = () => (window as unknown as { electron?: El }).electron
 
-export function PickBoardPanel({ rows, cols, items }: { rows: number; cols: number; items: PickItem[] }) {
-  const [cells, setCells] = useState<Cell[]>(() => buildCells(rows, cols, items))
-  const [lastResult, setLastResult] = useState<PickItem | null>(null)
-  const el = (window as unknown as Record<string, Record<string, unknown>>).electron
+export function PickBoardPanel() {
+  const [pb, setPb] = useState<PickboardState | null>(null)
+  const el = electron()
 
-  const broadcastState = (nextCells: Cell[], r: number, c: number) => {
-    if (el?.overlayBroadcast) {
-      (el.overlayBroadcast as (type: string, data: unknown) => void)(
-        'pickboard:state',
-        { cells: nextCells.map(cell => ({ revealed: cell.revealed, name: cell.prize.name, description: cell.prize.description, color: cell.prize.color })), rows: r, cols: c }
-      )
-    }
-  }
-
-  // Rebuild when size/items change
   useEffect(() => {
-    const next = buildCells(rows, cols, items)
-    setCells(next)
-    setLastResult(null)
-    broadcastState(next, rows, cols)
-  }, [rows, cols, JSON.stringify(items)])
+    if (!el) return
+    ;(el.pickboardGet as () => Promise<PickboardState>)().then(setPb).catch(() => {})
+    const off = (el.onPickboardUpdate as (cb: (s: unknown) => void) => () => void)(s => setPb(s as PickboardState))
+    return off
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const reveal = (idx: number) => {
-    if (cells[idx].revealed) return
-    const next = cells.map((c, i) => i === idx ? { ...c, revealed: true } : c)
-    setCells(next)
-    setLastResult(cells[idx].prize)
-    broadcastState(next, rows, cols)
-  }
+  const reveal = (idx: number) => { (el?.pickboardReveal as ((i: number) => Promise<unknown>) | undefined)?.(idx).catch(() => {}) }
+  const reset  = () => { (el?.pickboardReset as (() => Promise<unknown>) | undefined)?.().catch(() => {}) }
+  const show   = () => { (el?.pickboardShow as (() => Promise<unknown>) | undefined)?.().catch(() => {}) }
 
-  const reset = () => {
-    const next = buildCells(rows, cols, items)
-    setCells(next)
-    setLastResult(null)
-    broadcastState(next, rows, cols)
-  }
-
+  if (!pb) return <div className={styles.pbPanel}><div className={styles.listEmpty}>뽑기판 불러오는 중…</div></div>
+  const { rows, cols, cells, lastResult } = pb
   const revealedCount = cells.filter(c => c.revealed).length
 
   return (
@@ -401,7 +373,7 @@ export function PickBoardPanel({ rows, cols, items }: { rows: number; cols: numb
       <div className={styles.pbHeader}>
         <span className={styles.pbTitle}>뽑기판</span>
         <span className={styles.pbCount}>{revealedCount}/{rows * cols} 오픈</span>
-        <button className={styles.pbResetBtn} onClick={() => broadcastState(cells, rows, cols)}>오버레이 노출</button>
+        <button className={styles.pbResetBtn} onClick={show}>오버레이 노출</button>
         <button className={styles.pbResetBtn} onClick={reset}>초기화</button>
       </div>
 
@@ -577,9 +549,12 @@ export function buildLadderData(participants: string[], prizes: Prize[]): Ladder
     }
   }
 
-  const prizeNames = prizes.map(p => p.name)
-  while (prizeNames.length < cols) prizeNames.push(`${prizeNames.length + 1}등`)
-  const prizeOrder = [...prizeNames].sort(() => Math.random() - 0.5).slice(0, cols)
+  // 엔진(buildLadder)과 같은 규칙: 상위 순위부터 cols 개, 모자라면 "N등" 채움, Fisher-Yates 로 바닥 섞기
+  const ranked = prizes.slice(0, cols).map((p, rank) => ({ name: p.name, rank }))
+  while (ranked.length < cols) ranked.push({ name: `${ranked.length + 1}등`, rank: ranked.length })
+  const bottom = ranked.slice()
+  for (let i = bottom.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [bottom[i], bottom[j]] = [bottom[j], bottom[i]] }
+  const prizeOrder = bottom.map(b => b.name)
 
   const paths: LadderPath[] = participants.map((_, startCol) => {
     const colPath = [startCol]; let cur = startCol
@@ -593,10 +568,12 @@ export function buildLadderData(participants: string[], prizes: Prize[]): Ladder
 
   const results = participants.map((user, i) => {
     const endCol = paths[i].cols[rows]
-    return { user, prize: prizeOrder[endCol] ?? `${endCol + 1}등`, startCol: i, endCol }
+    return { user, prize: bottom[endCol].name, rank: bottom[endCol].rank, startCol: i, endCol }
   })
+  results.sort((a, b) => a.rank - b.rank)
 
-  return { rows, cols, rungs, paths, order: participants, prizes: prizeOrder, results }
+  return { rows, cols, rungs, paths, order: participants, prizes: prizeOrder,
+           results: results.map(({ user, prize, startCol, endCol }) => ({ user, prize, startCol, endCol })) }
 }
 
 export function LadderPanel({ gSettings, gameStates }: {
@@ -614,14 +591,17 @@ export function LadderPanel({ gSettings, gameStates }: {
   const isResult     = status === 'showing_result'
   const prizes       = (gSettings.prizes as Prize[]) ?? []
 
-  // ── 수동 모드 state ──
-  const [manualMode, setManualMode]           = useState(false)
-  const [manualInput, setManualInput]         = useState('')
-  const [manualParticipants, setManualParticipants] = useState<string[]>([])
-  const [previewData, setPreviewData]         = useState<LadderData | null>(null)
-  const [manualResult, setManualResult]       = useState<LadderData | null>(null)
-  const [manualAnimating, setManualAnimating] = useState(false)
-  const [revealedSet, setRevealedSet]         = useState<Set<number>>(new Set())
+  // ── 수동 모드 state (모듈 스토어 — 탭을 옮겨도 유지) ──
+  const [manualMode, setManualMode]   = useState(false)
+  const [manualInput, setManualInput] = useState('')
+  const manual = useManualLadder()
+  const manualParticipants = manual.participants
+  const previewData        = manual.previewData
+  const manualResult       = manual.result
+  const manualAnimating    = manual.animating
+  const revealedSet        = new Set(manual.revealed)
+  const animTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => { if (animTimer.current) clearTimeout(animTimer.current) }, [])
 
   const broadcast = (type: string, data: unknown) => {
     if (el?.overlayBroadcast)
@@ -631,42 +611,37 @@ export function LadderPanel({ gSettings, gameStates }: {
   const addParticipant = () => {
     const name = manualInput.trim()
     if (!name || manualParticipants.includes(name)) return
-    setManualParticipants(prev => [...prev, name])
+    setManualLadder(s => ({ participants: [...s.participants, name], previewData: null, result: null, revealed: [] }))
     setManualInput('')
-    setPreviewData(null); setManualResult(null); setRevealedSet(new Set())
   }
 
   const removeParticipant = (i: number) => {
-    setManualParticipants(prev => prev.filter((_, idx) => idx !== i))
-    setPreviewData(null); setManualResult(null); setRevealedSet(new Set())
+    setManualLadder(s => ({ participants: s.participants.filter((_, idx) => idx !== i), previewData: null, result: null, revealed: [] }))
   }
 
   const showOverlay = () => {
     if (manualParticipants.length < 2) return
     const data = buildLadderData(manualParticipants, prizes)
-    setPreviewData(data); setManualResult(null); setRevealedSet(new Set())
+    setManualLadder({ previewData: data, result: null, revealed: [] })
     broadcast('game:state', { id: 'ladder', status: 'manual_preview', ladder: { ladderData: data } })
   }
 
   const revealParticipant = (idx: number) => {
     if (!previewData || revealedSet.has(idx)) return
-    setRevealedSet(prev => new Set([...prev, idx]))
-    setManualResult(previewData)
+    setManualLadder(s => ({ revealed: [...s.revealed, idx], result: previewData }))
     broadcast('game:ladder:reveal', { ladderData: previewData, revealIdx: idx })
   }
 
   const revealAll = () => {
     if (!previewData) return
-    setManualResult(previewData); setManualAnimating(true)
+    setManualLadder({ result: previewData, animating: true, revealed: manualParticipants.map((_, i) => i) })
     broadcast('game:state', { id: 'ladder', status: 'manual_running', ladder: { ladderData: previewData } })
-    const unrevealed = manualParticipants.map((_, i) => i).filter(i => !revealedSet.has(i))
-    setRevealedSet(new Set(manualParticipants.map((_, i) => i)))
-    setTimeout(() => setManualAnimating(false), (previewData.rows + 2) * 60 + 500)
-    void unrevealed
+    if (animTimer.current) clearTimeout(animTimer.current)
+    animTimer.current = setTimeout(() => setManualLadder({ animating: false }), (previewData.rows + 2) * 60 + 500)
   }
 
   const resetManual = () => {
-    setPreviewData(null); setManualResult(null); setRevealedSet(new Set())
+    setManualLadder({ previewData: null, result: null, revealed: [], animating: false })
     broadcast('game:state', { id: 'ladder', status: 'idle', ladder: null })
   }
 
@@ -691,8 +666,9 @@ export function LadderPanel({ gSettings, gameStates }: {
   const participants = ladderState?.participants ?? []
   const maxSlots     = ladderState?.maxSlots ?? (gSettings.maxParticipants as number ?? 8)
   const deadline     = ladderState?.deadline ?? 0
+  const joinMs       = (ladderState as (LadderState & { joinMs?: number }) | undefined)?.joinMs ?? ((gSettings.joinDuration as number ?? 30) * 1000)
   const pct          = deadline
-    ? Math.max(0, Math.min(100, ((deadline - Date.now()) / ((gSettings.joinDuration as number ?? 30) * 1000)) * 100))
+    ? Math.max(0, Math.min(100, ((deadline - Date.now()) / joinMs) * 100))
     : 0
 
   return (
@@ -994,11 +970,11 @@ export function QuizPanel({
           <div className={styles.qpField}>
             <label>제한 시간</label>
             <div className={styles.qpRow}>
-              <input
+              <NumberField
                 className={styles.qpInput}
-                type="number" min={5} max={300} style={{ width: 80 }}
+                min={5} max={600} style={{ width: 80 }}
                 value={manualSec}
-                onChange={e => setManualSec(Number(e.target.value))}
+                onCommit={setManualSec}
               />
               <span className={styles.qpUnit}>초</span>
             </div>
@@ -1169,11 +1145,11 @@ export function SlotPanel({
       {/* 스핀 시간 */}
       <div className={styles.slSpinRow}>
         <label className={styles.slSpinLabel}>스핀 시간</label>
-        <input
-          type="number" className={styles.slSpinInput}
+        <NumberField
+          className={styles.slSpinInput}
           value={(gSettings.spinDuration as number) ?? 3000}
-          min={2000} max={6000} step={500}
-          onChange={e => saveSetting('spinDuration', Number(e.target.value))}
+          min={2000} max={8000} step={500}
+          onCommit={v => saveSetting('spinDuration', v)}
         />
         <span className={styles.slSpinUnit}>ms</span>
       </div>
@@ -1227,17 +1203,17 @@ export function NumberPanel({
         <div>
           <div className={styles.nbLabel} style={{ marginBottom: 6 }}>추첨 범위</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <input type="number" className={styles.nbInput} style={{ width: 72, flex: 1 }}
-              value={minNumber} onChange={e => saveSetting('minNumber', Number(e.target.value))} />
+            <NumberField className={styles.nbInput} style={{ width: 72, flex: 1 }} min={-1000000} max={1000000}
+              value={minNumber} onCommit={v => saveSetting('minNumber', v)} />
             <span className={styles.nbSep}>~</span>
-            <input type="number" className={styles.nbInput} style={{ width: 72, flex: 1 }}
-              value={maxNumber} onChange={e => saveSetting('maxNumber', Number(e.target.value))} />
+            <NumberField className={styles.nbInput} style={{ width: 72, flex: 1 }} min={-1000000} max={1000000}
+              value={maxNumber} onCommit={v => saveSetting('maxNumber', v)} />
           </div>
         </div>
         <div>
           <div className={styles.nbLabel} style={{ marginBottom: 6 }}>추첨 개수</div>
-          <input type="number" min={1} className={styles.nbInput} style={{ width: '100%' }}
-            value={count} onChange={e => saveSetting('count', Number(e.target.value))} />
+          <NumberField min={1} max={100} className={styles.nbInput} style={{ width: '100%' }}
+            value={count} onCommit={v => saveSetting('count', v)} />
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
           <div className={styles.nbLabel} style={{ marginBottom: 6 }}>애니메이션 시간 (ms)</div>

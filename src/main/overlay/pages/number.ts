@@ -154,7 +154,9 @@ setInterval(()=>{document.querySelectorAll('.sdot').forEach(d=>d.classList.toggl
 const BALLS=[...Array(8)].map((_,i)=>document.getElementById('bl'+i))
 const wrap=document.getElementById('nw'),wball=document.getElementById('wball'),mchips=document.getElementById('mchips'),bayRow=document.getElementById('bay-row')
 const bay=document.getElementById('bay'),machine=document.querySelector('.mc'),scene=document.querySelector('.scene')
-let rolling=false,rollIv=null
+let rolling=false,rollIv=null,timers=[],chipIv=null
+function later(fn,ms){const t=setTimeout(fn,ms);timers.push(t);return t}
+function cancelAll(){timers.forEach(clearTimeout);timers=[];if(rollIv){clearInterval(rollIv);rollIv=null}if(chipIv){clearInterval(chipIv);chipIv=null}FX.drumStop()}
 function rnd(a,b){return Math.floor(Math.random()*(b-a+1))+a}
 function tickBalls(a,b){BALLS.forEach(bl=>{bl.textContent=rnd(a,b)})}
 // keep=true: 클래스를 유지 (칩은 기본 chIn 애니메이션이 있어 클래스를 떼면 재생이 다시 시작됨; hide 때 통째로 비움)
@@ -172,7 +174,7 @@ function onAllLanded(targets,max,triggeredBy){
   FX.winner({nick:triggeredBy||'',sub:'숫자 추첨 · '+targets.join(', '),anchor:machine,ms:4800})
 }
 function rollAnimation(min,max,targets,spinMs,triggeredBy){
-  if(rolling)return;rolling=true
+  cancelAll();rolling=true   // 진행 중이면 끊고 새 판 (엔진은 spinMs 뒤에 결과를 확정하므로 연출도 그 안에 끝나야 함)
   FX.hideWinner()
   wrap.classList.add('show')
   bayRow.classList.remove('hit')
@@ -184,25 +186,27 @@ function rollAnimation(min,max,targets,spinMs,triggeredBy){
   if(targets.length>1){
     rollIv=setInterval(()=>tickBalls(min,max),25)
     mchips.style.display='flex';wball.style.display='none'
+    // 숫자 하나당 시간 = 전체 연출 시간 ÷ 개수 (60% 는 돌아가는 연출, 40% 는 멈춤)
+    const per=Math.max(250,Math.floor((spinMs-300)/targets.length)),frames=18,frameMs=Math.max(15,Math.floor(per*0.6/frames)),pause=per-frameMs*frames
     let idx=0
     function landNext(){
-      if(idx>=targets.length){clearInterval(rollIv);bayRow.classList.add('hit');onAllLanded(targets,max,triggeredBy);setTimeout(hide,5000);rolling=false;return}
+      if(idx>=targets.length){clearInterval(rollIv);rollIv=null;bayRow.classList.add('hit');onAllLanded(targets,max,triggeredBy);later(hide,5000);rolling=false;return}
       const chip=document.createElement('div');chip.className='mchip';chip.textContent='?';mchips.appendChild(chip)
-      let f=0;const iv=setInterval(()=>{chip.textContent=rnd(min,max);if(++f>=18){clearInterval(iv);chip.textContent=targets[idx];onLand(chip,true);idx++;setTimeout(landNext,500)}},40)
+      let f=0;chipIv=setInterval(()=>{chip.textContent=rnd(min,max);if(++f>=frames){clearInterval(chipIv);chipIv=null;chip.textContent=targets[idx];onLand(chip,true);idx++;later(landNext,pause)}},frameMs)
     }
     landNext()
   } else {
     rollIv=setInterval(()=>tickBalls(min,max),25)
-    setTimeout(()=>{
-      clearInterval(rollIv)
+    later(()=>{
+      clearInterval(rollIv);rollIv=null
       wball.textContent=targets[0];wball.classList.add('show');bayRow.classList.add('hit')
       onLand(bay)
       onAllLanded(targets,max,triggeredBy)
-      rolling=false;setTimeout(hide,5000)
+      rolling=false;later(hide,5000)
     },Math.max(spinMs-800,500))
   }
 }
-function hide(){wrap.classList.remove('show');clearInterval(rollIv);rolling=false;FX.hideWinner();FX.drumStop();scene.classList.remove('rolling');setTimeout(()=>{wball.classList.remove('show');wball.style.display='';mchips.innerHTML='';mchips.style.display='none';bayRow.classList.remove('hit')},600)}
+function hide(){wrap.classList.remove('show');cancelAll();rolling=false;FX.hideWinner();scene.classList.remove('rolling');later(()=>{wball.classList.remove('show');wball.style.display='';mchips.innerHTML='';mchips.style.display='none';bayRow.classList.remove('hit')},600)}
 function connect(){
   const ws=new WebSocket('ws://localhost:${port}/__overlay_ws__')
   ws.onmessage=e=>{

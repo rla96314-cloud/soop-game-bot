@@ -9,7 +9,7 @@ export const PREVIEW_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--navy:#172437;--navy-deep:#111a2b;--orange:#FF5B17;--cream:#F5F3EF;--line:#D9D3C6}
 html,body{width:1920px;height:1080px;overflow:hidden;background:#070b13;font-family:'Noto Sans KR',sans-serif}
-.grid{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(2,1fr);gap:10px;padding:10px;width:1920px;height:1080px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(3,1fr);gap:10px;padding:10px;width:1920px;height:1080px}
 .cell{position:relative;background:linear-gradient(170deg,#1b2b45 0%,var(--navy) 55%,var(--navy-deep) 100%);border-radius:12px;overflow:hidden;border:1.5px solid rgba(217,211,198,.7);box-shadow:0 8px 22px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.05)}
 /* 탭 오른쪽으로 이어지는 오렌지 상단 라인 */
 .cell::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:var(--orange);z-index:9;border-radius:12px 12px 0 0}
@@ -32,11 +32,15 @@ const GAMES=[
   {id:'number',    name:'숫자추첨'},
   {id:'lottery',   name:'행운복권'},
   {id:'pickboard', name:'뽑기판'},
+  {id:'race',      name:'동물경주'},
+  {id:'rps',       name:'가위바위보'},
+  {id:'fish',      name:'낚시'},
 ]
 const grid=document.getElementById('grid')
 function layout(){
-  const cellW=grid.offsetWidth/4
-  const cellH=grid.offsetHeight/2
+  // grid 1920×1080, padding 10, gap 10 → 측정 없이 계산 (OBS CEF 는 offsetWidth 가 불안정)
+  const cellW=(1920-20-30)/4
+  const cellH=(1080-20-20)/3
   const scale=Math.min(cellW/1920, cellH/1080)
   grid.querySelectorAll('iframe').forEach(f=>{f.style.transform='scale('+scale+')'})
 }

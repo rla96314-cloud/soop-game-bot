@@ -230,6 +230,10 @@ const leverKnob = document.getElementById('lever-knob')
 const machine   = document.querySelector('.machine')
 const reelsEl   = document.querySelector('.reels-frame')
 let spinning = false
+let lastRunId = null
+let timers = []            // 진행 중 연출 타이머 — 새 판이 오면 전부 취소
+function later(fn, ms) { const t = setTimeout(fn, ms); timers.push(t); return t }
+function cancelAll() { timers.forEach(clearTimeout); timers = [] }
 // 리치 연출: 3번째 릴이 느리게 추가로 도는 시간 / 최종 정지 시간
 const RICH_SLOW_MS = 1200, RICH_SETTLE_MS = 700
 
@@ -282,23 +286,23 @@ function spinReel(reelEl, innerEl, target, symbols, stopMs, opts, onPhase) {
   requestAnimationFrame(() => requestAnimationFrame(() => {
     if (!rich) {
       go(rows - 5, stopMs * 0.75, 'cubic-bezier(0.2,0,0.5,1)')
-      setTimeout(() => {
+      later(() => {
         go(rows - 1, 500, 'cubic-bezier(0,0,0.15,1)')
         reelEl.classList.add('lit')
-        setTimeout(settle, 500)
+        later(settle, 500)
       }, stopMs * 0.75)
     } else {
       const fastMs = opts.fastMs
       // 끝 속도가 느린 구간 속도와 비슷해지도록 브레이크 곡선
       go(rows - 7, fastMs, 'cubic-bezier(0.25,0.1,0.6,0.9)')
-      setTimeout(() => {
+      later(() => {
         reelEl.classList.add('slow')
         if (onPhase) onPhase('slow')
         go(rows - 3, RICH_SLOW_MS, 'linear')
-        setTimeout(() => {
+        later(() => {
           go(rows - 1, RICH_SETTLE_MS, 'cubic-bezier(0.1,0.5,0.2,1)')
           reelEl.classList.add('lit')
-          setTimeout(settle, RICH_SETTLE_MS)
+          later(settle, RICH_SETTLE_MS)
         }, RICH_SLOW_MS)
       }, fastMs)
     }
@@ -306,7 +310,10 @@ function spinReel(reelEl, innerEl, target, symbols, stopMs, opts, onPhase) {
 }
 
 function startSpin(slot) {
-  if (spinning) return; spinning = true
+  // 같은 판(runId)이 다시 오면 무시, 다른 판이면 진행 중 연출을 끊고 새로 시작 (spinMs 가 길 때 두 번째 판이 안 보이던 문제)
+  if (slot.runId !== undefined && slot.runId === lastRunId) return
+  lastRunId = slot.runId ?? null
+  cancelAll(); FX.drumStop(); FX.spinStop(); spinning = true
   const symbols = slot.symbols.length >= 3 ? slot.symbols : ['🍒','🍋','🍊','⭐','🎰','💎']
   const targets = slot.symbols
   const spinMs  = slot.spinMs ?? 3000
@@ -325,10 +332,11 @@ function startSpin(slot) {
   machine.classList.remove('rich', 'shake')
   ;[0,1,2].forEach(i => document.getElementById('reel' + i).classList.remove('lit', 'slow', 'bounce'))
 
+  leverKnob.classList.remove('pulled'); startBtn.classList.remove('active')
   leverKnob.classList.add('pulled')
-  setTimeout(() => leverKnob.classList.remove('pulled'), 600)
+  later(() => leverKnob.classList.remove('pulled'), 600)
   startBtn.classList.add('active')
-  setTimeout(() => startBtn.classList.remove('active'), 300)
+  later(() => startBtn.classList.remove('active'), 300)
 
   wrap.classList.add('show')
   FX.spinStart()
@@ -343,7 +351,7 @@ function startSpin(slot) {
     }
   ))
 
-  setTimeout(() => {
+  later(() => {
     if (slot.jackpot) {
       resultBar.className = 'result-bar show jackpot'; rbText.textContent = 'JACKPOT!'
       FX.sound('jackpot')
@@ -365,7 +373,7 @@ function startSpin(slot) {
     })
   }, resultAt)
 
-  setTimeout(() => {
+  later(() => {
     wrap.classList.remove('show'); spinning = false
     FX.hideWinner(); FX.drumStop(); FX.spinStop()
     machine.classList.remove('rich', 'shake')

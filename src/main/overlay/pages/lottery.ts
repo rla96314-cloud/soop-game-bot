@@ -133,7 +133,9 @@ function withAlpha(hex,a){
 
 function initCanvas(){
   // clientWidth/Height ignores CSS transform (scale) and the panel border, so always correct
-  cvs.width=swEl.clientWidth||584;cvs.height=swEl.clientHeight||214
+  // OBS(CEF) 에서 측정값이 0 이면 레이아웃 상수로: .sw 폭 574(테두리 4×2 제외 566), .pz 최소 높이 214
+  const w=swEl.clientWidth,h=swEl.clientHeight
+  cvs.width=(w>0&&w<2000)?w:566;cvs.height=(h>0&&h<2000)?h:214
   drawSilver()
 }
 
@@ -238,7 +240,7 @@ function showLottery(prize,color,detail,by,scratchMs,isWin){
       animateScratch(strokes,scratchMs,()=>{
         shEl.style.display='none';cspEl.style.display='none'
         pmEl.classList.add('popin')
-        if(prize!=='꽝'){pmEl.classList.add('shimmer');pmRow.classList.add('on')}
+        if(isWin){pmEl.classList.add('shimmer');pmRow.classList.add('on')}
         // ── 공개 연출 ──
         FX.drumStop();cardEl.classList.remove('tense')
         if(isWin){
@@ -282,7 +284,7 @@ function connect(){
       FX.handle(msg)
       if(msg.type==='game:state'&&msg.data?.id==='lottery'&&msg.data?.status==='running'){
         const ls=msg.data.lottery
-        if(ls)showLottery(ls.prize,ls.color,ls.detail,ls.triggeredBy,ls.scratchMs??3000,ls.isWin??(ls.prize!=='꽝'))
+        if(ls)showLottery(ls.prize,ls.color,ls.detail,ls.triggeredBy,ls.scratchMs??3000,ls.isWin!==undefined?ls.isWin:ls.prize!=='꽝')
       }
       if(msg.type==='ping')ws.send(JSON.stringify({type:'pong'}))
     }catch{}

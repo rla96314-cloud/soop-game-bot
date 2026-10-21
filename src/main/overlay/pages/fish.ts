@@ -1,6 +1,9 @@
 // OBS 오버레이 페이지: fish — '수중 다큐 카메라' 연출 (찌 던지기 → 기다리기 → 입질 → 챔질 → 결과)
 // 원본 시안: .inhabited/board/underwater (inhabited-design 이미지보드에서 채택). 캔버스 1장에 타임라인 렌더.
-// 엔진의 state.fish{name,rarity,triggeredBy,balloon,startedAt} 로 1회 재생. 영상 클립이 있으면 server 가 fish-video 를 대신 서빙.
+// 엔진의 state.fish(FishCastState: triggeredBy, fish{name,emoji,rarity,points}, castMs, startedAt, count, totalPoints) 로 1회 재생.
+//  - 연출 시간축(T0)은 기준 5100ms(던지기~챔질)를 엔진의 castMs 에 맞춰 늘이고 줄인다 → 결과 공개 = 엔진 결과 시점
+//  - startedAt 기준이라 OBS 새로고침으로 중간에 들어와도 이어서 재생
+// 영상 클립이 있으면 server 가 fish-video 를 대신 서빙.
 import { FX_SCRIPT } from './_fx'
 
 export const FISH_OVERLAY_HTML = (port: number) => `<!doctype html>
@@ -27,7 +30,7 @@ const C = document.getElementById('c'), X = C.getContext('2d');
 const W = 1920, H = 1080;
 
 /* ---------- data ---------- */
-let DATA = { fish:'', rarity:'일반', nick:'', gift:'', size:'', weight:'', depth:'', no:'' };
+let DATA = { fish:'', rarity:'일반', label:'일반', nick:'', gift:'', score:'', no:'' };
 const RARITY = {
   '일반':{a:'#c9d6df',b:'#6b8396',belly:'#f1f5f7',glow:'#cfe0ea',badge:'#7d93a6',en:'COMMON'},
   '고급':{a:'#5cf0bd',b:'#00936a',belly:'#e3fff4',glow:'#00CB84',badge:'#00CB84',en:'UNCOMMON'},
@@ -58,6 +61,11 @@ const eio=p=>p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2;
 const eback=p=>{const c1=2.0,c3=c1+1;return 1+c3*Math.pow(p-1,3)+c1*Math.pow(p-1,2);};
 const rnd=i=>{const x=Math.sin(i*127.1+311.7)*43758.5453;return x-Math.floor(x);};
 const tau=t=>t<T0.res?t:T0.res+(t-T0.res)*0.22;   // slow-mo after the hook
+/* 연출 시간(t, 기준 타임라인) ↔ 실제 경과(ms). 결과 전 구간만 castMs 에 맞춰 배속, 결과 이후는 1:1 */
+let K=1;                                           // 실제 ms / 기준 ms (결과 전 구간)
+const toStory=e=>e<T0.res*K?e/K:T0.res+(e-T0.res*K);
+/* 물결·해초·물고기 떼 같은 배경 움직임은 배속 없이 실제 시간으로 (결과 후엔 슬로모션) */
+const ambOf=t=>t<T0.res?t*K:T0.res*K+(t-T0.res)*0.22;
 
 /* ---------- motion model ---------- */
 function dip(t){
@@ -304,7 +312,7 @@ function drawRipples(c,time,t0,cx,n,maxr){
 
 /* ---------- world ---------- */
 function drawWorld(c,t,cam,cx,cy,pip){
-  const wt=tau(t);
+  const wt=tau(t), at=ambOf(t);
   c.save();
   c.translate(cx,cy); c.rotate(cam.r); c.scale(cam.z,cam.z); c.translate(-cam.x,-cam.y);
   // sky
@@ -319,7 +327,7 @@ function drawWorld(c,t,cam,cx,cy,pip){
   for(let x=-4000;x<=4000;x+=80) c.lineTo(x,-26-Math.max(0,Math.sin(x*.0021+1.3))*70-Math.sin(x*.009)*12);
   c.lineTo(4000,4); c.closePath(); c.fill();
 
-  const wv=x=>Math.sin(x*.011+wt*.0021)*7+Math.sin(x*.027-wt*.0033)*3.5;
+  const wv=x=>Math.sin(x*.011+at*.0021)*7+Math.sin(x*.027-at*.0033)*3.5;
   const waterPath=()=>{c.beginPath();c.moveTo(-4000,3200);for(let x=-4000;x<=4000;x+=20)c.lineTo(x,wv(x));c.lineTo(4000,3200);c.closePath();};
   g=c.createLinearGradient(0,0,0,720);
   g.addColorStop(0,'#38b3bf'); g.addColorStop(.12,'#178197'); g.addColorStop(.5,'#0b4766'); g.addColorStop(1,'#05182a');
@@ -328,8 +336,8 @@ function drawWorld(c,t,cam,cx,cy,pip){
   // god rays
   c.save(); waterPath(); c.clip(); c.globalCompositeOperation='lighter';
   for(let i=0;i<10;i++){
-    const x0=-1500+i*330+Math.sin(wt*.0004+i*1.7)*70, w0=40+rnd(i+3)*120, sl=-(.2+rnd(i+11)*.22);
-    const a=(.11+.07*Math.sin(wt*.0013+i*2.3))*(.55+rnd(i)*.7);
+    const x0=-1500+i*330+Math.sin(at*.0004+i*1.7)*70, w0=40+rnd(i+3)*120, sl=-(.2+rnd(i+11)*.22);
+    const a=(.11+.07*Math.sin(at*.0013+i*2.3))*(.55+rnd(i)*.7);
     const gr=c.createLinearGradient(0,0,0,860);
     gr.addColorStop(0,\`rgba(225,255,235,\${a})\`); gr.addColorStop(1,'rgba(225,255,235,0)');
     c.fillStyle=gr; c.beginPath(); c.moveTo(x0,0); c.lineTo(x0+w0,0); c.lineTo(x0+w0*2.4+860*sl,860); c.lineTo(x0-w0*.5+860*sl,860); c.closePath(); c.fill();
@@ -352,7 +360,7 @@ function drawWorld(c,t,cam,cx,cy,pip){
     const x0=-1700+i*205+rnd(i+40)*90, h=110+rnd(i+41)*190, by=bed(x0)+6;
     const col=i%3?'#0e6650':'#1a876a';
     for(let k=0;k<10;k++){
-      const u0=k/10,u1=(k+1)/10, s=Math.sin(wt*.0016+i*1.3);
+      const u0=k/10,u1=(k+1)/10, s=Math.sin(at*.0016+i*1.3);
       const xa=x0+s*28*Math.pow(u0,1.6)+Math.sin(u0*6+i)*6, xb=x0+s*28*Math.pow(u1,1.6)+Math.sin(u1*6+i)*6;
       c.strokeStyle=col; c.lineCap='round'; c.lineWidth=16*(1-u0*.8);
       c.beginPath(); c.moveTo(xa,by-u0*h); c.lineTo(xb,by-u1*h); c.stroke();
@@ -368,21 +376,21 @@ function drawWorld(c,t,cam,cx,cy,pip){
 
   // background schools
   for(let i=0;i<22;i++){
-    const y=170+rnd(i+20)*320, sp=.03+rnd(i)*.04, x=((rnd(i+30)*3800+wt*sp)%3800)-1900, s=18+rnd(i+33)*26;
+    const y=170+rnd(i+20)*320, sp=.03+rnd(i)*.04, x=((rnd(i+30)*3800+at*sp)%3800)-1900, s=18+rnd(i+33)*26;
     c.fillStyle=\`rgba(6,34,50,\${.35+rnd(i+34)*.3})\`;
     c.beginPath(); c.ellipse(x,y,s,s*.36,0,0,Math.PI*2); c.fill();
     c.beginPath(); c.moveTo(x-s*.8,y); c.lineTo(x-s*1.4,y-s*.4); c.lineTo(x-s*1.4,y+s*.4); c.closePath(); c.fill();
   }
   // marine snow
   for(let i=0;i<150;i++){
-    const x=rnd(i)*3800-1900+Math.sin(wt*.0008+i)*12, y=30+((rnd(i+7)*560+wt*.008*(.5+rnd(i+8)))%560), r=.8+rnd(i+9)*2;
+    const x=rnd(i)*3800-1900+Math.sin(at*.0008+i)*12, y=30+((rnd(i+7)*560+at*.008*(.5+rnd(i+8)))%560), r=.8+rnd(i+9)*2;
     c.fillStyle=\`rgba(230,252,245,\${.18+rnd(i+10)*.3})\`; c.beginPath(); c.arc(x,y,r,0,Math.PI*2); c.fill();
   }
   // ambient bubbles
   c.lineWidth=1.6;
   for(let i=0;i<34;i++){
-    const per=4000+rnd(i+51)*3000, x=-1700+rnd(i+50)*3400+Math.sin(wt*.002+i)*8;
-    const y=560-((wt+rnd(i+52)*per)%per)/per*560, r=2+rnd(i+53)*6;
+    const per=4000+rnd(i+51)*3000, x=-1700+rnd(i+50)*3400+Math.sin(at*.002+i)*8;
+    const y=560-((at+rnd(i+52)*per)%per)/per*560, r=2+rnd(i+53)*6;
     if(y<14) continue;
     c.strokeStyle='rgba(235,255,250,.5)'; c.beginPath(); c.arc(x,y,r,0,Math.PI*2); c.stroke();
   }
@@ -399,7 +407,7 @@ function drawWorld(c,t,cam,cx,cy,pip){
   const f=fish(t);
   if(t>=T0.res && !pip){
     const a=eo(seg(t,T0.res,T0.res+500));
-    c.save(); c.translate(f.x,f.y); c.rotate(wt*.0006);
+    c.save(); c.translate(f.x,f.y); c.rotate(at*.0006);
     c.globalCompositeOperation='lighter';
     for(let i=0;i<20;i++){
       const ang=i/20*Math.PI*2, w=.07;
@@ -466,7 +474,7 @@ function drawWorld(c,t,cam,cx,cy,pip){
   c.strokeStyle='rgba(150,240,240,.3)'; c.lineWidth=16; c.stroke();
   c.strokeStyle='rgba(250,250,240,.92)'; c.lineWidth=3.2; c.stroke();
   for(let i=0;i<16;i++){
-    const x=250+rnd(i+300)*700+Math.sin(wt*.001+i)*20, a=.4+.6*Math.abs(Math.sin(wt*.004+i*2));
+    const x=250+rnd(i+300)*700+Math.sin(at*.001+i)*20, a=.4+.6*Math.abs(Math.sin(at*.004+i*2));
     c.strokeStyle=\`rgba(255,226,170,\${a})\`; c.lineWidth=3; c.beginPath(); c.moveTo(x,wv(x)-2); c.lineTo(x+18+rnd(i)*30,wv(x)-2); c.stroke();
   }
 
@@ -557,7 +565,7 @@ const PH=[
   {n:'02',ko:'기다리기',en:'WAIT',s:1400,e:3000,sub:'미끼가 가라앉는다 — 어둠 속 무언가가 보고 있다'},
   {n:'03',ko:'입질',en:'BITE',s:3000,e:4400,sub:'다가온다… 건드린다…'},
   {n:'04',ko:'챔질',en:'HOOK',s:4400,e:5100},
-  {n:'05',ko:'결과',en:'CATCH',s:5100,e:7700}
+  {n:'05',ko:'결과',en:'CATCH',s:5100,e:7700}   // e 는 runFish 에서 T0.end 로 맞춤
 ];
 function phaseIdx(t){for(let i=PH.length-1;i>=0;i--)if(t>=PH[i].s)return i;return 0;}
 function hud(c,t,cam,py,ph){
@@ -578,7 +586,7 @@ function hud(c,t,cam,py,ph){
   c.fillStyle=on?'#ff2e2e':'rgba(255,46,46,.3)'; c.beginPath(); c.arc(P.x+92,P.y+52,11,0,Math.PI*2); c.fill();
   c.font=\`800 26px \${FM}\`; c.fillStyle=CR; c.textBaseline='middle';
   c.fillText('REC',P.x+112,P.y+53);
-  const fr=Math.floor(t/1000*30)%30, s=Math.floor(t/1000);
+  const rt=ambOf(t), fr=Math.floor(rt/1000*30)%30, s=Math.floor(rt/1000);
   c.fillStyle='rgba(245,243,239,.8)'; c.font=\`600 24px \${FM}\`;
   c.fillText(\`TC 00:12:\${String(40+s).padStart(2,'0')}:\${String(fr).padStart(2,'0')}\`,P.x+184,P.y+53);
   c.fillStyle=MINT; c.font=\`700 20px \${FM}\`;
@@ -733,8 +741,9 @@ function resultCard(c,t){
   }
   // stats
   const sp=seg(t,T0.res+620,T0.res+820);
-  c.globalAlpha=sp; c.fillStyle='rgba(23,36,55,.7)'; c.font=\`700 30px \${FM}\`;
-  c.fillText(\`\${DATA.size} · \${DATA.weight} · 수심 \${DATA.depth}\`,x0+56,y0+346);
+  c.globalAlpha=sp; c.fillStyle=NAVY; c.font=\`800 32px \${FK}\`;
+  {const mw=c.measureText(DATA.score).width; if(mw>w-110) c.font=\`800 \${Math.max(18,Math.floor(32*(w-110)/mw))}px \${FK}\`;}
+  c.fillText(DATA.score,x0+56,y0+346);
   c.globalAlpha=1;
   c.strokeStyle='rgba(23,36,55,.25)'; c.lineWidth=3; c.setLineDash([10,10]);
   c.beginPath(); c.moveTo(x0+50,y0+392); c.lineTo(x0+w-40,y0+392); c.stroke(); c.setLineDash([]);
@@ -762,7 +771,7 @@ function resultCard(c,t){
     c.fillStyle=NAVY; c.beginPath(); c.arc(6,8,112,0,Math.PI*2); c.fill();
     c.fillStyle=FC.badge; c.beginPath(); c.arc(0,0,112,0,Math.PI*2); c.fill();
     c.strokeStyle=CR; c.lineWidth=5; c.beginPath(); c.arc(0,0,96,0,Math.PI*2); c.stroke();
-    c.textAlign='center'; c.fillStyle=CR; c.font=\`84px \${FT}\`; c.fillText(DATA.rarity,0,-4);
+    c.textAlign='center'; c.fillStyle=CR; c.font=\`84px \${FT}\`; {const mw=c.measureText(DATA.label).width; if(mw>170) c.font=\`\${Math.floor(84*170/mw)}px \${FT}\`;} c.fillText(DATA.label,0,-4);
     c.font=\`800 20px \${FM}\`; c.fillText(FC.en,0,58);
     c.restore();
   }
@@ -794,12 +803,14 @@ function render(t){
   X.restore();
 }
 
-let start=0, playing=false, paused=false, lastT=-1, cues={};
-const RMAP={common:'일반',uncommon:'고급',rare:'희귀',legendary:'전설'};
-const SIZE={'일반':[28,45,.4,1.2],'고급':[40,62,1,2.6],'희귀':[55,80,2,4.5],'전설':[78,110,3.8,9]};
-function cue(t){ // 단계 전환 효과음 (FX 모듈)
+let start=0, playing=false, paused=false, cues={};
+const RMAP={common:'일반',uncommon:'고급',rare:'희귀',legendary:'전설'};        // 연출 색·크기 (전설 = 레전드 연출)
+const RLABEL={common:'일반',uncommon:'고급',rare:'희귀',legendary:'레전드'};     // 화면 표기 (엔진 FISH_RARITY_LABEL 과 동일)
+const BASE_PRE=T0.res;       // 기준 타임라인의 던지기~챔질 길이 (5100)
+const HOLD=5000;             // 결과 화면 유지 (엔진 결과 표시 5초와 맞춤) → 이후 0.4초 페이드
+function cue(t,silent){ // 단계 전환 효과음 (FX 모듈). silent: 중간 합류 시 지난 효과음은 건너뜀
   if(!window.FX) return;
-  const at=(k,ms,fn)=>{ if(t>=ms && !cues[k]){ cues[k]=1; fn(); } };
+  const at=(k,ms,fn)=>{ if(t>=ms && !cues[k]){ cues[k]=1; if(!silent) fn(); } };
   at('cast',60,()=>FX.sound('whoosh'));
   at('land',T0.wait-150,()=>FX.sound('pop'));
   at('bite',T0.bite,()=>FX.drumStart(130));
@@ -811,23 +822,42 @@ function cue(t){ // 단계 전환 효과음 (FX 모듈)
   at('stamp',T0.res+560,()=>FX.sound('stop'));
 }
 function loop(now){
-  if(playing && !paused){ const t=now-start; cue(t); lastT=t; render(t);
+  if(playing && !paused){ const t=toStory(now-start); cue(t); render(t);
     if(t>T0.end+500){ playing=false; X.setTransform(1,0,0,1,0,0); X.clearRect(0,0,W,H); if(window.FX) FX.drumStop(); } }
   requestAnimationFrame(loop);
 }
+/** 기준 타임라인(ms) 위치를 정지 화면으로 그린다 (미리보기·캡처용) */
 window.seek=ms=>{ paused=true; render(ms); };
 window.TIMELINE=T0;
-window.runFish=fs=>{
-  const rarity=RMAP[fs.rarity]||'일반', z=SIZE[rarity];
-  const name=String(fs.name||'물고기').replace(/\\p{Extended_Pictographic}/gu,'').replace(/\\uFE0F/g,'').trim()||'물고기';
-  const seed=(Number(fs.startedAt)||Date.now())%997, r1=rnd(seed+1), r2=rnd(seed+2), r3=rnd(seed+3);
-  let no=1; try{ no=(Number(localStorage.getItem('fishNo'))||0)+1; localStorage.setItem('fishNo',String(no)); }catch(e){ no=Math.floor(1+r3*900); }
+/** 진행 중인 판 멈추고 화면 비움 */
+window.stopFish=()=>{ playing=false; X.setTransform(1,0,0,1,0,0); X.clearRect(0,0,W,H); if(window.FX){ FX.drumStop(); FX.hideWinner(); } };
+/**
+ * fs: 엔진 FishCastState { triggeredBy, fish{name,emoji,rarity,points}, castMs, startedAt, count, totalPoints }
+ * balloon: 결과(GameResult) 에 담겨 오는 별풍선 수 (진행 중엔 모름 → setFishBalloon 으로 나중에 채움)
+ */
+window.runFish=(fs,balloon)=>{
+  const f=fs.fish||{};
+  const rarity=RMAP[f.rarity]||'일반';
+  const name=String(f.name||'물고기').replace(/\\p{Extended_Pictographic}/gu,'').replace(/\\uFE0F/g,'').trim()||'물고기';
+  let no=1; try{ no=(Number(localStorage.getItem('fishNo'))||0)+1; localStorage.setItem('fishNo',String(no)); }catch(e){ no=1+Math.floor(rnd((Number(fs.startedAt)||Date.now())%997)*900); }
   const nick=fs.triggeredBy&&fs.triggeredBy!=='weflab'?fs.triggeredBy:'스트리머';
-  DATA={ fish:name, rarity, nick, gift:Number(fs.balloon)>0?\`별풍선 \${Number(fs.balloon).toLocaleString()}개\`:'',
-    size:Math.round(lerp(z[0],z[1],r1))+'cm', weight:lerp(z[2],z[3],r2).toFixed(1)+'kg', depth:(1.5+r3*4).toFixed(1)+'m', no:String(no).padStart(3,'0') };
-  FC=RARITY[rarity]; cues={}; lastT=-1; paused=false; playing=true; start=performance.now();
-  if(window.FX) FX.hideWinner();
+  const pts=Number(f.points)||0;
+  DATA={ fish:name, rarity, label:RLABEL[f.rarity]||String(f.rarity||'일반'), nick, gift:'',
+    score:\`\${f.emoji?f.emoji+' ':''}+\${pts}점 · 누적 \${Number(fs.count)||1}마리 · 총 \${Number(fs.totalPoints)||pts}점\`,
+    no:String(no).padStart(3,'0') };
+  window.setFishBalloon(balloon);
+  FC=RARITY[rarity];
+  // 엔진 castMs 에 맞춰 결과 전 구간 배속, 결과 화면은 HOLD 만큼
+  K=Math.max(200,Number(fs.castMs)||BASE_PRE)/BASE_PRE;
+  T0.end=T0.res+HOLD; PH[4].e=T0.end;
+  // 중간 합류: startedAt 기준 경과만큼 앞으로 (지난 효과음은 건너뛰고, 입질 구간이면 두구두구만 이어서)
+  const elapsed=Math.max(0,Date.now()-(Number(fs.startedAt)||Date.now()));
+  if(window.FX){ FX.drumStop(); FX.hideWinner(); }
+  cues={}; paused=false; playing=true; start=performance.now()-elapsed;
+  const t0=toStory(elapsed);
+  if(t0>200){ cue(t0-1,true); if(window.FX && t0>=T0.bite && t0<T0.hook) FX.drumStart(130); }
 };
+window.setFishBalloon=b=>{ DATA.gift=Number(b)>0?\`별풍선 \${Number(b).toLocaleString()}개\`:''; };
 if(document.fonts&&document.fonts.load){
   Promise.all([document.fonts.load(\`100px \${FT}\`),document.fonts.load(\`900 40px \${FK}\`),document.fonts.load(\`700 40px \${FK}\`),document.fonts.load(\`800 20px \${FM}\`)]).catch(()=>{});
 }
@@ -836,14 +866,18 @@ requestAnimationFrame(loop);
 <\/script>
 <script>
 let curStart=null
+function onState(s){
+  const f=s.fish
+  if((s.status==='running'||s.status==='showing_result')&&f&&f.startedAt!==curStart){
+    curStart=f.startedAt; window.runFish(f, s.status==='showing_result'&&s.result?s.result.balloon:0)
+  }
+  if(s.status==='showing_result'&&s.result&&f&&f.startedAt===curStart) window.setFishBalloon(s.result.balloon)
+}
 function connect(){
   const ws=new WebSocket('ws://localhost:${port}/__overlay_ws__')
   ws.onmessage=e=>{ try{
     const msg=JSON.parse(e.data); FX.handle(msg)
-    if(msg.type==='game:state'&&msg.data&&msg.data.id==='fish'){
-      const s=msg.data
-      if(s.status==='running'&&s.fish&&s.fish.startedAt!==curStart){ curStart=s.fish.startedAt; window.runFish(s.fish) }
-    }
+    if(msg.type==='game:state'&&msg.data&&msg.data.id==='fish') onState(msg.data)
     if(msg.type==='ping') ws.send(JSON.stringify({type:'pong'}))
   }catch(err){} }
   ws.onopen=()=>{ if(window.__wsDown) location.reload() }
