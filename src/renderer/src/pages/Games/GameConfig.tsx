@@ -85,6 +85,15 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
               <Field label="최대 참가 인원">
                 <NumberField min={2} max={50} value={(g.maxParticipants as number) ?? 8} onCommit={v => save('maxParticipants', v)} />
               </Field>
+              <Field label="줄 공개">
+                <label className="switch-row" title="끄면 스트리머가 줄을 하나씩 골라 공개합니다">
+                  <span className="switch">
+                    <input type="checkbox" checked={!!g.autoReveal} onChange={e => save('autoReveal', e.target.checked)} />
+                    <span className="track" />
+                  </span>
+                  <span>{g.autoReveal ? '자동으로 차례대로' : '스트리머가 직접 고르기'}</span>
+                </label>
+              </Field>
             </>)}
             {gameId === 'race' && (<>
               <Field label="예측 접수 시간 (초)">

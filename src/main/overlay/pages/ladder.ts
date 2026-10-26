@@ -154,7 +154,22 @@ export const LADDER_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
   /* ── 결과 단계 ── */
   #phase-result { display: none; flex-direction: column; }
   #phase-result.on { display: flex; }
-  #lsvg { width: 100%; display: block; }
+  #lsvg { width: 100%; display: block; transform-origin: 0 0; will-change: transform; }
+  /* 줄 공개: 고른 줄만 밝게, 나머지는 흐리게 */
+  #lsvg .name-g { transform-box: fill-box; transform-origin: 50% 50%; transition: opacity .3s, transform .35s cubic-bezier(.34,1.56,.64,1); }
+  #lsvg .name-g.picked { transform: scale(1.4); }
+  #lsvg .dim { opacity: .28; transition: opacity .3s; }
+  @keyframes wob { 0%,100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
+  #lsvg .prize-box.wob { animation: wob .16s linear infinite; }
+  .pick-hint { position: relative; z-index: 2; text-align: center; min-height: 46px; margin-bottom: 2px;
+    font-size: 30px; font-weight: 900; color: var(--navy); line-height: 46px; }
+  .pick-hint .who { color: var(--orange); }
+  .pick-hint.wait { color: rgba(23,36,55,.5); font-size: 24px; animation: waitPulse 1.6s ease-in-out infinite; }
+  @keyframes waitPulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+  .pick-hint.slam { animation: slam .45s cubic-bezier(.34,1.56,.64,1) both; }
+  @keyframes slam { 0% { transform: scale(1.9) rotate(-6deg); opacity: 0; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+  .pick-hint.big { font-size: 42px; color: var(--orange); -webkit-text-stroke: 1px var(--navy); }
+  @media (prefers-reduced-motion: reduce) { .pick-hint.slam, #lsvg .prize-box.wob { animation: none; } }
   /* 경로를 이끄는 점 */
   #lsvg .lead-dot { filter: drop-shadow(0 0 4px rgba(255,255,255,0.9)); }
   /* 상품 박스 착지 바운스 */
@@ -232,6 +247,7 @@ export const LADDER_OVERLAY_HTML = (port: number) => `<!DOCTYPE html>
 
         <!-- 결과 단계 -->
         <div id="phase-result">
+          <div class="pick-hint" id="pick-hint"></div>
           <svg id="lsvg" viewBox="0 0 800 300"></svg>
         </div>
       </div>
@@ -258,6 +274,7 @@ const phColl  = document.getElementById('phase-collecting')
 const phRes   = document.getElementById('phase-result')
 const svgEl   = document.getElementById('lsvg')
 const resList = document.getElementById('res-list')
+const pickHint = document.getElementById('pick-hint')
 let hideTimer = null
 let _revealLd = null
 
@@ -335,17 +352,21 @@ function _buildGrid(ld) {
 
 // 상단 이름 박스 (흰 배경 + 색 테두리)
 function _drawNames(ld, xp) {
+  const out = []
   ld.order.forEach((name, c) => {
     const label = name.length > 5 ? name.slice(0,4)+'…' : name
     const tw = Math.max(46, label.length * 13 + 22)
     const col = PEN[c % PEN.length]
     const g = document.createElementNS('http://www.w3.org/2000/svg','g')
+    g.setAttribute('class', 'name-g')
     g.appendChild(_mkSvgEl('rect',{x:xp(c)-tw/2,y:6,width:tw,height:30,rx:6,
       fill:'#fff',stroke:col,'stroke-width':2.4}))
     const t = _mkSvgEl('text',{x:xp(c),y:27,'text-anchor':'middle',
       'font-size':13.5,'font-weight':900,fill:col,'font-family':FONT})
     t.textContent = label; g.appendChild(t); svgEl.appendChild(g)
+    out[c] = g
   })
+  return out
 }
 
 // 하단 상품 박스 (흰 배경 + 네이비 테두리)
@@ -444,50 +465,235 @@ function _showWinnerBanner(ld) {
   _fx(F => F.winner({ nick: w.user, text: _topPrize, sub: '사다리 1등', anchor: card, ms: 6000 }))
 }
 
-function revealSinglePath(ld, idx) {
-  if (!ld) return
-  const cols = ld.cols, rows = ld.rows
-  const COL_W = Math.min(120, Math.floor(760 / Math.max(cols - 1, 1)))
-  const PAD_X = 50, PAD_T = 52
-  const ROW_H = Math.max(16, Math.min(30, Math.floor(380 / Math.max(1, rows))))
-  const xp = c => PAD_X + c * COL_W
-  const path = ld.paths[idx]; if (!path) return
-  const penColor = PEN[idx % PEN.length]
+// ── 줄 하나씩 공개 (스트리머가 고른 줄이 내려간다) ─────────────────────
+// 박자: 선택(이름 확대·나머지 흐리게) → 내려가기(카메라가 점을 따라감, 끝 22% 에서 확 느려짐)
+//      → 착지 직전 북소리·'?' 상자 떨림 → 80ms 멈춤 + 섬광 + 상품 쾅 → 카메라 복귀
+const REVEAL = { pick: 800, travel: 4600, land: 1600 }   // 합계 7000 = 엔진 LADDER_REVEAL_MS
+const REVEAL_TOTAL = REVEAL.pick + REVEAL.travel + REVEAL.land
+let _board = null
 
-  const pl = _mkSvgEl('polyline', { fill:'none', stroke: penColor,
-    'stroke-width': 5,
-    'stroke-linecap': 'round', 'stroke-linejoin': 'round',
-    points: xp(path.cols[0]) + ',' + PAD_T })
-  svgEl.appendChild(pl)
-  const dot = _mkSvgEl('circle', { r: 6.5, fill: '#fff', cx: xp(path.cols[0]), cy: PAD_T, stroke: penColor, 'stroke-width': 3.5, class: 'lead-dot' })
-  svgEl.appendChild(dot)
-  // 상품 박스는 점보다 위에 보이도록 맨 뒤로
+function _pathPts(ld, idx, L) {
+  const cols = ld.paths[idx].cols, pts = [[L.xp(cols[0]), L.PAD_T]]
+  for (let r = 0; r < L.rows; r++) {
+    const curY = L.PAD_T + r * L.ROW_H, nxtY = L.PAD_T + (r + 1) * L.ROW_H
+    if (cols[r + 1] !== cols[r]) pts.push([L.xp(cols[r + 1]), curY])
+    pts.push([L.xp(cols[r + 1]), nxtY])
+  }
+  return pts
+}
+function _ptsStr(pts) { return pts.map(p => p[0] + ',' + p[1]).join(' ') }
+
+/** 판 깔기 (같은 판이면 그대로). 상품은 '?' 로 가린다 */
+function ensureBoard(ld) {
+  const key = JSON.stringify([ld.order, ld.rungs, ld.prizes])
+  if (_board && _board.key === key) return _board
+  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }
+  if (pathTick) { clearInterval(pathTick); pathTick = null }
+  _stopCollTick(); _clearSeq(); _fx(F => F.hideWinner())
+  _endAnim(true)
+  phColl.style.display = 'none'
+  phRes.classList.add('on')
+  resList.innerHTML = ''
+  svgEl.style.transform = ''
+  const L = _buildGrid(ld)
+  const layer = _mkSvgEl('g', {}); svgEl.appendChild(layer)
+  const names = _drawNames(ld, L.xp)
+  _drawPrizes(ld, L.rows, L.PAD_T, L.ROW_H, L.xp, true)
+  _board = { key, ld, L, layer, names, drawn: new Set(), animKey: '', anim: null, total: ld.order.length }
+  _hintWait()
+  show()
+  return _board
+}
+
+function _hintWait() {
+  if (!_board) return
+  const left = _board.total - _board.drawn.size
+  pickHint.className = 'pick-hint wait'
+  pickHint.textContent = left > 0 ? '스트리머가 줄을 고르는 중… (남은 ' + left + '줄)' : ''
+}
+function _hintSlam(html, big) {
+  pickHint.className = 'pick-hint'
+  void pickHint.offsetWidth
+  pickHint.className = 'pick-hint slam' + (big ? ' big' : '')
+  pickHint.innerHTML = html
+}
+function _esc(t) { return String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])) }
+
+/** 상품 상자 조용히 공개 (새로고침·중간 접속 때) */
+function _revealBoxQuiet(endCol, prize, color) {
+  const box = _prizeBoxes[endCol]; if (!box) return
+  if (box.hidden) {
+    const label = prize.length > 5 ? prize.slice(0,4)+'…' : prize
+    box.text.textContent = label; box.text.setAttribute('font-size', 13.5)
+    const tw = Math.max(46, label.length * 13 + 22), cx = parseFloat(box.text.getAttribute('x'))
+    box.rect.setAttribute('x', cx - tw/2); box.rect.setAttribute('width', tw); box.hidden = false
+  }
+  box.rect.setAttribute('fill', '#fff'); box.rect.setAttribute('stroke', color); box.text.setAttribute('fill', color)
+}
+
+/** 이미 연 줄을 바로 그려 둔다 */
+function drawStatic(idx, withSound) {
+  const B = _board; if (!B || B.drawn.has(idx)) return
+  const ld = B.ld, color = PEN[idx % PEN.length], pts = _pathPts(ld, idx, B.L)
+  B.layer.appendChild(_mkSvgEl('polyline', { fill: 'none', stroke: color, 'stroke-width': 5, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', points: _ptsStr(pts) }))
+  const end = pts[pts.length - 1]
+  B.layer.appendChild(_mkSvgEl('circle', { r: 6.5, fill: '#fff', cx: end[0], cy: end[1], stroke: color, 'stroke-width': 3.5 }))
   _prizeBoxes.forEach(b => { if (b) svgEl.appendChild(b.g) })
+  const res = ld.results.find(r => r.startCol === idx)
+  const row = res ? _addResRow(res.user, res.prize, color) : null
+  if (withSound) _landPath(ld, idx, color, row)
+  else if (res) _revealBoxQuiet(res.endCol, res.prize, color)
+  B.drawn.add(idx)
+}
 
-  let step = 0
-  const tick = setInterval(() => {
-    step++
-    _fx(F => F.sound('tick'))
-    pl.setAttribute('points', _orthoPts(path.cols, step, rows, COL_W, PAD_X, PAD_T, ROW_H))
-    const cr = Math.min(step, rows)
-    dot.setAttribute('cx', xp(path.cols[cr]))
-    dot.setAttribute('cy', PAD_T + cr * ROW_H)
-    if (step >= rows) {
-      clearInterval(tick)
-      const res = ld.results.find(r => r.startCol === idx) ?? ld.results[idx]
-      const row = res ? _addResRow(res.user, res.prize, penColor) : null
-      const landed = _landPath(ld, idx, penColor, row)
-      // 수동 공개: 1등이 공개되는 순간 배너
-      if (landed.top && landed.res) _fx(F => F.winner({ nick: landed.res.user, text: _topPrize, sub: '사다리 1등', anchor: card, ms: 6000 }))
-      if (hideTimer) clearTimeout(hideTimer)
-      hideTimer = setTimeout(hide, 15000)
-    }
-  }, 55)
+function _setDim(on, keep) {
+  const B = _board; if (!B) return
+  B.names.forEach((g, c) => { g.classList.toggle('dim', on && c !== keep); g.classList.toggle('picked', on && c === keep) })
+  Array.from(B.layer.children).forEach(el => { if (!el.__live) el.classList.toggle('dim', on) })
+}
+function _camera(z, fx, fy) {
+  const B = _board; if (!B) return
+  if (z <= 1.001) { svgEl.style.transform = ''; return }
+  const cw = svgEl.clientWidth, ch = svgEl.clientHeight
+  const s = Math.min(cw / B.L.W, ch / B.L.H), ox = (cw - B.L.W * s) / 2, oy = (ch - B.L.H * s) / 2
+  const px = ox + fx * s, py = oy + fy * s
+  const a = Math.min(1, (z - 1) / 0.8)               // 확대될수록 점을 화면 가운데로
+  const tx = px * (1 - z) + (cw / 2 - px) * a, ty = py * (1 - z) + (ch / 2 - py) * a
+  svgEl.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + z + ')'
+}
+const _eio = t => t < .5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2
+const _eo  = t => 1 - Math.pow(1 - t, 3)
+
+/** 고른 줄 내려가기 시작 (at = 엔진이 공개를 받은 시각 → 중간 접속해도 같은 지점부터) */
+function animateReveal(idx, at) {
+  const B = _board; if (!B) return
+  const key = idx + ':' + at
+  if (B.animKey === key || B.drawn.has(idx)) return
+  _endAnim(true)
+  B.animKey = key
+  const ld = B.ld, color = PEN[idx % PEN.length], pts = _pathPts(ld, idx, B.L)
+  const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i-1] + Math.hypot(pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1]))
+  const pl = _mkSvgEl('polyline', { fill: 'none', stroke: color, 'stroke-width': 6.5, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', points: _ptsStr([pts[0]]) })
+  const dot = _mkSvgEl('circle', { r: 8.5, fill: '#fff', cx: pts[0][0], cy: pts[0][1], stroke: color, 'stroke-width': 4, class: 'lead-dot' })
+  pl.__live = dot.__live = true
+  B.layer.appendChild(pl); B.layer.appendChild(dot)
+  _prizeBoxes.forEach(b => { if (b) svgEl.appendChild(b.g) })
+  const res = ld.results.find(r => r.startCol === idx)
+  B.anim = { idx, at, color, pts, cum, total: cum[cum.length - 1], pl, dot, res, seg: 0, drum: false, landed: false }
+  _setDim(true, idx)
+  _hintSlam('<span class="who">' + _esc(ld.order[idx]) + '</span> 님의 줄!')
+  if (Date.now() - at < 400) _fx(F => F.sound('whoosh'))
+  requestAnimationFrame(_animLoop)
+}
+
+function _progress(t) {   // 0..1 시간 → 0..1 거리. 앞 62% 시간에 78% 를 가고, 남은 22% 를 끈질기게 끈다
+  if (t <= 0) return 0
+  if (t >= 1) return 1
+  if (t < .62) return t * (.78 / .62)
+  const u = (t - .62) / .38
+  return .78 + .22 * (1 - Math.pow(1 - u, 2.4))
+}
+
+function _animLoop() {
+  const B = _board, A = B && B.anim; if (!A) return
+  const e = Date.now() - A.at
+  const t = (e - REVEAL.pick) / REVEAL.travel
+  const d = _progress(t) * A.total
+  let i = 1; while (i < A.cum.length - 1 && A.cum[i] < d) i++
+  const k = A.cum[i] === A.cum[i-1] ? 1 : (d - A.cum[i-1]) / (A.cum[i] - A.cum[i-1])
+  const x = A.pts[i-1][0] + (A.pts[i][0] - A.pts[i-1][0]) * Math.min(1, Math.max(0, k))
+  const y = A.pts[i-1][1] + (A.pts[i][1] - A.pts[i-1][1]) * Math.min(1, Math.max(0, k))
+  if (!A.landed) {
+    A.pl.setAttribute('points', _ptsStr(A.pts.slice(0, i).concat([[x, y]])))
+    A.dot.setAttribute('cx', x); A.dot.setAttribute('cy', y)
+    // 가로 발판을 건널 때마다 딱
+    if (i !== A.seg) { if (A.seg && A.pts[i][1] === A.pts[i-1][1]) _fx(F => F.sound('tick')); A.seg = i }
+  }
+  // 긴장: 마지막 구간에 북소리 + 가려진 상자 떨림
+  if (t > .62 && !A.drum && !A.landed) {
+    A.drum = true
+    if (e < REVEAL.pick + REVEAL.travel) _fx(F => F.drumStart())
+    _prizeBoxes.forEach(b => { if (b && b.hidden) b.g.classList.add('wob') })
+  }
+  // 카메라: 선택 때 다가가고, 내려가는 동안 따라가고, 끝에서 더 붙는다
+  let z
+  if (e < REVEAL.pick) z = 1 + .7 * _eio(e / REVEAL.pick)
+  else if (t < 1) z = 1.7 + (t > .62 ? .55 * _eio((t - .62) / .38) : 0)
+  else { const r = (e - REVEAL.pick - REVEAL.travel) / 900; z = r < 1 ? 2.25 - 1.25 * _eo(r) : 1 }
+  // 착지 직후 흔들림
+  let sx = 0, sy = 0
+  if (A.landed) { const q = e - REVEAL.pick - REVEAL.travel; if (q < 380) { const a = 9 * (1 - q / 380); sx = (Math.random() - .5) * a; sy = (Math.random() - .5) * a } }
+  _camera(z, x + sx, y + sy)
+
+  if (t >= 1 && !A.landed) {
+    A.landed = true
+    A.pl.setAttribute('points', _ptsStr(A.pts)); const end = A.pts[A.pts.length - 1]
+    A.dot.setAttribute('cx', end[0]); A.dot.setAttribute('cy', end[1])
+    _prizeBoxes.forEach(b => { if (b) b.g.classList.remove('wob') })
+    _fx(F => F.drumStop())
+    // 80ms 히트스톱 뒤 공개
+    setTimeout(() => {
+      if (!_board || _board.anim !== A) return
+      _fx(F => F.flash('rgba(255,255,255,.55)'))
+      const row = A.res ? _addResRow(A.res.user, A.res.prize, A.color) : null
+      const landed = _landPath(_board.ld, A.idx, A.color, row)
+      _board.drawn.add(A.idx)
+      const prize = A.res ? A.res.prize : ''
+      _hintSlam(_esc(prize || '결과') + (landed.top ? '!!' : _isLose(prize) ? '…' : '!'), true)
+      if (landed.top && landed.res) _fx(F => F.winner({ nick: landed.res.user, text: _topPrize, sub: '사다리 1등', anchor: card, ms: 5000 }))
+    }, 80)
+  }
+  if (e >= REVEAL_TOTAL) { _endAnim(false); return }
+  requestAnimationFrame(_animLoop)
+}
+
+/** 진행 중 공개 마무리. now=true 면 즉시 끝(결과는 조용히 반영) */
+function _endAnim(now) {
+  const B = _board, A = B && B.anim; if (!A) return
+  if (now && !A.landed) {
+    _fx(F => F.drumStop())
+    _prizeBoxes.forEach(b => { if (b) b.g.classList.remove('wob') })
+    A.pl.setAttribute('points', _ptsStr(A.pts))
+    if (A.res) { _addResRow(A.res.user, A.res.prize, A.color); _revealBoxQuiet(A.res.endCol, A.res.prize, A.color) }
+    B.drawn.add(A.idx)
+  }
+  A.pl.__live = A.dot.__live = false
+  A.dot.setAttribute('r', 6.5)
+  B.anim = null
+  _setDim(false)
+  svgEl.style.transform = ''
+  _hintWait()
+}
+
+/** 엔진 상태 → 화면 (running: 줄 고르는 중 / 한 줄 내려가는 중) */
+function renderPicking(l) {
+  const B = ensureBoard(l.ladderData)
+  const rv = l.revealing
+  ;(l.revealed || []).forEach(idx => {
+    if (rv && rv.idx === idx && Date.now() - rv.at < REVEAL_TOTAL) animateReveal(idx, rv.at)
+    else if (!(B.anim && B.anim.idx === idx)) drawStatic(idx, false)
+  })
+}
+
+/** 결과 확정: 아직 안 연 줄은 차례로 빠르게 공개 → 1등 배너 */
+function renderFinal(ld) {
+  const B = ensureBoard(ld)
+  const left = ld.order.map((_, i) => i).filter(i => !B.drawn.has(i) && !(B.anim && B.anim.idx === i))
+  const seq = _seq
+  left.forEach((idx, k) => _seqTimers.push(setTimeout(() => { if (seq === _seq && _board === B) drawStatic(idx, true) }, k * 420)))
+  _seqTimers.push(setTimeout(() => {
+    if (seq !== _seq) return
+    pickHint.className = 'pick-hint'; pickHint.textContent = '결과 확정!'
+    _showWinnerBanner(ld)
+  }, left.length * 420 + 300))
+  if (hideTimer) clearTimeout(hideTimer)
+  hideTimer = setTimeout(hide, 12000 + left.length * 420)
 }
 
 function show() { card.classList.add('show') }
 function hide() {
   card.classList.remove('show')
+  _endAnim(true); _board = null
   _stopCollTick(); _clearSeq(); _prevParts = []
   _fx(F => F.hideWinner())
 }
@@ -511,6 +717,7 @@ function renderCollecting(ladder) {
   if (pathTick) { clearInterval(pathTick); pathTick = null }
   _clearSeq()
   _fx(F => F.hideWinner())
+  _endAnim(true); _board = null; svgEl.style.transform = ''
   phColl.style.display = ''
   phRes.classList.remove('on')
   resList.innerHTML = ''
@@ -544,6 +751,8 @@ function renderResult(ld) {
   if (pathTick) { clearInterval(pathTick); pathTick = null }
   _stopCollTick(); _clearSeq()
   _fx(F => F.hideWinner())
+  _endAnim(true); _board = null; svgEl.style.transform = ''
+  pickHint.className = 'pick-hint'; pickHint.textContent = ''
   phColl.style.display = 'none'
   phRes.classList.add('on')
   resList.innerHTML = ''
@@ -620,22 +829,9 @@ function renderResult(ld) {
 }
 
 function renderManualPreview(ld) {
-  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }
-  if (pathTick) { clearInterval(pathTick); pathTick = null }
-  _stopCollTick(); _clearSeq()
-  _fx(F => F.hideWinner())
   _revealLd = ld
-  phColl.style.display = 'none'
-  phRes.classList.add('on')
-
-  const layout = _buildGrid(ld)
-  const { rows, PAD_T, ROW_H, xp } = layout
-
-  _drawNames(ld, xp)
-  _drawPrizes(ld, rows, PAD_T, ROW_H, xp, true)
-
-  resList.innerHTML = ''
-  show()
+  _board = null
+  ensureBoard(ld)
 }
 
 function connect() {
@@ -648,12 +844,16 @@ function connect() {
         const s = msg.data
         if (s.ladder && Array.isArray(s.ladder.prizes) && s.ladder.prizes.length) _topPrize = s.ladder.prizes[0]
         if (s.status === 'collecting' && s.ladder) renderCollecting(s.ladder)
-        else if (s.status === 'showing_result' && s.ladder?.ladderData) renderResult(s.ladder.ladderData)
+        else if (s.status === 'running' && s.ladder?.ladderData) renderPicking(s.ladder)
+        else if (s.status === 'showing_result' && s.ladder?.ladderData) renderFinal(s.ladder.ladderData)
         else if (s.status === 'manual_preview' && s.ladder?.ladderData) renderManualPreview(s.ladder.ladderData)
         else if (s.status === 'manual_running' && s.ladder?.ladderData) renderResult(s.ladder.ladderData)
         else if (s.status === 'idle') hide()
       }
-      if (msg.type === 'game:ladder:reveal') revealSinglePath(msg.data?.ladderData ?? _revealLd, msg.data?.revealIdx)
+      if (msg.type === 'game:ladder:reveal') {   // 수동 모드: 앱 패널이 직접 보낸다
+        const ld = msg.data?.ladderData ?? _revealLd
+        if (ld) { ensureBoard(ld); animateReveal(msg.data?.revealIdx, Date.now()) }
+      }
       if (msg.type === 'ping') ws.send(JSON.stringify({type:'pong'}))
     } catch {}
   }

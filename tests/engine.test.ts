@@ -175,9 +175,44 @@ describe('GameEngine', () => {
     eng.onChat('v1', '!참가')   // 중복 무시
     expect(eng.getState('ladder').ladder!.participants).toHaveLength(5)
     vi.advanceTimersByTime(30_000)
+    // 모집이 끝나면 판만 깔고 스트리머가 줄을 고르길 기다린다
+    expect(eng.getState('ladder').status).toBe('running')
+    expect(eng.ladderRevealAll()).toBe(true)
     const st = eng.getState('ladder')
     expect(st.status).toBe('showing_result')
     expect(st.result!.result).toMatch(/\(1등\)$/)
+  })
+
+  it('사다리: 줄을 하나씩 공개 — 내려가는 동안은 다음 줄을 받지 않고, 다 열면 결과 확정', () => {
+    eng.trigger('ladder', '스트리머', 0)
+    eng.onChat('v1', '!참가'); eng.onChat('v2', '!참가'); eng.onChat('v3', '!참가')
+    vi.advanceTimersByTime(30_000)
+    const l = eng.getState('ladder').ladder!
+    expect(eng.ladderReveal(1)).toBe(true)
+    expect(l.revealing!.idx).toBe(1)
+    expect(eng.ladderReveal(0)).toBe(false)        // 아직 1번 줄이 내려가는 중
+    expect(eng.ladderReveal(1)).toBe(false)        // 이미 연 줄
+    vi.advanceTimersByTime(7_000)
+    expect(eng.ladderRevealNext()).toBe(true)      // 왼쪽부터 → 0번
+    expect(l.revealed).toEqual([1, 0])
+    vi.advanceTimersByTime(7_000)
+    expect(eng.ladderReveal(2)).toBe(true)
+    expect(eng.getState('ladder').status).toBe('running')   // 마지막 줄 연출이 끝날 때까지 기다림
+    vi.advanceTimersByTime(8_000)
+    expect(eng.getState('ladder').status).toBe('showing_result')
+  })
+
+  it('사다리: 자동 진행이면 차례대로 다 열고 끝난다', () => {
+    const s = settings(); s.games.ladder.autoReveal = true
+    eng.updateSettings(s)
+    eng.trigger('ladder', '스트리머', 0)
+    eng.onChat('v1', '!참가'); eng.onChat('v2', '!참가')
+    vi.advanceTimersByTime(30_000 + 1_800)
+    expect(eng.getState('ladder').ladder!.revealed).toEqual([0])
+    vi.advanceTimersByTime(8_200)
+    expect(eng.getState('ladder').ladder!.revealed).toEqual([0, 1])
+    vi.advanceTimersByTime(7_800)
+    expect(eng.getState('ladder').status).toBe('showing_result')
   })
 
   it('퀴즈: 공백·대소문자 차이가 있어도 정답 처리, 표시용 정답은 원문', () => {

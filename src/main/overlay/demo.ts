@@ -16,6 +16,7 @@ function demoSettings(): Settings {
   for (const g of Object.values(s.games)) g.enabled = true
   const set = (id: string, k: string, v: number) => { if (s.games[id]) s.games[id][k] = v }
   set('ladder', 'joinDuration', 8)
+  if (s.games.ladder) s.games.ladder.autoReveal = true   // 미리보기는 줄을 차례대로 자동 공개
   set('race', 'joinDuration', 6)
   set('rps', 'joinDuration', 6)
   set('quiz', 'timeLimit', 10)

@@ -39,8 +39,13 @@ export interface LadderState {
   deadline:     number    // timestamp
   joinMs:       number    // 모집 전체 시간 (오버레이 타이머 막대용)
   prizes:       string[]
-  ladderData?:  LadderData   // populated after game finishes
+  ladderData?:  LadderData   // 모집이 끝나면 채워진다 (상품은 오버레이에서 가려 둔다)
+  revealed?:    number[]     // 공개된 줄 (열 번호, 공개 순서대로)
+  revealing?:   { idx: number; at: number } | null   // 지금 내려가는 줄 — 오버레이는 at 기준으로 재생
 }
+
+/** 한 줄 공개 연출 길이 (오버레이 REVEAL 합계와 같아야 함). 이 동안은 다음 줄을 받지 않는다 */
+export const LADDER_REVEAL_MS = 7000
 
 export interface QuizState {
   question:  string
@@ -326,6 +331,7 @@ export class GameEngine extends EventEmitter {
   private ladderTimer: ReturnType<typeof setTimeout> | null = null
   private phaseTimers: Map<GameId, ReturnType<typeof setTimeout>> = new Map()
   private slotRunId = 0
+  private ladderRun: { by: string; balloon: number } | null = null
   private fishRecorder: FishRecorder = (_u, f) => ({ count: 1, totalPoints: f.points })
 
   /** 낚시 누적 기록 저장소 연결 (메인에서 fishlog 주입 — 엔진은 파일을 모른다) */
@@ -560,14 +566,60 @@ export class GameEngine extends EventEmitter {
       return
     }
 
-    const ladderData = buildLadder(participants, prizes)
-    state.ladder.ladderData = ladderData
+    // 판만 깔고 멈춘다 — 스트리머가 줄을 하나씩 골라 공개한다 (자동 진행이면 차례대로)
+    state.ladder.ladderData = buildLadder(participants, prizes)
+    state.ladder.revealed = []
+    state.ladder.revealing = null
+    state.status = 'running'
+    this.ladderRun = { by, balloon }
+    this.emit('game:update', 'ladder', state)
+    if (this.settings.games.ladder?.autoReveal) this.setPhaseTimer('ladder', () => this.ladderRevealNext(), 1800)
+  }
 
-    const winner = ladderData.results[0]
+  /** 줄 하나 공개 (열 번호). 다른 줄이 내려가는 중이거나 이미 연 줄이면 false */
+  ladderReveal(idx: number): boolean {
+    const state = this.getState('ladder')
+    const l = state.ladder
+    if (state.status !== 'running' || !l?.ladderData) return false
+    const n = l.ladderData.order.length
+    const revealed = l.revealed ?? (l.revealed = [])
+    if (!Number.isInteger(idx) || idx < 0 || idx >= n || revealed.includes(idx)) return false
+    if (l.revealing && Date.now() - l.revealing.at < LADDER_REVEAL_MS) return false
+    revealed.push(idx)
+    l.revealing = { idx, at: Date.now() }
+    this.emit('game:update', 'ladder', state)
+    if (revealed.length >= n) this.setPhaseTimer('ladder', () => this.finishLadderGame(), LADDER_REVEAL_MS + 800)
+    else if (this.settings.games.ladder?.autoReveal) this.setPhaseTimer('ladder', () => this.ladderRevealNext(), LADDER_REVEAL_MS + 1200)
+    return true
+  }
+
+  /** 아직 안 연 줄 중 왼쪽부터 하나 */
+  ladderRevealNext(): boolean {
+    const l = this.getState('ladder').ladder
+    if (!l?.ladderData) return false
+    const idx = l.ladderData.order.findIndex((_, i) => !(l.revealed ?? []).includes(i))
+    return idx >= 0 && this.ladderReveal(idx)
+  }
+
+  /** 남은 줄을 한 번에 공개하고 결과 확정 */
+  ladderRevealAll(): boolean {
+    if (this.getState('ladder').status !== 'running') return false
+    this.finishLadderGame()
+    return true
+  }
+
+  private finishLadderGame() {
+    const state = this.getState('ladder')
+    const ld = state.ladder?.ladderData
+    if (state.status !== 'running' || !ld) return
+    const prev = this.phaseTimers.get('ladder')
+    if (prev) { clearTimeout(prev); this.phaseTimers.delete('ladder') }
+    const { by, balloon } = this.ladderRun ?? { by: '스트리머', balloon: 0 }
+    const winner = ld.results[0]
     this.finishGame('ladder', {
       gameId: 'ladder', triggeredBy: by, balloon,
       result: `${winner.user} (${winner.prize})`,
-      detail: ladderData.results.map(r => `${r.user} → ${r.prize}`).join(' | '),
+      detail: ld.results.map(r => `${r.user} → ${r.prize}`).join(' | '),
       ts:     Date.now(),
     })
   }

@@ -87,7 +87,7 @@ export const DEFAULTS: Settings = {
     },
     ladder: {
       enabled: true, balloonThreshold: 0, chatCommand: '!참가',
-      maxParticipants: 8, joinDuration: 30,
+      maxParticipants: 8, joinDuration: 30, autoReveal: false,
       prizes: [
         { name: '1등', description: '치킨 쿠폰' },
         { name: '2등', description: '음료 쿠폰' },

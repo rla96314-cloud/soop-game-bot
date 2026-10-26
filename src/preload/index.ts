@@ -34,6 +34,11 @@ contextBridge.exposeInMainWorld('electron', {
   fishRanking:  (limit?: number) => ipcRenderer.invoke('fish:ranking', limit),
   fishResetLog: ()               => ipcRenderer.invoke('fish:resetLog'),
 
+  // Ladder (모집이 끝나면 줄을 하나씩 공개)
+  ladderReveal:     (idx: number) => ipcRenderer.invoke('ladder:reveal', idx),
+  ladderRevealNext: ()            => ipcRenderer.invoke('ladder:revealNext'),
+  ladderRevealAll:  ()            => ipcRenderer.invoke('ladder:revealAll'),
+
   // Pickboard (상태는 메인 프로세스)
   pickboardGet:    ()            => ipcRenderer.invoke('pickboard:get'),
   pickboardReveal: (idx: number) => ipcRenderer.invoke('pickboard:reveal', idx),

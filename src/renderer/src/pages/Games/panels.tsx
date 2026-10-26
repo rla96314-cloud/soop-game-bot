@@ -23,7 +23,11 @@ export interface LadderData {
 export interface LadderState {
   participants: string[]; maxSlots: number; deadline: number
   prizes: string[]; ladderData?: LadderData
+  revealed?: number[]; revealing?: { idx: number; at: number } | null
 }
+
+/** 한 줄 공개 연출 길이 — 메인 엔진 LADDER_REVEAL_MS 와 같다 (이 동안 다른 줄 버튼을 잠근다) */
+const LADDER_REVEAL_MS = 7000
 
 // ── List editors ──────────────────────────────────────────────────────────────
 
@@ -588,6 +592,7 @@ export function LadderPanel({ gSettings, gameStates }: {
   const ladderData  = ladderState?.ladderData
 
   const isCollecting = status === 'collecting'
+  const isPicking    = status === 'running' && !!ladderData
   const isResult     = status === 'showing_result'
   const prizes       = (gSettings.prizes as Prize[]) ?? []
 
@@ -657,11 +662,17 @@ export function LadderPanel({ gSettings, gameStates }: {
 
   const [tick, setTick] = useState(0)
   useEffect(() => {
-    if (!isCollecting) return
-    const id = setInterval(() => setTick(t => t + 1), 1000)
+    if (!isCollecting && !isPicking) return
+    const id = setInterval(() => setTick(t => t + 1), 500)
     return () => clearInterval(id)
-  }, [isCollecting])
+  }, [isCollecting, isPicking])
   void tick
+
+  // ── 줄 고르기 (모집이 끝나면 엔진이 판만 깔고 기다린다) ──
+  const revealedLines = new Set(ladderState?.revealed ?? [])
+  const revealing     = ladderState?.revealing
+  const lineBusy      = !!revealing && Date.now() - revealing.at < LADDER_REVEAL_MS
+  const callLadder = (name: string, ...args: unknown[]) => (el?.[name] as ((...a: unknown[]) => Promise<unknown>) | undefined)?.(...args)
 
   const participants = ladderState?.participants ?? []
   const maxSlots     = ladderState?.maxSlots ?? (gSettings.maxParticipants as number ?? 8)
@@ -803,6 +814,48 @@ export function LadderPanel({ gSettings, gameStates }: {
           </div>
         )}
 
+        {/* ── 줄 고르기 ── */}
+        {isPicking && ladderData && (
+          <div className={styles.ladderRevealSection}>
+            <div className={styles.ladderRevealLabel}>
+              {lineBusy
+                ? `${ladderData.order[revealing!.idx]} 님의 줄이 내려가는 중…`
+                : `공개할 줄을 고르세요 (남은 ${ladderData.order.length - revealedLines.size}줄)`}
+            </div>
+            <div className={styles.ladderRevealBtns}>
+              {ladderData.order.map((p, i) => {
+                const done = revealedLines.has(i), c = PLAYER_COLORS[i % PLAYER_COLORS.length]
+                return (
+                  <button key={i}
+                    className={`${styles.ladderRevealBtn} ${done ? styles.ladderRevealBtnDone : ''}`}
+                    style={{ borderColor: c, color: done ? '#fff' : c, background: done ? c : c + '18' }}
+                    disabled={done || lineBusy}
+                    onClick={() => callLadder('ladderReveal', i)}
+                  >{p}</button>
+                )
+              })}
+              <button className={styles.ladderManualStartBtn} style={{ flex: 'none', padding: '6px 12px' }}
+                disabled={lineBusy} onClick={() => callLadder('ladderRevealNext')}>다음 줄</button>
+              <button className={styles.ladderManualResetBtn} style={{ flex: 'none', padding: '6px 12px' }}
+                onClick={() => callLadder('ladderRevealAll')}>남은 줄 한번에</button>
+            </div>
+            {revealedLines.size > 0 && (
+              <div className={styles.ladderResultList}>
+                {(ladderState?.revealed ?? []).filter(i => !(lineBusy && revealing!.idx === i)).map(i => {
+                  const r = ladderData.results.find(x => x.startCol === i)
+                  return r ? (
+                    <div key={i} className={styles.ladderResultRow} style={{ borderLeftColor: PLAYER_COLORS[i % PLAYER_COLORS.length] }}>
+                      <span className={styles.ladderResultUser} style={{ color: PLAYER_COLORS[i % PLAYER_COLORS.length] }}>{r.user}</span>
+                      <span className={styles.ladderResultArrow}>→</span>
+                      <span className={styles.ladderResultPrize}>{r.prize}</span>
+                    </div>
+                  ) : null
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── Result + SVG ── */}
         {isResult && ladderData && (
           <div className={styles.ladderResult}>
@@ -826,7 +879,7 @@ export function LadderPanel({ gSettings, gameStates }: {
         )}
 
         {/* ── Idle hint ── */}
-        {!isCollecting && !isResult && (
+        {!isCollecting && !isPicking && !isResult && (
           <div className={styles.ladderIdle}>
             <div className={styles.ladderIdleIcon} />
             <div>

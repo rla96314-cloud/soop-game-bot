@@ -182,6 +182,9 @@ export function registerIpcHandlers(win: BrowserWindow) {
   // Overlay
   ipcMain.handle('overlay:url',       (_, gameId: string)        => overlayServer.getUrl(gameId))
   ipcMain.handle('overlay:broadcast', authed((type: string, data: unknown) => { overlayServer.broadcast(String(type), data); return { ok: true } }))
+  ipcMain.handle('ladder:reveal',     authed((idx: number) => ({ ok: gameEngine.ladderReveal(Number(idx)) })))
+  ipcMain.handle('ladder:revealNext', authed(() => ({ ok: gameEngine.ladderRevealNext() })))
+  ipcMain.handle('ladder:revealAll',  authed(() => ({ ok: gameEngine.ladderRevealAll() })))
   ipcMain.handle('overlay:openGallery', () => { shell.openExternal(overlayServer.getGalleryUrl()); return { ok: true } })
   ipcMain.handle('overlay:open', (_, gameId: string)  => {
     const url = overlayServer.getUrl(String(gameId).replace(/[^a-z]/g, ''))
