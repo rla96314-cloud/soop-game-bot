@@ -1,9 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useApp } from '../../contexts/AppContext'
 import { GAMES, gameById } from '../../games'
 import Icon, { type IconName } from '../../components/Icon'
 import { CopyBtn } from '../Games/GameConfig'
-import { RouletteWheel } from '../Games/GamePreview'
 import styles from './Overlay.module.css'
 
 interface UrlRow { id: string; name: string; color: string; icon: IconName | null }
@@ -13,12 +12,32 @@ const ROWS: UrlRow[] = [
   { id: 'preview', name: '전체 미리보기', color: '#172437', icon: null },
 ]
 
+/** 데모 엔진으로 도는 실제 오버레이 (방송과 분리, 소리 없음). 1920×1080 을 칸 크기에 맞춰 축소 */
+function DemoFrame({ port, id }: { port: number; id: string }) {
+  const box = useRef<HTMLDivElement>(null)
+  const [k, setK] = useState(0.3)
+  const [nonce, setNonce] = useState(0)
+  useEffect(() => {
+    const el = box.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setK(Math.min(el.clientWidth / 1920, el.clientHeight / 1080)))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  return (
+    <div ref={box} className={styles.demoBox}>
+      <iframe key={`${id}-${nonce}`} title={`${id} 미리보기`} src={`http://localhost:${port}/overlay/${id}?demo=1&mute=1`}
+        className={styles.demoFrame} style={{ transform: `translate(-50%, -50%) scale(${k})` }} />
+      <button className={`btn btn-sm ${styles.demoRestart}`} onClick={() => setNonce(n => n + 1)}>처음부터</button>
+    </div>
+  )
+}
+
 export default function OverlayPage() {
   const { settings } = useApp()
   const port = ((settings?.overlay as Record<string, unknown> | undefined)?.port as number) ?? 3939
   const [sel, setSel] = useState('roulette')
   const game = gameById(sel)!
-  const g = (settings?.games as Record<string, Record<string, unknown>> | undefined)?.[sel] ?? {}
   const el = (window as unknown as Record<string, Record<string, unknown>>).electron
   const open = (id: string) => (el?.overlayOpen as (id: string) => void)?.(id)
   const url = (id: string) => `http://localhost:${port}/overlay/${id}`
@@ -30,25 +49,17 @@ export default function OverlayPage() {
         <div className="card-head">
           <div>
             <div className="sec-title">{game.name} 오버레이 미리보기</div>
-            <div className="sec-desc">방송에 표시될 오버레이 모양을 미리 확인하세요.</div>
+            <div className="sec-desc">가짜 시청자로 한 판씩 계속 재생합니다. 방송 화면과 기록에는 나가지 않습니다.</div>
           </div>
           <div className={styles.headRight}>
             <select className="select" style={{ width: 150 }} value={sel} onChange={e => setSel(e.target.value)}>
               {GAMES.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
             </select>
-            <button className="btn" onClick={() => open(sel)}><Icon name="external" size={14} />실제 화면 열기</button>
+            <button className="btn" onClick={() => (el?.overlayOpenGallery as () => void)?.()}><Icon name="external" size={14} />전체 게임 애니메이션 보기</button>
           </div>
         </div>
         <div className={`${styles.stage} checker`}>
-          {sel === 'roulette'
-            ? <RouletteWheel items={(g.items as Array<{ name: string; probability: number }>) ?? []} size={440} />
-            : (
-              <div className={styles.placeholder}>
-                <span className="game-ic lg" style={{ background: game.color, width: 80, height: 80 }}><Icon name={game.icon} size={40} /></span>
-                <b>{game.name} 오버레이</b>
-                <small>실제 애니메이션은 OBS 브라우저 소스 또는 '실제 화면 열기'에서 확인할 수 있습니다.<br />투명 배경으로 렌더링됩니다.</small>
-              </div>
-            )}
+          <DemoFrame port={port} id={sel} />
         </div>
       </div>
 

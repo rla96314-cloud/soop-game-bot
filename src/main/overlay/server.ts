@@ -7,6 +7,8 @@ import type { GameResult, GameState } from '../games/engine'
 import { loadSettings } from '../store/settings'
 import { listMedia, mediaDir, MEDIA_TYPES } from './media'
 import { OVERLAY_ASSETS } from './assets'
+import { startDemo, DEMO_GAMES } from './demo'
+import { GALLERY_HTML } from './pages/gallery'
 
 import { QUIZ_OVERLAY_HTML } from './pages/quiz'
 import { LADDER_OVERLAY_HTML } from './pages/ladder'
@@ -60,6 +62,7 @@ export type SnapshotProvider = () => Array<{ type: string; data: unknown }>
 export class OverlayServer extends EventEmitter {
   private httpServer: ReturnType<typeof createServer> | null = null
   private wss: WebSocketServer | null = null
+  private demoWss: WebSocketServer | null = null
   private clients: Set<WebSocket> = new Set()
   private port = 3939
   private snapshot: SnapshotProvider = () => []
@@ -104,6 +107,13 @@ export class OverlayServer extends EventEmitter {
       const mFile = /^\/media\/([a-z]+)\/([^/]+)$/.exec(path)
       if (mFile) { this.serveMedia(req, res, mFile[1], mFile[2]); return }
 
+      // ── 애니메이션 미리보기 (데모 엔진, 방송과 분리) ──
+      if (path === '/gallery' || path === '/gallery/') {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' })
+        res.end(GALLERY_HTML())
+        return
+      }
+
       const m = /^\/overlay\/([a-z]+)\/?$/.exec(path)
       const gameId = m ? m[1] : (path === '/' ? 'roulette' : '')
       const page = PAGES[gameId]
@@ -117,18 +127,37 @@ export class OverlayServer extends EventEmitter {
         'Cache-Control': 'no-store',
         'X-Content-Type-Options': 'nosniff',
       })
-      res.end(page(port))
+      const query = new URLSearchParams((req.url ?? '').split('?')[1] ?? '')
+      const demo = query.get('demo') === '1' && (DEMO_GAMES as readonly string[]).includes(gameId)
+      // 데모 모드는 같은 페이지를 데모 전용 WS 로 붙인다 (gameId 는 위 허용 목록에서 온 값)
+      res.end(demo ? page(port).split('/__overlay_ws__').join(`/__demo_ws__?game=${gameId}`) : page(port))
+    })
+
+    // 경로가 둘(방송용·데모용)이라 업그레이드를 직접 나눈다 — server+path 방식은 다른 경로를 400 으로 끊는다
+    const verifyClient = ({ origin }: { origin: string }) =>
+      !origin || origin === `http://localhost:${port}` || origin === `http://127.0.0.1:${port}`
+    const demoWss = new WebSocketServer({ noServer: true, verifyClient })
+    demoWss.on('connection', (ws, req: IncomingMessage) => {
+      const game = new URLSearchParams((req.url ?? '').split('?')[1] ?? '').get('game') ?? ''
+      const send = (type: string, data: unknown) => {
+        if (ws.readyState === WebSocket.OPEN) { try { ws.send(JSON.stringify({ type, data })) } catch {} }
+      }
+      const stopDemo = startDemo(game, send, OverlayServer.publicState)
+      ws.on('close', stopDemo)
+      ws.on('error', stopDemo)
+    })
+    server.on('upgrade', (req, socket, head) => {
+      const p = (req.url ?? '').split('?')[0]
+      if (p === '/__overlay_ws__') wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req))
+      else if (p === '/__demo_ws__') demoWss.handleUpgrade(req, socket, head, ws => demoWss.emit('connection', ws, req))
+      else socket.destroy()
     })
 
     const wss = new WebSocketServer({
-      server,
-      path: '/__overlay_ws__',
+      noServer: true,
       // OBS 브라우저 소스는 Origin 이 http://localhost:PORT, 앱 내 미리보기도 동일.
       // 스트리머 PC 의 다른 웹페이지가 붙어 방송 상태를 읽어가는 것을 막는다.
-      verifyClient: ({ origin }: { origin: string }) => {
-        if (!origin) return true
-        return origin === `http://localhost:${port}` || origin === `http://127.0.0.1:${port}`
-      },
+      verifyClient,
     })
     wss.on('connection', (ws) => {
       this.clients.add(ws)
@@ -152,6 +181,7 @@ export class OverlayServer extends EventEmitter {
 
     this.httpServer = server
     this.wss = wss
+    this.demoWss = demoWss
     try {
       server.listen(port, '127.0.0.1')
     } catch (err) {
@@ -212,6 +242,10 @@ export class OverlayServer extends EventEmitter {
     return { ...state, quiz: { ...quiz, answer: '' } }
   }
 
+  getGalleryUrl() {
+    return `http://localhost:${this.port}/gallery`
+  }
+
   getUrl(gameId: string) {
     return `http://localhost:${this.port}/overlay/${gameId}`
   }
@@ -220,6 +254,9 @@ export class OverlayServer extends EventEmitter {
     for (const c of this.clients) { try { c.terminate() } catch {} }
     this.clients.clear()
     try { this.wss?.close() } catch {}
+    for (const c of this.demoWss?.clients ?? []) { try { c.terminate() } catch {} }
+    try { this.demoWss?.close() } catch {}
+    this.demoWss = null
     try { this.httpServer?.close() } catch {}
     this.wss = null
     this.httpServer = null

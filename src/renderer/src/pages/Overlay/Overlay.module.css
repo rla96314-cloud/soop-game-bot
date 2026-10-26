@@ -34,3 +34,9 @@
 .steps i { width: 32px; height: 32px; border-radius: 50%; background: var(--orange); color: #fff; font-style: normal; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .steps b { display: block; font-size: 13px; }
 .steps small { font-size: 12px; color: var(--muted); }
+
+/* 데모 오버레이 (iframe 1920×1080 을 칸에 맞춰 축소) */
+.demoBox { position: absolute; inset: 0; overflow: hidden; }
+.demoFrame { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; border: 0; background: transparent; pointer-events: none; transform-origin: 50% 50%; }
+.demoRestart { position: absolute; right: 10px; bottom: 10px; }
+.stage { position: relative; }
