@@ -87,7 +87,9 @@ function drawHand(c,kind,side,skin,mini){
   if(im&&im.complete&&im.naturalWidth){
     var h=340, w=h*im.naturalWidth/im.naturalHeight;
     if(skin&&skin!==CR) c.filter='grayscale(.85) brightness(.8)';
-    c.drawImage(im,-w/2,150-h,w,h);
+    // 보자기는 상하 반전 (손이 옆으로 누워 있어 화면 기준 상하 = 그림의 좌우)
+    if(kind==='paper'&&!mini){ c.save(); c.scale(-1,1); c.drawImage(im,-w/2,150-h,w,h); c.restore(); }
+    else c.drawImage(im,-w/2,150-h,w,h);
     c.filter='none';
     return;
   }

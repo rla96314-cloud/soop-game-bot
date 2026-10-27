@@ -86,12 +86,14 @@ export class OverlayServer extends EventEmitter {
       }
 
       // ── 내장 이미지 (슬롯 캐릭터·가위바위보 손) ──
-      const aFile = /^\/assets\/([a-z-]+)\.png$/.exec(path)
+      const aFile = /^\/assets\/([a-z-]+)\.(png|webp)$/.exec(path)
       if (aFile) {
         const b64 = OVERLAY_ASSETS[aFile[1]]
         if (!b64) { res.writeHead(404); res.end(); return }
         const buf = Buffer.from(b64, 'base64')
-        res.writeHead(200, { 'Content-Type': 'image/png', 'Content-Length': buf.length, 'Cache-Control': 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff' })
+        const isWebp = buf.length > 12 && buf.toString('ascii', 8, 12) === 'WEBP'
+        if (isWebp !== (aFile[2] === 'webp')) { res.writeHead(404); res.end(); return }
+        res.writeHead(200, { 'Content-Type': isWebp ? 'image/webp' : 'image/png', 'Content-Length': buf.length, 'Cache-Control': 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff' })
         res.end(req.method === 'HEAD' ? undefined : buf)
         return
       }
