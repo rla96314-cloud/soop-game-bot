@@ -24,6 +24,9 @@ export interface GameStates {
 
 export interface AppNotice { id: number; level: 'info' | 'warn' | 'error'; message: string; ts: number }
 
+/** 무대 대기열 한 칸 — 어떤 게임이든 진행 중이면 나머지는 종류 상관없이 한 줄로 기다린다 */
+export interface StageItem { gameId: string; triggeredBy: string; balloon: number }
+
 export interface AppCtx {
   connected:  boolean
   simulation: boolean
@@ -33,10 +36,12 @@ export interface AppCtx {
   history:    HistoryItem[]
   stats:      Stats
   gameStates: GameStates
+  stage:      StageItem[]     // 무대 대기열 (앞이 다음 차례)
   settings:   Record<string, unknown> | null
   notices:    AppNotice[]     // 메인 프로세스 알림 (포트 충돌, 설정 파일 손상 등)
   dismissNotice: (id: number) => void
   triggerGame:   (gameId: string) => void
+  clearStage:    () => void
   refreshSettings: () => void
   patchSettings: (patch: unknown) => void
 }
@@ -52,10 +57,12 @@ const defaultCtx: AppCtx = {
   history:    [],
   stats:      { todayRuns: 0, todayBalloons: 0, todayViewers: 0 },
   gameStates: {},
+  stage:      [],
   settings:   null,
   notices:    [],
   dismissNotice:    () => {},
   triggerGame:      () => {},
+  clearStage:       () => {},
   refreshSettings:  () => {},
   patchSettings:    () => {},
 }
@@ -96,6 +103,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [history,    setHistory]    = useState<HistoryItem[]>([])
   const [stats,      setStats]      = useState<Stats>({ todayRuns: 0, todayBalloons: 0, todayViewers: 0 })
   const [gameStates, setGameStates] = useState<GameStates>({})
+  const [stage,      setStage]      = useState<StageItem[]>([])
   const [settings,   setSettings]   = useState<Record<string, unknown> | null>(null)
   const [notices,    setNotices]    = useState<AppNotice[]>([])
 
@@ -120,6 +128,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // 메인은 배열(getAllStates)로 주므로 gameId 키의 맵으로 바꾼다 — 예전엔 배열을 그대로 넣어 첫 갱신 전까지 상태가 비어 있었음
       .then(list => setGameStates(Object.fromEntries((list ?? []).map(s => [String(s.id ?? ''), s]))))
       .catch(() => {})
+    call<StageItem[]>('gameStage').then(q => setStage(q ?? [])).catch(() => {})
     call<HistoryItem[]>('gameHistory', MAX_HISTORY)
       .then(items => setHistory((items ?? []).map(r => ({ ...r, gameName: GAME_META[r.gameId]?.name ?? r.gameId }))))
       .catch(() => {})
@@ -144,6 +153,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     off.push(sub('onGameUpdate', (id, state) => {
       setGameStates(prev => ({ ...prev, [String(id)]: state as GameStates[string] }))
     }))
+    off.push(sub('onStageUpdate', (q) => setStage((q as StageItem[]) ?? [])))
     off.push(sub('onGameResult', (id, result) => {
       const r = result as HistoryItem
       const item: HistoryItem = { ...r, gameId: String(id), gameName: GAME_META[String(id)]?.name ?? String(id) }
@@ -162,6 +172,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ── Actions ───────────────────────────────────────────────────────────────
 
   const triggerGame = useCallback((gameId: string) => { call('gameTrigger', gameId).catch(() => {}) }, [])
+  const clearStage  = useCallback(() => { call('gameClearStage').catch(() => {}) }, [])
   const refreshSettings = useCallback(() => {
     call<Record<string, unknown>>('settingsGet').then(setSettings).catch(() => {})
   }, [])
@@ -173,10 +184,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // value 를 memo 하지 않으면 이벤트마다 모든 소비자가 다시 렌더링된다
   const value = useMemo<AppCtx>(() => ({
     connected, simulation, standby, lastError, liveViewers,
-    history, stats, gameStates, settings, notices,
-    dismissNotice, triggerGame, refreshSettings, patchSettings,
-  }), [connected, simulation, standby, lastError, liveViewers, history, stats, gameStates, settings, notices,
-       dismissNotice, triggerGame, refreshSettings, patchSettings])
+    history, stats, gameStates, stage, settings, notices,
+    dismissNotice, triggerGame, clearStage, refreshSettings, patchSettings,
+  }), [connected, simulation, standby, lastError, liveViewers, history, stats, gameStates, stage, settings, notices,
+       dismissNotice, triggerGame, clearStage, refreshSettings, patchSettings])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

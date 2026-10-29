@@ -158,8 +158,14 @@ export interface GameState {
   fish?:    FishCastState
 }
 
-interface QueuedRun { triggeredBy: string; balloon: number }
+interface QueuedRun {
+  gameId:      GameId
+  triggeredBy: string
+  balloon:     number
+  quiz?:       { question: string; answer: string; timeLimit: number }   // 수동 출제 퀴즈
+}
 
+/** 무대 대기열 상한 — 게임 종류와 상관없이 한 줄이다 */
 const MAX_QUEUE   = 20
 const MAX_HISTORY = 1000
 const RESULT_SHOW_MS = 5000
@@ -324,7 +330,8 @@ export function buildLadder(participants: string[], prizes: string[], rand = Mat
 
 export class GameEngine extends EventEmitter {
   private states: Map<GameId, GameState> = new Map()
-  private queues: Map<GameId, QueuedRun[]> = new Map()
+  // 무대는 하나 — 어떤 게임이든 진행 중이면 나머지는 종류 상관없이 한 줄로 기다린다 (오버레이가 겹치지 않게)
+  private stage: QueuedRun[] = []
   private history: GameResult[] = []
   private settings!: Settings
   private quizTimer: ReturnType<typeof setTimeout> | null = null
@@ -350,10 +357,8 @@ export class GameEngine extends EventEmitter {
 
   init(settings: Settings) {
     this.settings = settings
-    for (const id of GAME_IDS) {
-      this.states.set(id, this.makeIdleState(id))
-      this.queues.set(id, [])
-    }
+    for (const id of GAME_IDS) this.states.set(id, this.makeIdleState(id))
+    this.stage = []
   }
 
   updateSettings(settings: Settings) {
@@ -435,32 +440,54 @@ export class GameEngine extends EventEmitter {
 
   // ── Trigger / queue ───────────────────────────────────────────────────────
 
+  /** 어떤 게임이든 모집·진행·결과 표시 중이면 무대가 찬 것 */
+  isStageBusy(): boolean {
+    for (const s of this.states.values()) if (s.status !== 'idle') return true
+    return false
+  }
+
+  /** 무대 대기열 (앞이 다음 차례) */
+  getStageQueue(): Array<{ gameId: GameId; triggeredBy: string; balloon: number }> {
+    return this.stage.map(({ gameId, triggeredBy, balloon }) => ({ gameId, triggeredBy, balloon }))
+  }
+
+  /** 게임별 queued 숫자를 무대 대기열에서 다시 센다 (바뀐 게임만 알림) */
+  private syncQueued(...changed: GameId[]) {
+    for (const id of new Set(changed)) {
+      const s = this.getState(id)
+      s.queued = this.stage.filter(r => r.gameId === id).length
+      this.emit('game:update', id, s)
+    }
+    this.emit('stage', this.getStageQueue())
+  }
+
   /**
-   * 게임 실행 요청. 대기 중이면 즉시 실행, 진행 중이면 대기열에 넣는다.
+   * 게임 실행 요청. 무대가 비어 있으면 즉시 실행, 다른 게임이라도 진행 중이면 한 줄로 기다린다.
    * 반환: 'started' | 'queued' | 'rejected'
    */
   trigger(gameId: GameId, triggeredBy: string, balloon: number): 'started' | 'queued' | 'rejected' {
-    const state = this.getState(gameId)
-    if (state.status !== 'idle') {
-      const q = this.queues.get(gameId)!
-      if (q.length >= MAX_QUEUE) {
-        this.emit('log', `[${gameId}] 대기열이 가득 차서 ${triggeredBy}님의 실행을 버렸습니다`)
-        return 'rejected'
-      }
-      q.push({ triggeredBy, balloon })
-      state.queued = q.length
-      this.emit('game:update', gameId, state)
-      return 'queued'
-    }
-    return this.startNow(gameId, triggeredBy, balloon) ? 'started' : 'rejected'
+    return this.enqueue({ gameId, triggeredBy, balloon })
   }
 
-  private startNow(gameId: GameId, by: string, balloon: number): boolean {
+  private enqueue(run: QueuedRun): 'started' | 'queued' | 'rejected' {
+    if (this.isStageBusy()) {
+      if (this.stage.length >= MAX_QUEUE) {
+        this.emit('log', `[${run.gameId}] 대기열이 가득 차서 ${run.triggeredBy}님의 실행을 버렸습니다`)
+        return 'rejected'
+      }
+      this.stage.push(run)
+      this.syncQueued(run.gameId)
+      return 'queued'
+    }
+    return this.startNow(run) ? 'started' : 'rejected'
+  }
+
+  private startNow({ gameId, triggeredBy: by, balloon, quiz }: QueuedRun): boolean {
     let ok = false
     switch (gameId) {
       case 'roulette': ok = this.runRoulette(by, balloon); break
       case 'ladder':   ok = this.startLadder(by, balloon); break
-      case 'quiz':     ok = this.startQuiz(by, balloon); break
+      case 'quiz':     ok = quiz ? this.beginQuiz(quiz.question, quiz.answer, quiz.timeLimit, by, 0) : this.startQuiz(by, balloon); break
       case 'slot':     ok = this.runSlot(by, balloon); break
       case 'race':     ok = this.runRace(by, balloon); break
       case 'rps':      ok = this.runRps(by, balloon); break
@@ -472,21 +499,27 @@ export class GameEngine extends EventEmitter {
     return ok
   }
 
-  private drainQueue(gameId: GameId) {
-    const q = this.queues.get(gameId)!
-    while (q.length) {
-      const next = q.shift()!
-      this.getState(gameId).queued = q.length
-      if (this.startNow(gameId, next.triggeredBy, next.balloon)) return
+  /** 무대가 비었을 때 호출 — 종류 상관없이 맨 앞 것부터 올린다 */
+  private drainStage() {
+    while (this.stage.length && !this.isStageBusy()) {
+      const next = this.stage.shift()!
+      this.syncQueued(next.gameId)
+      if (this.startNow(next)) return
       // 실행 거부(설정 비어 있음 등)면 다음 항목으로
     }
   }
 
+  /** 그 게임의 대기 건만 줄에서 뺀다 (다른 게임 대기는 유지) */
   clearQueue(gameId: GameId) {
-    this.queues.set(gameId, [])
-    const s = this.getState(gameId)
-    s.queued = 0
-    this.emit('game:update', gameId, s)
+    this.stage = this.stage.filter(r => r.gameId !== gameId)
+    this.syncQueued(gameId)
+  }
+
+  /** 대기열 전부 비우기 */
+  clearStage() {
+    const ids = this.stage.map(r => r.gameId)
+    this.stage = []
+    this.syncQueued(...ids)
   }
 
   // ── Roulette ──────────────────────────────────────────────────────────────
@@ -562,7 +595,7 @@ export class GameEngine extends EventEmitter {
       state.status = 'idle'
       state.ladder = undefined
       this.emit('game:update', 'ladder', state)
-      this.drainQueue('ladder')
+      this.drainStage()
       return
     }
 
@@ -637,15 +670,11 @@ export class GameEngine extends EventEmitter {
     return this.beginQuiz(q.question.trim(), q.answer.trim(), timeLim, by, balloon)
   }
 
-  // 수동 퀴즈 (스트리머가 직접 문제/정답 지정)
+  // 수동 퀴즈 (스트리머가 직접 문제/정답 지정) — 다른 게임이 돌고 있으면 무대 줄에 선다
   startManualQuiz(question: string, answer: string, timeLimit: number, by = '스트리머'): boolean {
-    const state = this.getState('quiz')
-    if (state.status !== 'idle') return false
     const q = question.trim(), a = answer.trim()
     if (!q || !a) return false
-    const ok = this.beginQuiz(q, a, Math.max(5, Number(timeLimit) || 30), by, 0)
-    if (ok) { this.todayRuns++; this.emitStats() }
-    return ok
+    return this.enqueue({ gameId: 'quiz', triggeredBy: by, balloon: 0, quiz: { question: q, answer: a, timeLimit: Math.max(5, Number(timeLimit) || 30) } }) !== 'rejected'
   }
 
   private beginQuiz(question: string, answer: string, timeLim: number, by: string, balloon: number): boolean {
@@ -975,7 +1004,7 @@ export class GameEngine extends EventEmitter {
       s2.slot = undefined; s2.number = undefined; s2.lottery = undefined
       s2.race = undefined; s2.rps = undefined; s2.fish = undefined
       this.emit('game:update', id, s2)
-      this.drainQueue(id)
+      this.drainStage()
     }, RESULT_SHOW_MS)
   }
 }

@@ -20,7 +20,7 @@ export default function Dashboard({ onNavigate, user }: {
   onNavigate: (page: 'games' | 'overlay' | 'help' | 'history', gameId?: string) => void
   user?: { id: string; name: string } | null
 }) {
-  const { settings, stats, history, gameStates, connected, liveViewers } = useApp()
+  const { settings, stats, history, gameStates, stage, clearStage, connected, liveViewers } = useApp()
   const [selected, setSelected] = useState('roulette')
   const port = ((settings?.overlay as Record<string, unknown> | undefined)?.port as number) ?? 3939
   const games = (settings?.games as Record<string, Record<string, unknown>> | undefined) ?? {}
@@ -52,6 +52,21 @@ export default function Dashboard({ onNavigate, user }: {
           <span className={styles.gameText}><b>{active.name}</b><small>{active.desc}</small></span>
           <Icon name="chevron-right" size={16} className={styles.arrow} />
         </button>
+        {/* 무대 대기열 — 후원이 몰리면 종류 상관없이 한 줄로 차례를 기다린다 */}
+        {stage.length > 0 && (
+          <div className={styles.stage}>
+            <div className={styles.stageHead}>
+              <b>다음 차례 <span className="num">{stage.length}</span>건</b>
+              <button className="btn btn-ghost btn-sm" onClick={clearStage} title="대기 중인 실행을 모두 버립니다 (진행 중인 게임은 그대로)">비우기</button>
+            </div>
+            <div className={styles.stageList}>
+              {stage.slice(0, 8).map((q, i) => (
+                <span key={i} className={styles.stageItem}><i style={{ background: gameColor(q.gameId) }} />{gameName(q.gameId)}<small>{q.balloon > 0 ? `${q.balloon.toLocaleString()}개` : q.triggeredBy}</small></span>
+              ))}
+              {stage.length > 8 && <span className={styles.stageMore}>외 {stage.length - 8}건</span>}
+            </div>
+          </div>
+        )}
         <div className={styles.leftHead} style={{ borderTop: '1px solid var(--line)' }}>
           <div className="sec-title" style={{ fontSize: 18 }}>빠른 실행</div>
           <div className="sec-desc">즐겨 사용하는 게임을 바로 실행하세요.</div>

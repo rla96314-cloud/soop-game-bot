@@ -95,6 +95,7 @@ export function registerIpcHandlers(win: BrowserWindow) {
     overlayServer.sendResult(result)
   })
   gameEngine.on('quiz:question', (q) => send('quiz:question', q))
+  gameEngine.on('stage', (q) => send('stage:update', q))
   gameEngine.on('stats', sendStats)
   gameEngine.on('log', (m: string) => send('app:notice', { level: 'warn', message: m }))
 
@@ -169,6 +170,8 @@ export function registerIpcHandlers(win: BrowserWindow) {
     if (isGameId(gameId)) gameEngine.clearQueue(gameId)
     return { ok: true }
   }))
+  ipcMain.handle('game:stage',      ()                   => gameEngine.getStageQueue())
+  ipcMain.handle('game:clearStage', authed(() => { gameEngine.clearStage(); return { ok: true } }))
   ipcMain.handle('game:state',   (_, gameId: GameId) => isGameId(gameId) ? gameEngine.getState(gameId) : null)
   ipcMain.handle('game:all',     ()                   => gameEngine.getAllStates())
   ipcMain.handle('game:history', (_, limit = 50)      => gameEngine.getHistory(Math.min(1000, Math.max(1, Number(limit) || 50))))

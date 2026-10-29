@@ -25,6 +25,11 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
   const status = gameStates[gameId]?.status ?? 'idle'
   const busy = status === 'running' || status === 'collecting'
   const queued = (gameStates[gameId]?.queued as number | undefined) ?? 0
+  // 무대는 하나 — 다른 게임이 돌고 있으면 실행 버튼은 줄 서기가 된다
+  const stageBusy = !busy && Object.values(gameStates).some(s => s.status && s.status !== 'idle')
+  const runLabel = busy ? (queued > 0 ? `진행 중… (대기 ${queued})` : '진행 중…')
+    : stageBusy ? (queued > 0 ? `다른 게임 뒤에 대기 ${queued}` : '다른 게임 뒤에 줄 서기')
+    : queued > 0 ? `대기 ${queued}` : '테스트 실행'
   const save = (key: string, value: unknown) => patchSettings({ games: { [gameId]: { [key]: value } } })
   const enabled = (g.enabled as boolean) ?? true
 
@@ -202,7 +207,7 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
         </label>
         {game.engine && (
           <button className="btn btn-dark" disabled={busy || !enabled} onClick={() => triggerGame(gameId)}>
-            <Icon name="play" size={14} />{busy ? (queued > 0 ? `진행 중… (대기 ${queued})` : '진행 중…') : '테스트 실행'}
+            <Icon name="play" size={14} />{runLabel}
           </button>
         )}
       </div>

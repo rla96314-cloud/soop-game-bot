@@ -151,6 +151,42 @@ describe('GameEngine', () => {
     expect(eng.getState('slot').queued).toBe(1)
   })
 
+  it('무대는 하나 — 다른 게임이 돌고 있으면 종류가 달라도 줄을 서고, 끝나면 들어온 순서대로 올라간다', () => {
+    const s = settings(); s.games.slot.enabled = true; s.games.roulette.spinDuration = 1000
+    eng.updateSettings(s)
+    expect(eng.trigger('roulette', 'A', 0)).toBe('started')
+    expect(eng.trigger('slot', 'B', 0)).toBe('queued')          // 슬롯은 놀고 있지만 룰렛이 무대에 있다
+    expect(eng.trigger('roulette', 'C', 0)).toBe('queued')
+    expect(eng.getState('slot').status).toBe('idle')
+    expect(eng.getState('slot').queued).toBe(1)
+    expect(eng.getState('roulette').queued).toBe(1)
+    expect(eng.getStageQueue().map(q => q.gameId)).toEqual(['slot', 'roulette'])
+    expect(eng.isStageBusy()).toBe(true)
+
+    vi.advanceTimersByTime(1000 + 5000)   // 룰렛 끝 → 다음은 슬롯
+    expect(eng.getState('slot').status).toBe('running')
+    expect(eng.getState('roulette').status).toBe('idle')
+    expect(eng.getState('slot').queued).toBe(0)
+    expect(eng.getStageQueue().map(q => q.gameId)).toEqual(['roulette'])
+  })
+
+  it('수동 퀴즈도 무대 줄에 선다 / clearQueue 는 그 게임 것만, clearStage 는 전부 뺀다', () => {
+    eng.trigger('roulette', 'A', 0)
+    expect(eng.startManualQuiz('q', 'a', 30)).toBe(true)
+    eng.trigger('roulette', 'B', 0)
+    expect(eng.getStageQueue().map(q => q.gameId)).toEqual(['quiz', 'roulette'])
+    eng.clearQueue('roulette')
+    expect(eng.getStageQueue().map(q => q.gameId)).toEqual(['quiz'])
+    expect(eng.getState('roulette').queued).toBe(0)
+    vi.advanceTimersByTime(1000 + 5000)
+    expect(eng.getState('quiz').status).toBe('collecting')
+    expect(eng.getState('quiz').quiz!.question).toBe('q')
+    eng.trigger('slot', 'C', 0)
+    eng.clearStage()
+    expect(eng.getStageQueue()).toEqual([])
+    expect(eng.getState('slot').queued).toBe(0)
+  })
+
   it('룰렛 항목이 비어 있으면 실행 횟수가 올라가지 않는다', () => {
     const s = settings(); s.games.roulette.items = []
     eng.updateSettings(s)

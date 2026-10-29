@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld('electron', {
   // Games
   gameTrigger:    (gameId: string)        => ipcRenderer.invoke('game:trigger', gameId),
   gameClearQueue: (gameId: string)        => ipcRenderer.invoke('game:clearQueue', gameId),
+  gameStage:      ()                      => ipcRenderer.invoke('game:stage'),
+  gameClearStage: ()                      => ipcRenderer.invoke('game:clearStage'),
   gameState:      (gameId: string)        => ipcRenderer.invoke('game:state', gameId),
   gameAll:        ()                      => ipcRenderer.invoke('game:all'),
   gameHistory:    (limit?: number)        => ipcRenderer.invoke('game:history', limit),
@@ -87,6 +89,7 @@ contextBridge.exposeInMainWorld('electron', {
   onSoopBalloon:      (cb: (e: SoopBalloonEvent) => void)     => on('soop:balloon',      cb),
   onSoopChat:         (cb: (e: SoopChatEvent) => void)        => on('soop:chat',         cb),
   onGameUpdate:       (cb: (id: string, s: unknown) => void)  => on('game:update',       cb),
+  onStageUpdate:      (cb: (q: unknown) => void)              => on('stage:update',      cb),
   onGameResult:       (cb: (id: string, r: unknown) => void)  => on('game:result',       cb),
   onQuizQuestion:     (cb: (q: unknown) => void)              => on('quiz:question',      cb),
   onStatsUpdate:      (cb: (s: StatsSnapshot) => void)        => on('stats:update',      cb),
