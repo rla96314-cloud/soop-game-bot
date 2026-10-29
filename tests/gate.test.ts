@@ -11,6 +11,27 @@ describe('DonationGate', () => {
     expect(g.push('weflab', 'kim', 100, t + DEDUPE_MS + 1)).toBe(true)   // 시간 지나면 새 후원
   })
 
+  it('both: 같은 경로에서 같은 후원자가 같은 개수를 연달아 쏘면 전부 통과 (짝은 다른 경로끼리만)', () => {
+    const g = new DonationGate()
+    const t = 0
+    expect(g.push('weflab', 'kim', 100, t)).toBe(true)
+    expect(g.push('weflab', 'kim', 100, t + 300)).toBe(true)
+    expect(g.push('weflab', 'kim', 100, t + 600)).toBe(true)
+    // 뒤늦게 SOOP 로 같은 3건이 오면 각각 짝지어 버려진다
+    expect(g.push('soop', 'kim', 100, t + 700)).toBe(false)
+    expect(g.push('soop', 'kim', 100, t + 800)).toBe(false)
+    expect(g.push('soop', 'kim', 100, t + 900)).toBe(false)
+    expect(g.push('soop', 'kim', 100, t + 1000)).toBe(true)   // 4번째는 짝이 없는 새 후원
+  })
+
+  it('both: 두 경로가 번갈아 와도 1:1 로만 짝지어진다', () => {
+    const g = new DonationGate()
+    expect(g.push('soop',   'kim', 100, 0)).toBe(true)
+    expect(g.push('weflab', 'kim', 100, 100)).toBe(false)
+    expect(g.push('soop',   'kim', 100, 1000)).toBe(true)    // 두 번째 실제 후원
+    expect(g.push('weflab', 'kim', 100, 1100)).toBe(false)
+  })
+
   it('both: 다른 개수·다른 후원자는 중복이 아님', () => {
     const g = new DonationGate()
     const t = 0
