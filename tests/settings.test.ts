@@ -99,6 +99,10 @@ describe('weflab', () => {
     expect(parseDonationFrame('2')).toBeNull()
     expect(parseDonationFrame('42["msg",{"type":"chat","data":{}}]')).toBeNull()
   })
+  it('위플랩 대시보드 "테스트 후원" 프레임(test_donation, 닉네임 없음)도 별풍선으로 받는다 — 2026-10 실측 형태', () => {
+    const d = parseDonationFrame('42["msg",{"type":"test_donation","data":{"type":"SENDBALLOON","value":"330","uname":"","uid":""},"page":"setup"}]')
+    expect(d).toMatchObject({ donor: '', balloons: 330, amount: 0 })
+  })
 })
 
 describe('슬롯 기본 심볼 마이그레이션', () => {
