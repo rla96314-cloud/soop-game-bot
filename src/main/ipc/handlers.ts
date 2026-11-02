@@ -113,6 +113,16 @@ export function registerIpcHandlers(win: BrowserWindow) {
     send('pickboard:update', pickboardStore.get())
     overlayServer.broadcast('pickboard:state', pickboardStore.toWire())
   })
+  // 엔진은 "어느 칸을 열지"만 정하고, 판은 여기 store 가 연다
+  const pickPrize = (idx: number) => {
+    const p = pickboardStore.reveal(idx)
+    return p ? { name: p.name, description: p.description, color: p.color, lose: !!pickboardStore.get().cells[idx]?.lose } : null
+  }
+  gameEngine.setPickboard({
+    total:         () => pickboardStore.total(),
+    closedIndices: () => pickboardStore.closedIndices(),
+    reveal:        pickPrize,
+  })
 
   // ── Overlay server ───────────────────────────────────────────────────────
 
@@ -178,7 +188,11 @@ export function registerIpcHandlers(win: BrowserWindow) {
 
   // Pickboard
   ipcMain.handle('pickboard:get',    ()           => pickboardStore.get())
-  ipcMain.handle('pickboard:reveal', authed((idx: number) => ({ ok: true, prize: pickboardStore.reveal(Number(idx)) })))
+  ipcMain.handle('pickboard:reveal', authed((idx: number) => {
+    const prize = pickPrize(Number(idx))
+    if (prize) gameEngine.logPickboardManual(Number(idx), prize)   // 직접 누른 것도 기록에 남긴다
+    return { ok: true, prize }
+  }))
   ipcMain.handle('pickboard:reset',  authed(() => { pickboardStore.reset(loadSettings()); return { ok: true } }))
   ipcMain.handle('pickboard:show',   authed(() => { overlayServer.broadcast('pickboard:state', pickboardStore.toWire()); return { ok: true } }))
 

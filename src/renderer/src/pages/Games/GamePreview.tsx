@@ -66,7 +66,8 @@ export default function GamePreview({ gameId, port, wheelSize = 320, title = '�
   const save = (_k: string, _v: unknown) => {}
   const enabled = (g.enabled as boolean) ?? true
 
-  const idleHint = game.engine
+  const idleHint = gameId === 'pickboard' && g.pickMode === 'manual' ? '직접 뽑기 — 가운데 판에서 칸을 누르면 열립니다'
+    : game.engine
     ? ((g.balloonThreshold as number) > 0 ? `별풍선 ${g.balloonThreshold}개 후원 시 자동 실행` : '별풍선 트리거가 꺼져 있습니다 (채팅 명령어 또는 실행 버튼)')
     : '칸을 눌러 하나씩 공개합니다'
 
@@ -91,11 +92,29 @@ export default function GamePreview({ gameId, port, wheelSize = 320, title = '�
         )}
         {gameId === 'pickboard' && (
           <div className={`${styles.pvStage} checker`}>
-            <div className={styles.pvIdle}>
-              <span className="game-ic lg" style={{ background: game.color, width: 64, height: 64 }}><Icon name={game.icon} size={32} /></span>
-              <b>뽑기판</b>
-              <small>가운데 설정 칸의 뽑기판에서 칸을 누르면<br />OBS 오버레이에 바로 반영됩니다.</small>
-            </div>
+            {!busy && !result && (
+              <div className={styles.pvIdle}>
+                <span className="game-ic lg" style={{ background: game.color, width: 64, height: 64 }}><Icon name={game.icon} size={32} /></span>
+                <b>뽑기판 대기 중</b>
+                <small>{idleHint}</small>
+              </div>
+            )}
+            {busy && (() => {
+              const p = state?.pickboard as { triggeredBy: string; no?: number; prize?: { name: string }; deadline?: number; how?: string } | undefined
+              return (
+                <div className={styles.pvIdle}>
+                  <b>{status === 'collecting' ? `${p?.triggeredBy ?? ''}님의 번호를 기다리는 중…` : p?.no !== undefined ? `${p.no}번 → ${p.prize?.name ?? ''}` : '여는 중…'}</b>
+                  <small>{status === 'collecting' ? '후원자가 채팅으로 번호를 보내면 그 칸이 열립니다' : p?.how ?? ''}</small>
+                </div>
+              )
+            })()}
+            {!busy && result && (
+              <div className={styles.pvResult}>
+                <small style={{ color: 'var(--muted)' }}>{result.triggeredBy}님의 결과</small>
+                <div className="big">{result.result}</div>
+                <small style={{ color: 'var(--text2)' }}>{result.detail}</small>
+              </div>
+            )}
           </div>
         )}
         {gameId === 'quiz' && (

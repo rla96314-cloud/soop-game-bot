@@ -384,7 +384,8 @@ function setCount(n, total, pop) {
   countEl.classList.remove('pop'); void countEl.offsetWidth; countEl.classList.add('pop')
 }
 
-const isLoseName = name => /꽝/.test(String(name || ''))
+// 꽝 판정은 메인이 준 lose 플래그가 우선 (꽝 문구를 바꿔도 맞게), 없으면(구버전) 이름으로
+const isLoseCell = cell => typeof cell.lose === 'boolean' ? cell.lose : /꽝/.test(String(cell.name || ''))
 const isJackName = name => /1등|대박|특별/.test(String(name || ''))
 
 // 한 칸 공개 연출: 3D 플립(0→90° 앞면 → 내용 교체 → -90→0° 상품면) → 당첨/꽝 피드백
@@ -393,7 +394,7 @@ function revealCell(ticket, cell, finalCount, total, batch) {
   const gen = gridGen
   const wrapEl = ticket.parentElement
   const col = parseColor(cell.color)
-  const lose = isLoseName(cell.name), jack = isJackName(cell.name)
+  const lose = isLoseCell(cell), jack = !lose && isJackName(cell.name)
   const mySound = lose ? 'lose' : jack ? 'jackpot' : 'win'
   ticket.classList.remove('glow', 'shake', 'flip-in')
   ticket.classList.add('flip-out')
@@ -436,7 +437,7 @@ function finale(total) {
   FX.confetti({ x: r.left + r.width / 2, y: r.top + 30, count: 320, spread: 1.5 })
   FX.confetti({ x: r.left + 20, y: r.top + r.height * 0.6, count: 90, spread: 0.7 })
   FX.confetti({ x: r.right - 20, y: r.top + r.height * 0.6, count: 90, spread: 0.7 })
-  FX.winner({ text: '뽑기판 종료', sub: total + '칸 모두 공개', anchor: board, ms: 6000, icon: '🎯' })
+  FX.winner({ text: '뽑기판 종료', sub: total + '칸 모두 공개', ...bannerPos(), ms: 6000, icon: '🎯' })
 }
 
 function updateGrid(cells, rows, cols) {
@@ -459,7 +460,7 @@ function updateGrid(cells, rows, cols) {
   const fresh = cells.filter((cell, i) => !currentCells[i].revealed && cell.revealed)
   // 이번 배치의 대표 효과음: 1등급 > 당첨 > 꽝
   const batch = { flip: false, pop: false, played: false,
-    kind: fresh.some(c => isJackName(c.name)) ? 'jackpot' : fresh.some(c => !isLoseName(c.name)) ? 'win' : 'lose' }
+    kind: fresh.some(c => !isLoseCell(c) && isJackName(c.name)) ? 'jackpot' : fresh.some(c => !isLoseCell(c)) ? 'win' : 'lose' }
   let flipped = 0
   cells.forEach((cell, i) => {
     if (!currentCells[i].revealed && cell.revealed) {
@@ -479,6 +480,35 @@ function updateGrid(cells, rows, cols) {
   }
 }
 
+// ── 자동 뽑기 진행 배너 (누가·몇 번·무엇) — 칸 플립은 pickboard:state 가, 사람 정보는 game:state 가 준다 ──
+let runBanner = null, waitTimer = null
+function clearWait() { if (waitTimer) { clearInterval(waitTimer); waitTimer = null } }
+function hideRunBanner() { if (runBanner && document.body.contains(runBanner)) FX.hideWinner(); runBanner = null }
+// 판 아래에 자리가 없으면(작은 소스) 배너를 판 위로 — 마지막 줄 칸을 가리지 않게
+const bannerPos = () => { const r = board.getBoundingClientRect(); return innerHeight - r.bottom < 130 ? { anchor: board, above: true } : { anchor: board } }
+function onRun(st) {
+  const p = st && st.pickboard
+  clearWait()
+  if (st.status === 'collecting' && p && p.deadline) {
+    const range = p.startNo + '~' + (p.startNo + p.total - 1) + '번'
+    const left = () => Math.max(0, Math.ceil((p.deadline - Date.now()) / 1000))
+    runBanner = FX.winner({ nick: p.triggeredBy, text: '채팅으로 번호를 보내 주세요', sub: range + ' · ' + left() + '초', ...bannerPos(), ms: 600000, icon: '💬', balloons: p.balloon })
+    FX.sound('timer')
+    waitTimer = setInterval(() => { const el = runBanner && runBanner.querySelector('.fx-sub'); if (el) el.textContent = range + ' · ' + left() + '초' }, 1000)
+    return
+  }
+  if (st.status === 'running' && p && p.prize) {
+    runBanner = FX.winner({ nick: p.triggeredBy, text: p.no + '번 → ' + p.prize.name, sub: p.how || '', ...bannerPos(),
+      ms: (p.revealMs || 1600) + 2600, icon: p.prize.lose ? '💨' : '🎁', balloons: p.balloon })
+    return
+  }
+  if (st.status === 'running' && p && p.how && !p.prize) {   // 건너뜀 (이미 열린 칸·판 밖)
+    runBanner = FX.winner({ nick: p.triggeredBy, text: '건너뜀', sub: p.how, ...bannerPos(), ms: 1800, icon: '⏭️' })
+    return
+  }
+  if (st.status === 'idle') hideRunBanner()
+}
+
 function connect() {
   const ws = new WebSocket('ws://localhost:${port}/__overlay_ws__')
   ws.onmessage = e => {
@@ -488,6 +518,7 @@ function connect() {
       if (msg.type === 'pickboard:state') {
         updateGrid(msg.data.cells, msg.data.rows, msg.data.cols)
       }
+      if (msg.type === 'game:state' && msg.data && msg.data.id === 'pickboard') onRun(msg.data)
       if (msg.type === 'ping') ws.send(JSON.stringify({type:'pong'}))
     } catch {}
   }

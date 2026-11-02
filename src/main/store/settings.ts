@@ -14,6 +14,11 @@ export interface QuizQuestion { question: string; answer: string }
 export interface Prize        { name: string; description: string }
 export interface PickItem     { name: string; description: string; color: string; count: number }
 
+/** 뽑기판 자동 뽑기 방식
+ *  balloon: 후원 개수가 곧 칸 번호 / chat: 후원자가 채팅으로 번호 / random: 무작위 / order: 빈칸 순서 / manual: 스트리머만 */
+export type PickMode = 'balloon' | 'chat' | 'random' | 'order' | 'manual'
+export const PICK_MODES: PickMode[] = ['balloon', 'chat', 'random', 'order', 'manual']
+
 export interface GameConfig {
   enabled:          boolean
   balloonThreshold: number
@@ -31,6 +36,12 @@ export interface GameConfig {
   pickRows?: number
   pickCols?: number
   pickItems?: PickItem[]
+  pickMode?:        PickMode
+  pickMax?:         number            // 참여 가능한 최대 별풍선 (0 = 제한 없음). 최소는 balloonThreshold
+  pickStartNo?:     number            // 칸 번호 시작값 (별풍 번호 방식: 개수 - 시작값 + 1 번째 칸)
+  pickDupPolicy?:   'random' | 'skip' // 번호 칸이 이미 열렸거나 범위 밖일 때: 무작위 칸 / 건너뜀
+  pickChatWaitSec?: number            // 채팅 번호 방식에서 후원자의 번호를 기다리는 시간
+  loseText?:        string            // 꽝 칸 문구 (사행성 경고 대비)
   // quiz
   timeLimit?: number
   questions?: QuizQuestion[]
@@ -95,8 +106,9 @@ export const DEFAULTS: Settings = {
       ],
     },
     pickboard: {
-      enabled: true, balloonThreshold: 0, chatCommand: '',
+      enabled: true, balloonThreshold: 0, chatCommand: '!뽑기',
       pickRows: 4, pickCols: 5,
+      pickMode: 'random', pickMax: 0, pickStartNo: 1, pickDupPolicy: 'random', pickChatWaitSec: 30, loseText: '꽝',
       pickItems: [
         { name: '1등 상품', description: '치킨 쿠폰',  color: '#F59E0B', count: 1 },
         { name: '2등 상품', description: '음료 쿠폰',  color: '#8B5CF6', count: 2 },
@@ -167,6 +179,9 @@ export const LIMITS = {
   count:            { min: 1,    max: 100 },
   probability:      { min: 0,    max: 1_000_000 },
   pickCount:        { min: 0,    max: 100 },
+  pickMax:          { min: 0,    max: 1_000_000 },
+  pickStartNo:      { min: 0,    max: 1_000_000 },
+  pickChatWaitSec:  { min: 5,    max: 600 },
   scale:            { min: 50,   max: 200 },
   maxRunsPerDonation: { min: 1,  max: 100 },
   raceDuration:     { min: 3000, max: 30000 },
@@ -216,6 +231,12 @@ function sanitizeGame(id: string, g: GameConfig, def: GameConfig): GameConfig {
       color:       /^#[0-9a-f]{6}$/i.test(String((p as PickItem)?.color)) ? String((p as PickItem).color) : '#6B7280',
       count:       clampNum((p as PickItem)?.count, LIMITS.pickCount, 1),
     })) : def.pickItems
+    out.pickMode        = PICK_MODES.includes(g.pickMode as PickMode) ? (g.pickMode as PickMode) : 'random'
+    out.pickMax         = clampNum(g.pickMax, LIMITS.pickMax, 0)
+    out.pickStartNo     = clampNum(g.pickStartNo, LIMITS.pickStartNo, 1)
+    out.pickDupPolicy   = g.pickDupPolicy === 'skip' ? 'skip' : 'random'
+    out.pickChatWaitSec = clampNum(g.pickChatWaitSec, LIMITS.pickChatWaitSec, 30)
+    out.loseText        = String(g.loseText ?? '').trim().slice(0, 20) || '꽝'
   }
   if (id === 'quiz') {
     out.timeLimit = clampNum(g.timeLimit, LIMITS.timeLimit, 30)

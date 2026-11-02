@@ -7,14 +7,14 @@ export interface GameMeta {
   desc:  string
   color: string
   icon:  IconName
-  /** 엔진이 돌리는 게임인지 (뽑기판은 렌더러에서 직접 진행) */
+  /** 엔진이 돌리는 게임인지 (이제 전부 true — 뽑기판도 후원·채팅으로 자동 실행된다) */
   engine: boolean
 }
 
 export const GAMES: GameMeta[] = [
   { id: 'roulette',  name: '룰렛',      desc: '항목을 돌려 당첨 결과를 추첨하는 게임',   color: '#ff5b17', icon: 'roulette',  engine: true  },
   { id: 'ladder',    name: '사다리타기', desc: '참여자 중 당첨자를 뽑는 게임',            color: '#12a866', icon: 'ladder',    engine: true  },
-  { id: 'pickboard', name: '뽑기판',     desc: '칸을 선택해 상품을 뽑는 게임',            color: '#ff7a3d', icon: 'pickboard', engine: false },
+  { id: 'pickboard', name: '뽑기판',     desc: '후원 개수·채팅 번호·랜덤으로 칸을 열어 상품을 뽑는 게임', color: '#ff7a3d', icon: 'pickboard', engine: true },
   { id: 'quiz',      name: '퀴즈',      desc: '질문과 보기로 진행하는 퀴즈 게임',        color: '#2f6bff', icon: 'quiz',      engine: true  },
   { id: 'slot',      name: '슬롯머신',   desc: '3개의 슬롯으로 잭팟을 노리는 게임',       color: '#7a3cff', icon: 'slot',      engine: true  },
   { id: 'race',      name: '경주',      desc: '시청자가 채팅으로 1등을 예측하는 동물 경주 게임', color: '#00a884', icon: 'race',      engine: true  },

@@ -4,7 +4,7 @@ import { GameEngine, GAME_IDS, type GameId, type GameState, type GameResult } fr
 import { PickboardStore } from '../games/pickboard'
 import { loadSettings, type Settings } from '../store/settings'
 
-export const DEMO_GAMES = [...GAME_IDS, 'pickboard'] as const
+export const DEMO_GAMES = [...GAME_IDS] as const
 
 const VIEWERS = ['별빛여우', '감자도리', '치즈냥', '멍멍이', '하늘콩', '초코칩', '새벽달']
 const HANDS = ['가위', '바위', '보']

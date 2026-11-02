@@ -5,9 +5,9 @@ import { SLOT_DEFAULT_SYMBOLS } from '../store/settings'
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type GameId = 'roulette' | 'ladder' | 'quiz' |
-                     'slot' | 'race' | 'rps' | 'fish' | 'lottery' | 'number'
+                     'slot' | 'race' | 'rps' | 'fish' | 'lottery' | 'number' | 'pickboard'
 
-export const GAME_IDS: GameId[] = ['roulette','ladder','quiz','slot','race','rps','fish','lottery','number']
+export const GAME_IDS: GameId[] = ['roulette','ladder','quiz','slot','race','rps','fish','lottery','number','pickboard']
 
 export type GameStatus = 'idle' | 'collecting' | 'running' | 'showing_result'
 
@@ -142,6 +142,34 @@ export interface FishCastState {
 }
 export type FishRecorder = (user: string, fish: FishItem) => { count: number; totalPoints: number }
 
+// ── 뽑기판 (판 자체는 pickboard store 가 들고 있고, 엔진은 "어느 칸을 열지"만 정한다) ──
+export type PickMode = 'balloon' | 'chat' | 'random' | 'order' | 'manual'
+export interface PickPrize { name: string; description: string; color: string; lose: boolean }
+export interface PickboardRunState {
+  mode:        PickMode
+  triggeredBy: string
+  balloon:     number
+  startNo:     number     // 칸 번호 시작값 (1이면 1번 칸 = idx 0)
+  total:       number
+  command:     string
+  deadline?:   number     // 채팅 번호 방식: 후원자의 번호를 기다리는 마감
+  joinMs?:     number
+  idx?:        number     // 연 칸 (0부터)
+  no?:         number     // 연 칸의 번호 (startNo 기준)
+  prize?:      PickPrize
+  how?:        string     // 어떻게 골랐는지 (기록·화면용)
+  revealMs?:   number
+}
+/** 메인이 pickboard store 를 이 모양으로 붙여 준다 — 엔진은 판 저장소를 모른다 */
+export interface PickboardApi {
+  total(): number
+  closedIndices(): number[]
+  reveal(idx: number): PickPrize | null
+}
+/** 칸 공개 연출 길이 (오버레이 플립 ~450ms + 당첨 연출) 와 결과 표시 시간 — 후원이 몰려도 한 칸에 이만큼만 쓴다 */
+export const PICK_REVEAL_MS = 1600
+export const PICK_RESULT_MS = 2600
+
 export interface GameState {
   id:       GameId
   status:   GameStatus
@@ -156,6 +184,7 @@ export interface GameState {
   race?:    RaceState
   rps?:     RpsState
   fish?:    FishCastState
+  pickboard?: PickboardRunState
 }
 
 interface QueuedRun {
@@ -163,6 +192,7 @@ interface QueuedRun {
   triggeredBy: string
   balloon:     number
   quiz?:       { question: string; answer: string; timeLimit: number }   // 수동 출제 퀴즈
+  pick?:       { no: number }                                            // 뽑기판: 채팅 명령으로 지정한 칸 번호
 }
 
 /** 무대 대기열 상한 — 게임 종류와 상관없이 한 줄이다 */
@@ -340,9 +370,12 @@ export class GameEngine extends EventEmitter {
   private slotRunId = 0
   private ladderRun: { by: string; balloon: number } | null = null
   private fishRecorder: FishRecorder = (_u, f) => ({ count: 1, totalPoints: f.points })
+  private pickboard: PickboardApi | null = null
 
   /** 낚시 누적 기록 저장소 연결 (메인에서 fishlog 주입 — 엔진은 파일을 모른다) */
   setFishRecorder(fn: FishRecorder) { this.fishRecorder = fn }
+  /** 뽑기판 저장소 연결 */
+  setPickboard(api: PickboardApi | null) { this.pickboard = api }
 
   private setPhaseTimer(id: GameId, fn: () => void, ms: number) {
     const prev = this.phaseTimers.get(id)
@@ -401,21 +434,29 @@ export class GameEngine extends EventEmitter {
       if (!cfg.enabled || !GAME_IDS.includes(id as GameId)) continue
       const threshold = Number(cfg.balloonThreshold) || 0
       if (threshold <= 0) continue   // 0 = 이 게임은 별풍선으로 발동하지 않음
-      if (amount >= threshold && (!best || threshold > best.threshold)) {
-        best = { id: id as GameId, threshold }
+      if (amount < threshold) continue
+      if (id === 'pickboard') {
+        if (cfg.pickMode === 'manual') continue                      // 직접 뽑기: 후원으로는 열지 않는다
+        const max = Number(cfg.pickMax) || 0
+        if (max > 0 && amount > max) continue                        // 참여 범위(최소~최대) 밖
       }
+      if (!best || threshold > best.threshold) best = { id: id as GameId, threshold }
     }
     if (!best) return
 
     const multi   = this.settings.soop.multiRun !== false
     const maxRuns = Math.max(1, Number(this.settings.soop.maxRunsPerDonation) || 10)
-    const runs    = multi ? Math.min(maxRuns, Math.floor(amount / best.threshold)) : 1
+    // 뽑기판은 후원 1건 = 뽑기 1번 (개수가 곧 번호라서 배수 반복이 뜻이 없다)
+    const runs    = best.id === 'pickboard' ? 1 : multi ? Math.min(maxRuns, Math.floor(amount / best.threshold)) : 1
     for (let i = 0; i < runs; i++) this.trigger(best.id, username, i === 0 ? amount : 0)
   }
 
   onChat(username: string, message: string) {
     this.todayViewers.add(username)
     const msg = message.trim()
+
+    // 뽑기판이 후원자의 번호를 기다리는 중이면 그 사람의 숫자 채팅이 먼저다
+    if (this.pickboardChatNumber(username, msg)) return
 
     for (const [id, cfg] of Object.entries(this.settings.games)) {
       if (!GAME_IDS.includes(id as GameId)) continue
@@ -431,6 +472,8 @@ export class GameEngine extends EventEmitter {
         this.rpsChat(username, arg, cfg.enabled)
       } else if (id === 'race') {
         this.raceChat(username, arg, cfg.enabled)
+      } else if (id === 'pickboard') {
+        this.pickboardCommand(username, arg, cfg.enabled)
       } else if (cfg.enabled) {
         this.trigger(id as GameId, username, 0)
       }
@@ -482,9 +525,10 @@ export class GameEngine extends EventEmitter {
     return this.startNow(run) ? 'started' : 'rejected'
   }
 
-  private startNow({ gameId, triggeredBy: by, balloon, quiz }: QueuedRun): boolean {
+  private startNow({ gameId, triggeredBy: by, balloon, quiz, pick }: QueuedRun): boolean {
     let ok = false
     switch (gameId) {
+      case 'pickboard': ok = this.runPickboard(by, balloon, pick); break
       case 'roulette': ok = this.runRoulette(by, balloon); break
       case 'ladder':   ok = this.startLadder(by, balloon); break
       case 'quiz':     ok = quiz ? this.beginQuiz(quiz.question, quiz.answer, quiz.timeLimit, by, 0) : this.startQuiz(by, balloon); break
@@ -984,15 +1028,157 @@ export class GameEngine extends EventEmitter {
     return true
   }
 
+  // ── Pickboard (뽑기판: 후원 개수·채팅 번호·랜덤·순서로 칸을 연다) ─────────────
+
+  private pickCfg() {
+    const cfg = this.settings.games.pickboard
+    const mode = (['balloon', 'chat', 'random', 'order', 'manual'] as PickMode[]).includes(cfg?.pickMode as PickMode)
+      ? (cfg!.pickMode as PickMode) : 'random'
+    return {
+      mode,
+      startNo:  Math.trunc(Number(cfg?.pickStartNo ?? 1)) || 0,
+      dupSkip:  cfg?.pickDupPolicy === 'skip',
+      waitSec:  Math.max(5, Number(cfg?.pickChatWaitSec) || 30),
+      command:  String(cfg?.chatCommand ?? '').trim(),
+    }
+  }
+
+  /** "!뽑기" / "!뽑기 12" — 직접 뽑기 모드에선 시청자 명령으로 열지 않는다 */
+  private pickboardCommand(username: string, arg: string, enabled: boolean) {
+    if (!enabled || this.pickCfg().mode === 'manual') return
+    const no = Number(arg.replace(/번$/, ''))
+    this.enqueue({ gameId: 'pickboard', triggeredBy: username, balloon: 0, pick: arg !== '' && Number.isInteger(no) ? { no } : undefined })
+  }
+
+  /** 채팅 번호 방식: 기다리던 후원자가 숫자(또는 랜덤)를 치면 그 칸을 연다. 소비했으면 true */
+  private pickboardChatNumber(username: string, msg: string): boolean {
+    const state = this.getState('pickboard')
+    const p = state.pickboard
+    if (state.status !== 'collecting' || !p) return false
+    if (p.triggeredBy.trim().toLowerCase() !== username.trim().toLowerCase()) return false
+    let t = msg.trim()
+    if (p.command && t.startsWith(p.command)) t = t.slice(p.command.length).trim()   // "!뽑기 12" 도 받는다
+    if (/^(랜덤|아무거나|암거나|random)$/i.test(t)) { this.pickboardOpen(null, '채팅: 랜덤'); return true }
+    const m = t.match(/^([0-9]{1,7})[ ]*번?$/)
+    if (!m) return false
+    const no = Number(m[1])
+    this.pickboardOpen(no - p.startNo, `채팅: ${no}번`)
+    return true
+  }
+
+  private runPickboard(by: string, balloon: number, hint?: { no: number }): boolean {
+    const api = this.pickboard
+    if (!api) { this.emit('log', '뽑기판이 준비되지 않았습니다'); return false }
+    const { mode, startNo, waitSec, command } = this.pickCfg()
+    const total  = api.total()
+    const closed = api.closedIndices()
+    if (!total || !closed.length) { this.emit('log', '뽑기판 칸이 모두 열렸습니다 — 초기화한 뒤 다시 실행하세요'); return false }
+
+    const state = this.getState('pickboard')
+    const base: PickboardRunState = { mode, triggeredBy: by, balloon, startNo, total, command }
+
+    // 채팅 번호 방식: 후원이면 후원자가 번호를 말할 때까지 기다린다 (버튼·명령어 실행은 바로 뽑는다)
+    if (mode === 'chat' && balloon > 0 && !hint) {
+      state.status    = 'collecting'
+      state.pickboard = { ...base, deadline: Date.now() + waitSec * 1000, joinMs: waitSec * 1000 }
+      this.emit('game:update', 'pickboard', state)
+      this.setPhaseTimer('pickboard', () => this.pickboardOpen(null, `${waitSec}초 동안 번호 없음 → 랜덤`), waitSec * 1000)
+      return true
+    }
+
+    state.status    = 'running'
+    state.pickboard = base
+    if (hint)                              return this.pickboardOpen(hint.no - startNo, `${hint.no}번 지정`)
+    if (mode === 'balloon' && balloon > 0) return this.pickboardOpen(balloon - startNo, `별풍선 ${balloon}개 → ${balloon}번`)
+    if (mode === 'order')                  return this.pickboardOpen(closed[0], '빈칸 순서')
+    return this.pickboardOpen(null, '랜덤')
+  }
+
+  /**
+   * 칸 하나를 연다. want 가 없거나 범위 밖·이미 열린 칸이면 설정대로 랜덤 대체 또는 건너뜀.
+   * (채팅 번호 방식의 대기 상태에서도, 바로 뽑는 상태에서도 여기로 모인다)
+   */
+  private pickboardOpen(want: number | null, how: string): boolean {
+    const api   = this.pickboard
+    const state = this.getState('pickboard')
+    const p     = state.pickboard
+    if (!api || !p) return false
+    const { dupSkip } = this.pickCfg()
+    const closed = api.closedIndices()
+    const by = p.triggeredBy, balloon = p.balloon
+
+    let idx = want
+    if (idx === null || !Number.isInteger(idx) || !closed.includes(idx)) {
+      if (!closed.length) {
+        this.emit('log', '뽑기판 칸이 모두 열렸습니다 — 초기화한 뒤 다시 실행하세요')
+        state.status = 'running'; state.pickboard = { ...p, how: '남은 칸 없음' }
+        this.finishGame('pickboard', { gameId: 'pickboard', triggeredBy: by, balloon, result: '건너뜀', detail: `${by}님 · 남은 칸 없음`, ts: Date.now() }, 1000)
+        return false
+      }
+      if (want !== null) {
+        const no = want + p.startNo
+        const why = idx !== null && idx >= 0 && idx < p.total ? `${no}번은 이미 열린 칸` : `${no}번은 판 밖(${p.startNo}~${p.startNo + p.total - 1})`
+        if (dupSkip) {
+          state.status = 'running'; state.pickboard = { ...p, deadline: undefined, joinMs: undefined, how: `${how} · ${why} → 건너뜀` }
+          this.emit('game:update', 'pickboard', state)
+          this.finishGame('pickboard', { gameId: 'pickboard', triggeredBy: by, balloon, result: '건너뜀', detail: `${by}님 · ${how} · ${why}`, ts: Date.now() }, 1800)
+          return true
+        }
+        how = `${how} · ${why} → 랜덤`
+      }
+      idx = closed[Math.floor(Math.random() * closed.length)]
+    }
+
+    const prize = api.reveal(idx)
+    if (!prize) {
+      this.emit('log', `뽑기판 ${idx + p.startNo}번 칸을 열 수 없습니다`)
+      state.status = 'idle'; state.pickboard = undefined
+      this.emit('game:update', 'pickboard', state)
+      this.drainStage()
+      return false
+    }
+    const no = idx + p.startNo
+    state.status    = 'running'
+    state.pickboard = { ...p, deadline: undefined, joinMs: undefined, idx, no, prize, how, revealMs: PICK_REVEAL_MS }
+    this.emit('game:update', 'pickboard', state)
+
+    this.setPhaseTimer('pickboard', () => {
+      this.finishGame('pickboard', {
+        gameId: 'pickboard', triggeredBy: by, balloon,
+        result: prize.name,
+        detail: `${by}님 ${no}번 → ${prize.name}${prize.description ? ` (${prize.description})` : ''}${prize.lose ? ' · 꽝' : ''} · ${how}`,
+        ts: Date.now(),
+      }, PICK_RESULT_MS)
+    }, PICK_REVEAL_MS)
+    return true
+  }
+
+  /** 스트리머가 앱에서 칸을 직접 눌러 연 것도 기록에 남긴다 (무대 상태는 건드리지 않는다) */
+  logPickboardManual(idx: number, prize: PickPrize, by = '스트리머') {
+    const { startNo } = this.pickCfg()
+    const no = idx + startNo
+    this.pushHistory({
+      gameId: 'pickboard', triggeredBy: by, balloon: 0,
+      result: prize.name,
+      detail: `${by}님 ${no}번 → ${prize.name}${prize.description ? ` (${prize.description})` : ''}${prize.lose ? ' · 꽝' : ''} · 직접 선택`,
+      ts: Date.now(),
+    })
+    this.todayRuns++; this.emitStats()
+  }
+
+  private pushHistory(result: GameResult) {
+    this.history.push(result)
+    if (this.history.length > MAX_HISTORY) this.history.splice(0, this.history.length - MAX_HISTORY)
+    this.emit('game:result', result.gameId, result)
+  }
+
   // ── Finish ────────────────────────────────────────────────────────────────
 
-  private finishGame(id: GameId, result: GameResult) {
+  private finishGame(id: GameId, result: GameResult, showMs = RESULT_SHOW_MS) {
     const state  = this.getState(id)
     state.status = 'showing_result'
     state.result = result
-    this.history.push(result)
-    if (this.history.length > MAX_HISTORY) this.history.splice(0, this.history.length - MAX_HISTORY)
-    this.emit('game:result', id, result)
+    this.pushHistory(result)
     this.emit('game:update', id, state)
 
     setTimeout(() => {
@@ -1002,10 +1188,10 @@ export class GameEngine extends EventEmitter {
       s2.result = null
       s2.roulette = undefined; s2.ladder = undefined; s2.quiz = undefined
       s2.slot = undefined; s2.number = undefined; s2.lottery = undefined
-      s2.race = undefined; s2.rps = undefined; s2.fish = undefined
+      s2.race = undefined; s2.rps = undefined; s2.fish = undefined; s2.pickboard = undefined
       this.emit('game:update', id, s2)
       this.drainStage()
-    }, RESULT_SHOW_MS)
+    }, showMs)
   }
 }
 

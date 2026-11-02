@@ -60,14 +60,53 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
         {/* ── 게임 설정 ── */}
         {tab === 'game' && (<>
           <div className={styles.fields}>
+            {gameId === 'pickboard' && (
+              <Field label="뽑기 방식">
+                <select value={(g.pickMode as string) ?? 'random'} onChange={e => save('pickMode', e.target.value)}>
+                  <option value="balloon">별풍 번호 — 후원 개수가 곧 칸 번호</option>
+                  <option value="chat">채팅 번호 — 후원자가 채팅으로 번호 입력</option>
+                  <option value="random">랜덤 — 후원 시 무작위 칸</option>
+                  <option value="order">순차 — 빈칸 순서대로</option>
+                  <option value="manual">직접 — 스트리머만 누름</option>
+                </select>
+              </Field>
+            )}
             {game.engine && (
-              <Field label="별풍선 트리거 (0=비활성)">
+              <Field label={gameId === 'pickboard' ? '최소 별풍선 (0=별풍선으로 실행 안 함)' : '별풍선 트리거 (0=비활성)'}>
                 <div className={styles.unitField}>
                   <NumberField min={0} max={1000000} value={(g.balloonThreshold as number) ?? 0} onCommit={v => save('balloonThreshold', v)} />
                   <span>개</span>
                 </div>
               </Field>
             )}
+            {gameId === 'pickboard' && (<>
+              <Field label="최대 별풍선 (0=제한 없음)">
+                <div className={styles.unitField}>
+                  <NumberField min={0} max={1000000} value={(g.pickMax as number) ?? 0} onCommit={v => save('pickMax', v)} />
+                  <span>개</span>
+                </div>
+              </Field>
+              <Field label="칸 번호 시작">
+                <div className={styles.unitField}>
+                  <NumberField min={0} max={1000000} value={(g.pickStartNo as number) ?? 1} onCommit={v => save('pickStartNo', v)} />
+                  <span>번부터</span>
+                </div>
+              </Field>
+              <Field label="번호 칸이 이미 열렸거나 판 밖이면">
+                <select value={(g.pickDupPolicy as string) ?? 'random'} onChange={e => save('pickDupPolicy', e.target.value)}>
+                  <option value="random">남은 칸 중 랜덤으로 대체</option>
+                  <option value="skip">건너뜀 (기록만 남김)</option>
+                </select>
+              </Field>
+              {g.pickMode === 'chat' && (
+                <Field label="번호 기다리는 시간 (초)">
+                  <NumberField min={5} max={600} value={(g.pickChatWaitSec as number) ?? 30} onCommit={v => save('pickChatWaitSec', v)} />
+                </Field>
+              )}
+              <Field label="꽝 문구">
+                <LoseTextField value={(g.loseText as string) ?? '꽝'} onSave={v => save('loseText', v)} />
+              </Field>
+            </>)}
             {gameId === 'roulette' && (
               <Field label="스핀 시간 (ms)">
                 <NumberField min={1000} max={15000} step={500} value={(g.spinDuration as number) ?? 3000} onCommit={v => save('spinDuration', v)} />
@@ -143,7 +182,16 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
           )}
           {gameId === 'pickboard' && (<>
             <PickBoardPanel />
-            <div className={styles.note}>칸을 누르면 하나씩 공개되고 OBS 오버레이에 바로 반영됩니다. 칸 크기와 상품은 <b>항목 설정</b> 탭에서 바꿉니다.</div>
+            <div className={styles.note}>
+              {({
+                balloon: <>후원 개수가 곧 칸 번호입니다. 예: 시작 번호 1이면 별풍선 12개 → <b>12번</b> 칸. 최소·최대 범위 밖의 후원은 무시됩니다.</>,
+                chat:    <>후원이 들어오면 후원자에게 번호를 기다립니다. 후원자가 채팅에 <b>숫자</b>(또는 "랜덤")를 치면 그 칸이 열리고, 시간이 지나면 랜덤으로 엽니다.</>,
+                random:  <>후원이 들어올 때마다 남은 칸 중 하나를 무작위로 엽니다.</>,
+                order:   <>후원이 들어올 때마다 빈칸을 번호 순서대로 엽니다.</>,
+                manual:  <>후원·채팅으로는 열리지 않고, 위 판에서 스트리머가 직접 누른 칸만 열립니다.</>,
+              } as Record<string, JSX.Element>)[(g.pickMode as string) ?? 'random']}
+              {' '}직접 누른 칸도 기록에 남습니다. 후원이 몰리면 다른 게임과 함께 한 줄로 차례를 기다립니다. 칸 크기와 상품은 <b>항목 설정</b> 탭에서 바꿉니다.
+            </div>
           </>)}
           {game.engine && (
             <KeywordEditor keywords={(g.weflabKeywords as string[]) ?? []} onSave={v => save('weflabKeywords', v)} />
@@ -249,6 +297,15 @@ function FishMediaPanel() {
         <button className="btn" onClick={load}><Icon name="refresh" size={14} /></button>
       </div>
     </div>
+  )
+}
+
+/** 꽝 문구 — 사행성 경고를 피하려 '꽝' 대신 다른 말을 쓸 때 */
+function LoseTextField({ value, onSave }: { value: string; onSave: (v: string) => void }) {
+  const [v, setV] = useState<string | null>(null)
+  return (
+    <input value={v ?? value} maxLength={20} placeholder="꽝" onChange={e => setV(e.target.value)}
+      onBlur={() => { if (v !== null) { onSave(v.trim() || '꽝'); setV(null) } }} />
   )
 }
 
