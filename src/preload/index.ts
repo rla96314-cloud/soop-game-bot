@@ -45,7 +45,7 @@ contextBridge.exposeInMainWorld('electron', {
   pickboardGet:    ()            => ipcRenderer.invoke('pickboard:get'),
   pickboardReveal: (idx: number) => ipcRenderer.invoke('pickboard:reveal', idx),
   pickboardReset:  ()            => ipcRenderer.invoke('pickboard:reset'),
-  pickboardShow:   ()            => ipcRenderer.invoke('pickboard:show'),
+  pickboardShow:   (v?: boolean) => ipcRenderer.invoke('pickboard:show', v),
 
   // Overlay
   overlayUrl:       (gameId: string)                  => ipcRenderer.invoke('overlay:url', gameId),

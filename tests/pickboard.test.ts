@@ -50,6 +50,25 @@ describe('뽑기판 칸 구성', () => {
   })
 })
 
+describe('뽑기판 오버레이 노출 토글', () => {
+  it('끄고 켤 수 있고, 숨긴 상태에서 칸이 열리면 다시 보인다', () => {
+    const { store } = setup()
+    expect(store.toWire().visible).toBe(true)
+    expect(store.setVisible()).toBe(false)
+    expect(store.toWire().visible).toBe(false)
+    expect(store.setVisible(true)).toBe(true)
+    store.setVisible(false)
+    store.reveal(0)
+    expect(store.toWire().visible).toBe(true)
+  })
+  it('숨긴 채로 판을 초기화해도 숨김 유지', () => {
+    const { store, s } = setup()
+    store.setVisible(false)
+    store.reset(s)
+    expect(store.toWire().visible).toBe(false)
+  })
+})
+
 describe('뽑기판 자동 뽑기', () => {
   it('별풍 번호: 후원 개수가 곧 칸 번호 (시작 번호 반영)', () => {
     const { eng, opened, results } = setup({ pickMode: 'balloon' })

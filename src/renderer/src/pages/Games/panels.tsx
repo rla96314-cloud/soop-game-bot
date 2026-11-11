@@ -348,7 +348,7 @@ export function PickBoardEditor({
 // 탭을 옮겨 패널이 다시 마운트돼도 진행 중인 판이 유지되고, 새 판이 OBS 로 송출되는 일이 없다.
 
 interface Cell { prize: PickItem; revealed: boolean }
-interface PickboardState { rows: number; cols: number; cells: Cell[]; lastResult: PickItem | null }
+interface PickboardState { rows: number; cols: number; cells: Cell[]; lastResult: PickItem | null; visible?: boolean }
 
 type El = Record<string, (...args: never[]) => unknown>
 const electron = () => (window as unknown as { electron?: El }).electron
@@ -366,7 +366,7 @@ export function PickBoardPanel() {
 
   const reveal = (idx: number) => { (el?.pickboardReveal as ((i: number) => Promise<unknown>) | undefined)?.(idx).catch(() => {}) }
   const reset  = () => { (el?.pickboardReset as (() => Promise<unknown>) | undefined)?.().catch(() => {}) }
-  const show   = () => { (el?.pickboardShow as (() => Promise<unknown>) | undefined)?.().catch(() => {}) }
+  const setShow = (v: boolean) => { (el?.pickboardShow as ((v: boolean) => Promise<unknown>) | undefined)?.(v).catch(() => {}) }
 
   if (!pb) return <div className={styles.pbPanel}><div className={styles.listEmpty}>뽑기판 불러오는 중…</div></div>
   const { rows, cols, cells, lastResult } = pb
@@ -377,7 +377,13 @@ export function PickBoardPanel() {
       <div className={styles.pbHeader}>
         <span className={styles.pbTitle}>뽑기판</span>
         <span className={styles.pbCount}>{revealedCount}/{rows * cols} 오픈</span>
-        <button className={styles.pbResetBtn} onClick={show}>오버레이 노출</button>
+        <label className="switch-row" title="끄면 OBS 오버레이에서 판을 숨깁니다. 칸이 열리면 자동으로 다시 보입니다">
+          <span className="switch">
+            <input type="checkbox" checked={pb.visible !== false} onChange={e => setShow(e.target.checked)} />
+            <span className="track" />
+          </span>
+          <span style={{ fontSize: 12 }}>오버레이 노출</span>
+        </label>
         <button className={styles.pbResetBtn} onClick={reset}>초기화</button>
       </div>
 

@@ -196,7 +196,8 @@ export function registerIpcHandlers(win: BrowserWindow) {
     return { ok: true, prize }
   }))
   ipcMain.handle('pickboard:reset',  authed(() => { pickboardStore.reset(loadSettings()); return { ok: true } }))
-  ipcMain.handle('pickboard:show',   authed(() => { overlayServer.broadcast('pickboard:state', pickboardStore.toWire()); return { ok: true } }))
+  // 오버레이 노출 토글 (값을 주면 그 값으로)
+  ipcMain.handle('pickboard:show',   authed((v?: boolean) => ({ ok: true, visible: pickboardStore.setVisible(typeof v === 'boolean' ? v : undefined) })))
 
   // Overlay
   ipcMain.handle('overlay:url',       (_, gameId: string)        => overlayServer.getUrl(gameId))

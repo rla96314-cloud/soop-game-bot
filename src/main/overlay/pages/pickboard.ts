@@ -517,6 +517,9 @@ function connect() {
       FX.handle(msg)
       if (msg.type === 'pickboard:state') {
         updateGrid(msg.data.cells, msg.data.rows, msg.data.cols)
+        // 스트리머가 숨김으로 토글했으면 판과 배너를 내린다 (구버전 메시지엔 visible 이 없음 → 보임)
+        if (msg.data.visible === false) { wrap.classList.remove('show'); hideRunBanner() }
+        else if (msg.data.cells.length > 0) wrap.classList.add('show')
       }
       if (msg.type === 'game:state' && msg.data && msg.data.id === 'pickboard') onRun(msg.data)
       if (msg.type === 'ping') ws.send(JSON.stringify({type:'pong'}))

@@ -11,12 +11,15 @@ export interface PickboardState {
   cols:  number
   cells: PickCell[]
   lastResult: PickItem | null
+  /** OBS 오버레이에 판을 보일지 — 스트리머가 토글. 칸이 열리면 자동으로 다시 보인다 */
+  visible: boolean
 }
 
 /** 오버레이로 보내는 축약 형태 */
 export interface PickboardWire {
   rows: number
   cols: number
+  visible: boolean
   cells: Array<{ revealed: boolean; name: string; description: string; color: string; lose: boolean }>
 }
 
@@ -42,7 +45,7 @@ export function buildCells(rows: number, cols: number, items: PickItem[], loseTe
 }
 
 export class PickboardStore extends EventEmitter {
-  private state: PickboardState = { rows: 0, cols: 0, cells: [], lastResult: null }
+  private state: PickboardState = { rows: 0, cols: 0, cells: [], lastResult: null, visible: true }
   private configKey = ''
 
   /** 설정이 바뀌면(크기·상품) 새 판, 아니면 그대로 유지 */
@@ -55,7 +58,7 @@ export class PickboardStore extends EventEmitter {
     const key = JSON.stringify({ rows, cols, items, loseText })
     if (key === this.configKey && this.state.cells.length) return
     this.configKey = key
-    this.state = { rows, cols, cells: buildCells(rows, cols, items, loseText), lastResult: null }
+    this.state = { rows, cols, cells: buildCells(rows, cols, items, loseText), lastResult: null, visible: this.state.visible }
     this.emit('update', this.state)
   }
 
@@ -71,7 +74,7 @@ export class PickboardStore extends EventEmitter {
 
   toWire(): PickboardWire {
     return {
-      rows: this.state.rows, cols: this.state.cols,
+      rows: this.state.rows, cols: this.state.cols, visible: this.state.visible,
       cells: this.state.cells.map(c => ({ revealed: c.revealed, name: c.prize.name, description: c.prize.description, color: c.prize.color, lose: c.lose })),
     }
   }
@@ -81,8 +84,16 @@ export class PickboardStore extends EventEmitter {
     if (!cell || cell.revealed) return null
     cell.revealed = true
     this.state.lastResult = cell.prize
+    this.state.visible = true   // 숨겨 둔 상태에서 칸이 열리면 시청자가 봐야 하므로 다시 보인다
     this.emit('update', this.state)
     return cell.prize
+  }
+
+  /** 오버레이 노출 켜기/끄기 — 값을 안 주면 반대로 */
+  setVisible(v?: boolean): boolean {
+    const next = typeof v === 'boolean' ? v : !this.state.visible
+    if (next !== this.state.visible) { this.state.visible = next; this.emit('update', this.state) }
+    return this.state.visible
   }
 
   /** 새 판 (같은 설정으로 다시 섞기) */
