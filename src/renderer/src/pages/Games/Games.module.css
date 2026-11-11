@@ -1235,3 +1235,10 @@
 @keyframes nbPulse { from { opacity: 0.4 } to { opacity: 1 } }
 
 .nbResultMeta { font-size: 12px; color: var(--text3); font-weight: 600; }
+
+/* 뽑기판 탭 — 자동 뽑기 요약 한 줄 */
+.pickAutoBar {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--surface2); font-size: 12px; color: var(--text2);
+}

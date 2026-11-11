@@ -1,4 +1,5 @@
 // 가운데 설정 카드: 게임 설정 / 항목 설정 / 화면 설정 탭 + 자동 실행 토글 + 테스트 실행
+// 뽑기판은 '뽑기판(직접 조작) / 연동(자동 뽑기·위플랩·조명) / 항목 설정 / 화면 설정' 으로 나눈다
 import { useEffect, useState } from 'react'
 import { useApp } from '../../contexts/AppContext'
 import { gameById } from '../../games'
@@ -11,7 +12,7 @@ import {
 } from './panels'
 import { RaceEditor, FishEditor, type RaceRacer, type FishItem } from './extraGames'
 
-type Tab = 'game' | 'items' | 'screen'
+type Tab = 'game' | 'link' | 'items' | 'screen'
 
 const HAS_ITEMS: Record<string, string> = {
   roulette: 'items', ladder: 'prizes', lottery: 'prizes', quiz: 'questions', pickboard: 'pickItems', race: 'racers', fish: 'fishes',
@@ -19,7 +20,10 @@ const HAS_ITEMS: Record<string, string> = {
 
 export default function GameConfig({ gameId, onHelp, port }: { gameId: string; onHelp?: () => void; port: number }) {
   const { settings, patchSettings, triggerGame, gameStates } = useApp()
-  const [tab, setTab] = useState<Tab>('game')
+  const [tabSel, setTab] = useState<Tab>('game')
+  const isPick = gameId === 'pickboard'
+  // 연동 탭은 뽑기판에만 있다 — 다른 게임으로 옮기면 게임 설정으로
+  const tab: Tab = tabSel === 'link' && !isPick ? 'game' : tabSel
   const game = gameById(gameId)!
   const g = (settings?.games as Record<string, Record<string, unknown>> | undefined)?.[gameId] ?? {}
   const status = gameStates[gameId]?.status ?? 'idle'
@@ -52,16 +56,20 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
       </div>
 
       <div className="tabs" style={{ padding: '0 16px' }}>
-        <button className={`tab ${tab === 'game' ? 'active' : ''}`} onClick={() => setTab('game')}>게임 설정</button>
+        <button className={`tab ${tab === 'game' ? 'active' : ''}`} onClick={() => setTab('game')}>{isPick ? '뽑기판' : '게임 설정'}</button>
+        {isPick && <button className={`tab ${tab === 'link' ? 'active' : ''}`} onClick={() => setTab('link')}>연동</button>}
         <button className={`tab ${tab === 'items' ? 'active' : ''}`} onClick={() => setTab('items')}>항목 설정{itemKey && <span className="cnt">{itemCount}</span>}</button>
         <button className={`tab ${tab === 'screen' ? 'active' : ''}`} onClick={() => setTab('screen')}>화면 설정</button>
       </div>
 
       <div className={styles.cfgBody}>
         {/* ── 게임 설정 ── */}
-        {tab === 'game' && (<>
+        {tab === 'game' && isPick && <PickManualPage g={g} onLink={() => setTab('link')} />}
+
+        {/* ── 뽑기판 연동: 자동 뽑기 방식·범위, 채팅 명령어, 위플랩 키워드, 조명·노래 연동 ── */}
+        {tab === 'link' && (<>
           <div className={styles.fields}>
-            {gameId === 'pickboard' && (
+            {(
               <Field label="뽑기 방식">
                 <select value={(g.pickMode as string) ?? 'random'} onChange={e => save('pickMode', e.target.value)}>
                   <option value="balloon">별풍 번호 — 후원 개수가 곧 칸 번호</option>
@@ -72,15 +80,13 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
                 </select>
               </Field>
             )}
-            {game.engine && (
-              <Field label={gameId === 'pickboard' ? '최소 별풍선 (0=별풍선으로 실행 안 함)' : '별풍선 트리거 (0=비활성)'}>
-                <div className={styles.unitField}>
-                  <NumberField min={0} max={1000000} value={(g.balloonThreshold as number) ?? 0} onCommit={v => save('balloonThreshold', v)} />
-                  <span>개</span>
-                </div>
-              </Field>
-            )}
-            {gameId === 'pickboard' && (<>
+            <Field label="최소 별풍선 (0=별풍선으로 실행 안 함)">
+              <div className={styles.unitField}>
+                <NumberField min={0} max={1000000} value={(g.balloonThreshold as number) ?? 0} onCommit={v => save('balloonThreshold', v)} />
+                <span>개</span>
+              </div>
+            </Field>
+            {(<>
               <Field label="최대 별풍선 (0=제한 없음)">
                 <div className={styles.unitField}>
                   <NumberField min={0} max={1000000} value={(g.pickMax as number) ?? 0} onCommit={v => save('pickMax', v)} />
@@ -104,10 +110,41 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
                   <NumberField min={5} max={600} value={(g.pickChatWaitSec as number) ?? 30} onCommit={v => save('pickChatWaitSec', v)} />
                 </Field>
               )}
-              <Field label="꽝 문구">
-                <LoseTextField value={(g.loseText as string) ?? '꽝'} onSave={v => save('loseText', v)} />
-              </Field>
             </>)}
+            <Field label="채팅 명령어">
+              <input value={cmdValue} placeholder="예: !뽑기" onChange={e => setCmd(e.target.value)} onBlur={() => { if (cmd !== null) { save('chatCommand', cmd.trim()); setCmd(null) } }} />
+            </Field>
+          </div>
+            <div className={styles.note}>
+              {({
+                balloon: <>후원 개수가 곧 칸 번호입니다. 예: 시작 번호 1이면 별풍선 12개 → <b>12번</b> 칸. 최소·최대 범위 밖의 후원은 무시됩니다.</>,
+                chat:    <>후원이 들어오면 후원자에게 번호를 기다립니다. 후원자가 채팅에 <b>숫자</b>(또는 "랜덤")를 치면 그 칸이 열리고, 시간이 지나면 랜덤으로 엽니다.</>,
+                random:  <>후원이 들어올 때마다 남은 칸 중 하나를 무작위로 엽니다.</>,
+                order:   <>후원이 들어올 때마다 빈칸을 번호 순서대로 엽니다.</>,
+                manual:  <>후원·채팅으로는 열리지 않고, <b>뽑기판</b> 탭에서 스트리머가 직접 누른 칸만 열립니다.</>,
+              } as Record<string, JSX.Element>)[(g.pickMode as string) ?? 'random']}
+              {' '}직접 누른 칸도 기록에 남습니다. 후원이 몰리면 다른 게임과 함께 한 줄로 차례를 기다립니다. 칸 크기와 상품은 <b>항목 설정</b> 탭에서 바꿉니다.
+            </div>
+          <KeywordEditor keywords={(g.weflabKeywords as string[]) ?? []} onSave={v => save('weflabKeywords', v)} />
+            <div className={styles.field}>
+              <label>조명·노래 연동 URL</label>
+              <input value={pickHook ?? ((g.pickWebhook as string) ?? '')} placeholder="예: http://127.0.0.1:8129/api/event/pickboard"
+                onChange={e => setPickHook(e.target.value)}
+                onBlur={() => { if (pickHook !== null) { save('pickWebhook', pickHook.trim()); setPickHook(null) } }} />
+              <div className="field-hint">칸이 열릴 때(자동·직접 모두) 상품 이름을 이 주소로 보냅니다. 위플랩→amaran FX 앱의 '뽑기 결과' 트리거가 받아서 조명 효과와 노래를 틀어요. 비우면 보내지 않습니다.</div>
+            </div>
+        </>)}
+
+        {tab === 'game' && !isPick && (<>
+          <div className={styles.fields}>
+            {game.engine && (
+              <Field label={gameId === 'pickboard' ? '최소 별풍선 (0=별풍선으로 실행 안 함)' : '별풍선 트리거 (0=비활성)'}>
+                <div className={styles.unitField}>
+                  <NumberField min={0} max={1000000} value={(g.balloonThreshold as number) ?? 0} onCommit={v => save('balloonThreshold', v)} />
+                  <span>개</span>
+                </div>
+              </Field>
+            )}
             {gameId === 'roulette' && (
               <Field label="스핀 시간 (ms)">
                 <NumberField min={1000} max={15000} step={500} value={(g.spinDuration as number) ?? 3000} onCommit={v => save('spinDuration', v)} />
@@ -181,26 +218,6 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
           {gameId === 'number' && (
             <NumberPanel key="number" gSettings={g} gameStates={gameStates} saveSetting={save} />
           )}
-          {gameId === 'pickboard' && (<>
-            <PickBoardPanel />
-            <div className={styles.note}>
-              {({
-                balloon: <>후원 개수가 곧 칸 번호입니다. 예: 시작 번호 1이면 별풍선 12개 → <b>12번</b> 칸. 최소·최대 범위 밖의 후원은 무시됩니다.</>,
-                chat:    <>후원이 들어오면 후원자에게 번호를 기다립니다. 후원자가 채팅에 <b>숫자</b>(또는 "랜덤")를 치면 그 칸이 열리고, 시간이 지나면 랜덤으로 엽니다.</>,
-                random:  <>후원이 들어올 때마다 남은 칸 중 하나를 무작위로 엽니다.</>,
-                order:   <>후원이 들어올 때마다 빈칸을 번호 순서대로 엽니다.</>,
-                manual:  <>후원·채팅으로는 열리지 않고, 위 판에서 스트리머가 직접 누른 칸만 열립니다.</>,
-              } as Record<string, JSX.Element>)[(g.pickMode as string) ?? 'random']}
-              {' '}직접 누른 칸도 기록에 남습니다. 후원이 몰리면 다른 게임과 함께 한 줄로 차례를 기다립니다. 칸 크기와 상품은 <b>항목 설정</b> 탭에서 바꿉니다.
-            </div>
-            <div className={styles.field}>
-              <label>조명·노래 연동 URL</label>
-              <input value={pickHook ?? ((g.pickWebhook as string) ?? '')} placeholder="예: http://127.0.0.1:8129/api/event/pickboard"
-                onChange={e => setPickHook(e.target.value)}
-                onBlur={() => { if (pickHook !== null) { save('pickWebhook', pickHook.trim()); setPickHook(null) } }} />
-              <div className="field-hint">칸이 열릴 때(자동·직접 모두) 상품 이름을 이 주소로 보냅니다. 위플랩→amaran FX 앱의 '뽑기 결과' 트리거가 받아서 조명 효과와 노래를 틀어요. 비우면 보내지 않습니다.</div>
-            </div>
-          </>)}
           {game.engine && (
             <KeywordEditor keywords={(g.weflabKeywords as string[]) ?? []} onSave={v => save('weflabKeywords', v)} />
           )}
@@ -217,6 +234,11 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
           {gameId === 'quiz'      && <QuizEditor      key="q" questions={(g.questions as QuizQuestion[]) ?? []} onSave={v => save('questions', v)} />}
           {gameId === 'race'      && <RaceEditor key="ra" racers={(g.racers as RaceRacer[]) ?? []} onSave={v => save('racers', v)} />}
           {gameId === 'fish'      && <FishEditor key="fi" fishes={(g.fishes as FishItem[]) ?? []} onSave={v => save('fishes', v)} />}
+          {gameId === 'pickboard' && (
+            <Field label="꽝 문구 (상품 없는 칸에 보일 말)">
+              <LoseTextField value={(g.loseText as string) ?? '꽝'} onSave={v => save('loseText', v)} />
+            </Field>
+          )}
           {gameId === 'pickboard' && (
             <PickBoardEditor key="p" items={(g.pickItems as PickItem[]) ?? []} rows={(g.pickRows as number) ?? 4} cols={(g.pickCols as number) ?? 5}
               onSave={v => save('pickItems', v)} onSaveSize={(r, c) => { save('pickRows', r); save('pickCols', c) }} />
@@ -306,6 +328,26 @@ function FishMediaPanel() {
       </div>
     </div>
   )
+}
+
+const PICK_MODE_LABEL: Record<string, string> = {
+  balloon: '별풍 번호', chat: '채팅 번호', random: '랜덤', order: '순차', manual: '직접만',
+}
+/** 뽑기판 탭 — 판을 직접 눌러 여는 화면. 자동 뽑기 설정은 한 줄 요약만 보이고 연동 탭에서 바꾼다 */
+function PickManualPage({ g, onLink }: { g: Record<string, unknown>; onLink: () => void }) {
+  const mode = (g.pickMode as string) ?? 'random'
+  const min = (g.balloonThreshold as number) ?? 0, max = (g.pickMax as number) ?? 0
+  const auto = mode === 'manual' || !((g.enabled as boolean) ?? true)
+    ? '자동 뽑기 꺼짐 — 누른 칸만 열립니다'
+    : `자동 뽑기: ${PICK_MODE_LABEL[mode] ?? mode}` + (min > 0 ? ` · 별풍선 ${min}개${max > 0 ? `~${max}개` : ' 이상'}` : ' · 별풍선으로는 실행 안 함')
+  return (<>
+    <div className={styles.pickAutoBar}>
+      <span>{auto}</span>
+      <button className="btn btn-sm" onClick={onLink}>연동 설정</button>
+    </div>
+    <PickBoardPanel />
+    <div className="field-hint">칸을 누르면 바로 열리고 OBS 오버레이와 기록에 반영됩니다. 칸 크기·상품·꽝 문구는 <b>항목 설정</b>에서 바꿉니다.</div>
+  </>)
 }
 
 /** 꽝 문구 — 사행성 경고를 피하려 '꽝' 대신 다른 말을 쓸 때 */
