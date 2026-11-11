@@ -38,6 +38,7 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
   const url = `http://localhost:${port}/overlay/${gameId}`
 
   const [cmd, setCmd] = useState<string | null>(null)
+  const [pickHook, setPickHook] = useState<string | null>(null)
   const cmdValue = cmd ?? ((g.chatCommand as string) ?? '')
 
   return (
@@ -191,6 +192,13 @@ export default function GameConfig({ gameId, onHelp, port }: { gameId: string; o
                 manual:  <>후원·채팅으로는 열리지 않고, 위 판에서 스트리머가 직접 누른 칸만 열립니다.</>,
               } as Record<string, JSX.Element>)[(g.pickMode as string) ?? 'random']}
               {' '}직접 누른 칸도 기록에 남습니다. 후원이 몰리면 다른 게임과 함께 한 줄로 차례를 기다립니다. 칸 크기와 상품은 <b>항목 설정</b> 탭에서 바꿉니다.
+            </div>
+            <div className={styles.field}>
+              <label>조명·노래 연동 URL</label>
+              <input value={pickHook ?? ((g.pickWebhook as string) ?? '')} placeholder="예: http://127.0.0.1:8129/api/event/pickboard"
+                onChange={e => setPickHook(e.target.value)}
+                onBlur={() => { if (pickHook !== null) { save('pickWebhook', pickHook.trim()); setPickHook(null) } }} />
+              <div className="field-hint">칸이 열릴 때(자동·직접 모두) 상품 이름을 이 주소로 보냅니다. 위플랩→amaran FX 앱의 '뽑기 결과' 트리거가 받아서 조명 효과와 노래를 틀어요. 비우면 보내지 않습니다.</div>
             </div>
           </>)}
           {game.engine && (

@@ -33,6 +33,7 @@ export interface GameConfig {
   joinDuration?:   number
   prizes?:         Prize[]
   // pickboard
+  pickWebhook?: string     // 뽑기 결과를 외부(조명·노래 앱)로 POST 할 URL
   pickRows?: number
   pickCols?: number
   pickItems?: PickItem[]
@@ -223,6 +224,7 @@ function sanitizeGame(id: string, g: GameConfig, def: GameConfig): GameConfig {
     })) : def.prizes
   }
   if (id === 'pickboard') {
+    out.pickWebhook = String(g.pickWebhook ?? '').trim().slice(0, 300)
     out.pickRows = clampNum(g.pickRows, LIMITS.pickRows, 4)
     out.pickCols = clampNum(g.pickCols, LIMITS.pickCols, 5)
     out.pickItems = Array.isArray(g.pickItems) ? g.pickItems.map(p => ({

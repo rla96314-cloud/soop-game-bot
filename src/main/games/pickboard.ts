@@ -94,3 +94,16 @@ export class PickboardStore extends EventEmitter {
 }
 
 export const pickboardStore = new PickboardStore()
+
+/**
+ * 뽑기 결과를 외부 앱(예: weflab-amaran-fx 의 /api/event/pickboard)으로 POST.
+ * 실패해도 게임 진행은 막지 않는다 — 알림만 남김. 2초 타임아웃.
+ */
+export function notifyPickResult(url: string | undefined, prize: PickItem, onError?: (msg: string) => void) {
+  const u = String(url ?? '').trim()
+  if (!/^https?:\/\//i.test(u)) return
+  const body = JSON.stringify({ source: 'soop-game-bot', game: 'pickboard', name: prize.name, description: prize.description, color: prize.color, ts: Date.now() })
+  fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: AbortSignal.timeout(2000) })
+    .then(r => { if (!r.ok) onError?.(`뽑기 결과 전송 실패 (${r.status}) — ${u}`) })
+    .catch(e => onError?.(`뽑기 결과 전송 실패: ${(e as Error).message} — ${u}`))
+}

@@ -1,7 +1,7 @@
 import { ipcMain, BrowserWindow, shell, app } from 'electron'
 import { join } from 'path'
 import { gameEngine, GAME_IDS, type GameId } from '../games/engine'
-import { pickboardStore }          from '../games/pickboard'
+import { pickboardStore, notifyPickResult } from '../games/pickboard'
 import { FishLog }                 from '../games/fishlog'
 import { soopClient }              from '../soop/client'
 import { overlayServer, OverlayServer } from '../overlay/server'
@@ -116,6 +116,8 @@ export function registerIpcHandlers(win: BrowserWindow) {
   // 엔진은 "어느 칸을 열지"만 정하고, 판은 여기 store 가 연다
   const pickPrize = (idx: number) => {
     const p = pickboardStore.reveal(idx)
+    // 조명·노래 연동: 자동·수동 어느 경로로 열려도 외부 URL 로 결과를 보낸다
+    if (p) notifyPickResult(loadSettings().games.pickboard?.pickWebhook, p, (m) => send('app:notice', { level: 'error', message: m }))
     return p ? { name: p.name, description: p.description, color: p.color, lose: !!pickboardStore.get().cells[idx]?.lose } : null
   }
   gameEngine.setPickboard({
